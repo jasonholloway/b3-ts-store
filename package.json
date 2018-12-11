@@ -1,0 +1,22 @@
+{
+  "name": "ts-store",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "immutable": "^4.0.0-rc.12"
+  },
+  "devDependencies": {
+    "@types/jest": "^23.3.10",
+    "chalk-cli": "^4.1.0",
+    "concurrently": "^4.1.0",
+    "cpx": "^1.5.0",
+    "jest": "^23.6.0",
+    "typescript": "^3.2.2"
+  }
+}
