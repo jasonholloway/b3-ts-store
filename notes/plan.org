@@ -1,0 +1,21 @@
+* Plan
+- Monolog
+- Sublogs
+- Commit hooks
+- Mainline snapshots
+- Sublog snapshots
+
+  
+** MonoLog
+- updates staged
+  - add products, see products after
+
+- updates committed
+  - store to file
+  - added products visible after recreation
+  
+** SubLogs
+- 
+
+
+

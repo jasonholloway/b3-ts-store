@@ -1,0 +1,111 @@
+
+So... we want separate logs; these don't have to be actors, but they must be separate in their rehydrations - this is the main requirement - it must be possible to load the /things/ up one by one.
+
+They're not entities, they're... logs. They represent whatever we wish.
+
+But our saving/committing has to be LogSpace-wide. 
+
+How would we represent this? Each log needs its staging area, and saves would presumably occur via central orchestration, as a single comple transaction.
+
+But, as a transaction, presumably writing to multiple files, it has to be atomic. A lot rests on how this will actually be stored. We want to leverage the simplicity we have here - non-distributed, single-threaded.
+
+There's nothing stopping us having a space-wide staging thing going. Simple stage and commit, lovely stuff.
+
+But we'd want to then actually save the miscellaneous log messages newly committed. How would this be done?
+
+We've got a clear choice here:
+- either everything is in one mono-log
+  - simplifies storage greatly
+  - rehydration of different /entities/ problematised
+    - we wanna pick and choose what we rehydrate - and only certain snapshots will be served via s3
+      and if everything is in one log, then we'd be rehydrating only parts of the log at once
+    - but if everything is one, in any case, we're going to have to save everything as one... that's one BIG accumulating file right there
+      (or, more likely, DynamoDB would be the one 'file')
+      
+
+- or different stores for different sub-logs
+  - suits separation of snapshots
+  - but problem of transactional upload
+
+transactions would have to be done on the file level:
+S3 only does transactions per file.
+
+So: presumably we'd load up a file, then update an index file.
+- it'd be transactional.
+- it'd require compression by some kind of background agent
+- but, even if inside the file everything was split up by target log, it would effectively now be a mono-log (in fact, the mono-log will always be like this - we'd always have to upload batches)
+  even after compression, the most perfect compression, we'd presumably have one big lump of a file, albeit with an internal index
+- if our storage only does transactions like this (and why wouldn't it) then we have to use it as such.
+
+then we commit as mono-log, and view as derivative logs. Like the mono-log is actually just a normal log amongst others. Our specialist side logs (branching out even into indices and tries etc) can then be separately loaded by consumers.
+
+are there then troublesome semantics when only part-loading a derivative log's snapshot? Or rather, when loading derivative logs and not the root one?
+- only if we are posting new events..
+- in editing, we'd have to post all to the one central log; we'd also have to load up the one central log in the admin bit (for anything involving editing anyway)
+- splitting up the state space into separate more managable islands implies a lack of transactionality in updating em - and this lack of overarching regulated consistency means
+  we'd need some way of reliably propagating updates between these islands... it gets more complicated, though the overall approach is more scalable.
+
+So the central mono-log is more realisable, more simple, more transactional - in short, an excellent start.
+- but it doesn't touch the problem of reliable messaging between these super-consistent islands 
+- derivative islands would need to track their parents - keep polling (or pushing to) and reacting to what they see. The reliability then is all in the messaging.
+
+But with one log, how would we do the viewing of discrete parts?
+- we're talking sub-logs, which'd have their own snapshots, just as the master log would presumably have its own perfect-fidelity snapshot
+- but such sub-log snapshotting would be above the level of the simple log stage-and-commit, as a superior layer
+  
+We could do the basic log stuff first, then
+- yes, and only afterwards worry about the sub-log snapshotting
+  
+As consumer, we'd have a handle on the log itself, but then we'd need a sub-log handle, as above so below, etc
+- the handle must always expose some behaviour: ie not just data access, but a representation of it, and checking of inputs.
+  the handing out of a sub-handle then becomes a part of the behaviour of the master-log representation.
+
+Though something has to be happening server-side too, to create the snapshots of the sublogs
+- the consumer handles would know to go to S3 to try to load the requisite data (but how would they know their hash?)
+- serverside, a commit-hook would fire - this'd be part of committing; as in, failure to generate snapshots would break the commit, the head would never be changed.
+
+So the server would need a commit hook mechanism before we could do snapshots
+- yup, but snapshots aren't absolutely needed
+- so we could forego em at first - just do the main log, with its stagings and commits, then its sublogs; the main log handler would effectively be routing events to the proper in-memory data structure
+
+So, when committing, the entire log would need to be hydrated... even with snapshotting belatedly put in place, the entire data structure would need to be loaded.
+- there could be different data structures, with different transactionalities, the commit function could operate on these separately, but there'dbe no guarantee that all changes would be atomically saved
+- plus, you wouldn't be able to have simple derived logs of these - because of the lack of transactionality 
+  
+But derived logs would be possible, with some mediation
+- yes, there'd need to be a reliable background process in place ensuring that derived logs were fastiduous in asking for their updated sources
+
+And this mediation would extra, unnecessary hastle to implement, if we didn't need that scalability up front?
+- yes, the shortest route here would be to have a single log, and simple interior derivations of it
+
+And snapshotting, which would aid our scaling, and make the site servable (with sub-log snapshots too) could come next
+- yup
+  
+
+----
+
+MonoLogs would ultimately be addressable by PartitionId - though no need for this as yet
+  
+
+
+
+
+
+
+  
+ 
+  
+
+
+
+---
+
+
+
+
+
+
+
+
+
+
