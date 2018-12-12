@@ -1,0 +1,39 @@
+
+So, at the bottom, an actual island of transactional state: a log.
+
+This can be snapshotted, transactionally updated, etc - easy peasy.
+
+And on top of it, as a view of its underlying aggregation, a SubLogSpace.
+- it demuxes the shared log, separating out smaller constituent virtual logs from it
+- committing is done at the level of the shared log
+
+Committing then has to be done with full data in place. The lambda will load all the data, apply new updates, and save them as a block.
+- the processing could just be done clientside - saves loading half the data
+- this'd also simplify the implementation: lambdas become mere accessors of the db - maybe even these wouldn't be needed... the client could contact S3 itself. Could it contact Dynamo? Doubtful.
+- lambdas though would have to generate the view (or would they, if we can access S3 without em?)
+
+BUT ANYWAY!
+
+SubLogSpaces: the idea has been, that we can serve snapshots when we want to view em. Instead of loading all events for all SubLogs (as all are muxed into the common Log),
+we'd retrieve a view that was a projection, a decoction of the real stuff: it'd look like a log, I suppose, but wouldn't be.
+
+The view of the SubLog wouldn't actually summon data unless it had to: it'd check for the /head of state/ and compare available snapshots.
+
+A SubLogModel wouldn't be that much different from the main LogModel, as the main LogModel would potentially have snapshots also (although... not convinced it actually should do...) 
+- but its the same angle of not actually having to load the data...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
