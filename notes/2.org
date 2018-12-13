@@ -23,6 +23,122 @@ A SubLogModel wouldn't be that much different from the main LogModel, as the mai
 - but its the same angle of not actually having to load the data...
 
 
+-----------
+
+So, we are where we are, and Iwant to rekindle my sense of direction...
+
+The next thing would be for the store to enforce versions of updates, surely.
+Each update will have a 'v' prop, that will rise monotonically per log.
+
+Although - this isn't entirely needed atm; versioning can be added as a validation concern.
+
+We should plough ahead with the SubLogs I reckon. This will bring us back to the surface of things, instead of burrowing about underground, like.
+
+
+----------
+
+Hmm...
+
+The problem with seeing a SubLogSpace as a view of a Log
+is that the view in this case lingers - it's surely the case that the View here will be held as a handle
+
+you have LogHandles, which you can commit to, and view
+
+then beneath the Log, as a second layer trying to impose some transitivity in our conceptions, to simplify the space and enable further leaps, you have the SubLogs
+
+Handle
+ \- update
+ \- view
+
+then we wanna nest a further tripartite log structure inside this
+the problem is that a handle is stateful, well... handle. It is something to grasp, while a View is a fleeting representation.
+
+You can't use a view as a handle...
+
+If you wans to get a SubHandle, then, you need to explicitly wrap the Handle, as all three parts of the progenitor are involved
+
+---------
+
+The Handle given out by the LogSpace to the Log should be subclassable:
+at the point of getting the Log, there should be chance to specify your kind of handle
+and this handle will have some bearing too on the model in use
+
+
+But we want the Model to determine everything about the log: surely this should determine the kind of handle also
+and the handle should certainly have access to the foundational Log
+
+The View should be stable though - that's for sure; the View should also be asynchronously fetched
+
+The Handle should be with us straight away - cheaply obtainable
+
+Again, the Model needs some way of saying: Use this kind of handle!
+
+*Log.view() is needed for snapshotting!*
+
+----------
+
+Who's in charge of the Models of SubLogs???
+
+In the Log style, we'd specify when we create the SubLog - seems reasoable. All the SubLogSpaceModel cares is that updates are of the SubLoggable type
+ie that they can be assigned to certain named SubLogs
+
+But then the validation of the SubLog, where will it be enforced also?
+There's a wider question over the split of responsibilities here.
+
+The SubLog is pretendiing to be a full-form log, but... is it really?
+
+Who aggregates? Surely the SubLog
+- then this implies validation is also done in the SubLog model
+
+So the SubLogSpace just separates SubLogs by name, without necessarily enforcing any particular model to them: aggregation is simply concatting arrays
+
+---
+
+Having the consumer determine the type of the log can become problematic tho. Choice here between central declaration of overall model, and a kind of interpretative ad hoc kinda set-up.
+
+When we come to follow-on events, the SubLogModel as a whole should be mapping relationships.
+- also having the central model do it would centralise and clarify the topology
+  
+Otherwise a consuming model would say which other log to tell about its own updates. And it would have to also supply the exact type of the observer...
+- this isn't a set-up conducive to integrity: the observing logs can't say 'no' so easily; the upstream log can just send whatever it likes to its listeners
+
+But this is the opposite approach to that we'd need in dealing with true islands of consistency: in that case, the other would be in charge of its own type definitely.
+
+So the consumer is all powerful; but with power comes <cough!> responsibility, in that the consumer now needs, at its own callsite, to repeat exactly the specs of the destination.
+
+----
+
+If the SubLogSpace knew its own topology up-front, it could be used to bits here and there. Stress is taken off the callsites, though then the model must be made commonly available.
+As in, if you have a SubLogSpace, it should be possible to get a SubLog out of it preseeded with an interior model (or rather, enforced by the common model which aggregates everything)
+
+The SubLogSpace would be like 'B3Space', and it would give you access to well-typed SubLogs, and would enforce its own interior model.
+
+But as is we manually supply the log to the SubLogSpace: at this point, the model is already set. Although the SubLogSpace can be selective about the exact kind of log passed into it.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

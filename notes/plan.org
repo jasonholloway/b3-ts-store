@@ -4,18 +4,20 @@
 - Commit hooks
 - Mainline snapshots
 - Sublog snapshots
+- Version enforcement
 
   
-** MonoLog
+** DONE MonoLog
 - updates staged
   - add products, see products after
 
 - updates committed
-  - store to file
+  - store to memory
   - added products visible after recreation
   
-** SubLogs
-- 
+** TODO SubLogs
+A SubLogSpace model should be developed, that provides an interface via its .view() very similar to the top-level LogSpace
+We want to then test that this subsidiary interface passes muster
 
 
 

@@ -1,4 +1,5 @@
 import { LogSpace, Log, declareModel, Store } from "../lib/bits";
+import { FakeStore } from "./fakes/FakeStore";
 
 const testModel = declareModel({
     zero: [],
@@ -89,24 +90,3 @@ describe('LogSpace log', () => {
     })
 
 })
-
-
-class FakeStore<U> implements Store<U> {
-
-    data: U[] = [];
-    errorsOnPersist = false;
-
-    async readAll(name: string): Promise<U[]> {
-        return this.data;
-    }
-
-    async persist(name: string, batch: U[]): Promise<void> {
-        if(this.errorsOnPersist) {
-            throw Error('ErrorsOnPersist');
-        }
-
-        this.data.push(...batch);
-    }
-}
-
-

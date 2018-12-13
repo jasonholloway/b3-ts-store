@@ -9,6 +9,7 @@ export type Model<U, D, V> = {
     view(data: D): V
 }
 
+
 export interface Log<U, V> {    
     stage(update: U): void;
     reset(): void;
@@ -16,6 +17,8 @@ export interface Log<U, V> {
     commit(): Promise<void>;
     view(): Promise<V>;
 }
+
+
 
 export interface Store<U> {
     readAll(name: string): Promise<U[]>;
@@ -63,6 +66,7 @@ class LogImpl<U, D, V> implements Log<U, V> {
     }
 
     async view(): Promise<V> {
+        //should load here?
         return this.model.view(this.staged.data);
     }
 }
