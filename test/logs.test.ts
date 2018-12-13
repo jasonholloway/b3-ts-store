@@ -47,7 +47,7 @@ describe('LogSpace log', () => {
     })
 
     describe('commits', () => {
-        let store: Store<string>;
+        let store: FakeStore<string>;
 
         beforeEach(() => {
             store = new FakeStore();
@@ -67,21 +67,44 @@ describe('LogSpace log', () => {
             expect(view).toBe(123 + 456);
         })
 
+        describe('on commit failure', () => {
+
+            beforeEach(() => {
+                store.errorsOnPersist = true;
+            })
+
+            it('staged updates left in place', async () => {
+                const log = getLog();
+                log.stage('999');
+                log.stage('1');
+
+                try { await log.commit(); }
+                catch {}
+
+                const view = await log.view();
+                expect(view).toBe(1000);
+            })
+        })
+
     })
 
 })
 
 
-
 class FakeStore<U> implements Store<U> {
 
     data: U[] = [];
+    errorsOnPersist = false;
 
     async readAll(name: string): Promise<U[]> {
         return this.data;
     }
 
     async persist(name: string, batch: U[]): Promise<void> {
+        if(this.errorsOnPersist) {
+            throw Error('ErrorsOnPersist');
+        }
+
         this.data.push(...batch);
     }
 }
