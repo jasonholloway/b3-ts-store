@@ -12,41 +12,57 @@ export type Model<U, D, V> = {
 export interface Log<U, V> {    
     stage(update: U): void;
     reset(): void;
+    load(): Promise<void>;
     commit(): Promise<void>;
     view(): Promise<V>;
 }
 
+export interface Store<U> {
+    readAll(name: string): Promise<U[]>;
+    persist(name: string, batch: U[]): Promise<void>;
+}
 
 export class LogSpace {
-    getLog<U, D, V>(name: string, model: Model<U, D, V>): Log<U, V> {
-        return new LogImpl(model);
+    getLog<U, D, V>(name: string, model: Model<U, D, V>, store: Store<U>): Log<U, V> {
+        return new LogImpl(model, store);
     }
 }
 
 
 class LogImpl<U, D, V> implements Log<U, V> {
 
-    data: D
     model: Model<U, D, V>
+    data: D
+    staged: { updates: U[], data: D }
+    store: Store<U>
 
-    constructor(model: Model<U, D, V>) {
+    constructor(model: Model<U, D, V>, store: Store<U>) {
         this.model = model;
-        this.data = model.zero
+        this.data = model.zero;
+        this.staged = { updates: [], data: this.data };
+        this.store = store;
     }
 
     stage(update: U): void {
-        this.data = this.model.add(this.data, update);
+        this.staged.data = this.model.add(this.staged.data, update);
+        this.staged.updates.push(update);
     }
 
     reset(): void {
-        this.data = this.model.zero;
+        this.staged = { updates: [], data: this.data };
     }
 
-    commit(): Promise<void> {
-        throw new Error("Method not implemented.");
+    async load(): Promise<void> {
+        const updates = await this.store.readAll('blah');
+        this.data = updates.reduce((d, u) => this.model.add(d, u), this.model.zero);
+        this.reset();
     }
 
-    view(): Promise<V> {
-        return Promise.resolve(this.model.view(this.data));
+    async commit(): Promise<void> {
+        await this.store.persist('blah', this.staged.updates);        
+    }
+
+    async view(): Promise<V> {
+        return this.model.view(this.staged.data);
     }
 }

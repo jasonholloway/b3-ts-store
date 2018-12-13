@@ -19,3 +19,7 @@
 
 
 
+* ToDo
+- store to file
+- LogImpl.load: only load the latest
+- LogImpl.load: check for snapshots 

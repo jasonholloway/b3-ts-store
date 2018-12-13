@@ -1,4 +1,4 @@
-import { LogSpace, Log, declareModel } from "../lib/bits";
+import { LogSpace, Log, declareModel, Store } from "../lib/bits";
 
 const testModel = declareModel({
     zero: [],
@@ -10,7 +10,6 @@ const testModel = declareModel({
     }
 })
 
-
 describe('LogSpace log', () => {
 
     let logSpace: LogSpace;
@@ -18,29 +17,70 @@ describe('LogSpace log', () => {
 
     beforeEach(() => {
         logSpace = new LogSpace();
-        log = logSpace.getLog('test', testModel);
-        console.log('LOG', log);
     })
 
-    it('aggregates staged updates into view', async () => {
-        log.stage('1');
-        log.stage('2');
-        log.stage('3');
+    describe('simple', () => {
+        beforeEach(() => {
+            log = logSpace.getLog('test', testModel, new FakeStore());
+        })
 
-        const view = await log.view();
-        expect(view).toBe(6);
+        it('aggregates staged updates into view', async () => {
+            log.stage('1');
+            log.stage('2');
+            log.stage('3');
+
+            const view = await log.view();
+            expect(view).toBe(6);
+        })
+
+        it('resets to zero', async () => {
+            log.stage('9');
+            log.stage('8');
+            log.reset();
+
+            const view = await log.view();
+            expect(view).toBe(0);
+        })
     })
 
-    it('resets to start', async () => {
-        log.stage('9');
-        log.stage('8');
-        log.reset();
+    describe('commits', () => {
+        let store: Store<string>;
 
-        const view = await log.view();
-        expect(view).toBe(0);
+        beforeEach(() => {
+            store = new FakeStore();
+        });
+
+
+        it('updates persisted', async () => {
+            const log1 = logSpace.getLog('test', testModel, store);
+            log1.stage('123');
+            log1.stage('456');
+            await log1.commit();
+
+            const log2 = logSpace.getLog('test', testModel, store);
+            await log2.load();
+            const view = await log2.view();
+
+            expect(view).toBe(123 + 456);
+        })
+
     })
-
 
 })
+
+
+
+class FakeStore<U> implements Store<U> {
+
+    data: U[] = [];
+
+    async readAll(name: string): Promise<U[]> {
+        return this.data;
+    }
+
+    async persist(name: string, batch: U[]): Promise<void> {
+        this.data.push(...batch);
+    }
+}
 
 
