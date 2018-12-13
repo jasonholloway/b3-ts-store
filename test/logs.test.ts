@@ -13,15 +13,18 @@ const testModel = declareModel({
 describe('LogSpace log', () => {
 
     let logSpace: LogSpace;
-    let log: Log<string, number>;
+    let getLog: () => Log<string, number>;
 
     beforeEach(() => {
         logSpace = new LogSpace();
+        getLog = () => logSpace.getLog('test', testModel, new FakeStore());
     })
 
     describe('simple', () => {
+        let log: Log<string, number>;
+
         beforeEach(() => {
-            log = logSpace.getLog('test', testModel, new FakeStore());
+            log = getLog();
         })
 
         it('aggregates staged updates into view', async () => {
@@ -48,16 +51,16 @@ describe('LogSpace log', () => {
 
         beforeEach(() => {
             store = new FakeStore();
+            getLog = () => logSpace.getLog('test', testModel, store);
         });
 
-
         it('updates persisted', async () => {
-            const log1 = logSpace.getLog('test', testModel, store);
+            const log1 = getLog();
             log1.stage('123');
             log1.stage('456');
             await log1.commit();
 
-            const log2 = logSpace.getLog('test', testModel, store);
+            const log2 = getLog();
             await log2.load();
             const view = await log2.view();
 
