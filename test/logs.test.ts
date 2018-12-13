@@ -6,7 +6,7 @@ const testModel = declareModel({
         return data.concat([parseInt(up)]);
     },
     view(data) {
-        return data.reduce((ac, v) => ac + v);
+        return data.reduce((ac, v) => ac + v, 0);
     }
 })
 
@@ -30,6 +30,16 @@ describe('LogSpace log', () => {
         const view = await log.view();
         expect(view).toBe(6);
     })
+
+    it('resets to start', async () => {
+        log.stage('9');
+        log.stage('8');
+        log.reset();
+
+        const view = await log.view();
+        expect(view).toBe(0);
+    })
+
 
 })
 

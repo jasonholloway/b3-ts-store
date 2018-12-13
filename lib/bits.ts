@@ -11,6 +11,7 @@ export type Model<U, D, V> = {
 
 export interface Log<U, V> {    
     stage(update: U): void;
+    reset(): void;
     commit(): Promise<void>;
     view(): Promise<V>;
 }
@@ -35,6 +36,10 @@ class LogImpl<U, D, V> implements Log<U, V> {
 
     stage(update: U): void {
         this.data = this.model.add(this.data, update);
+    }
+
+    reset(): void {
+        this.data = this.model.zero;
     }
 
     commit(): Promise<void> {
