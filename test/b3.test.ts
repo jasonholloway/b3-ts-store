@@ -3,6 +3,14 @@ import { declareUpdate } from '../lib/utils';
 import { declareModel } from '../lib/bits';
 
 
+describe('b3 model', () => {
+    it('blah', () => {
+        
+    })
+})
+
+
+
 type Id = number
 
 type Product = {

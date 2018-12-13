@@ -19,6 +19,7 @@ describe('LogSpace log', () => {
     beforeEach(() => {
         logSpace = new LogSpace();
         log = logSpace.getLog('test', testModel);
+        console.log('LOG', log);
     })
 
     it('aggregates staged updates into view', async () => {
