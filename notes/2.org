@@ -115,41 +115,221 @@ The SubLogSpace would be like 'B3Space', and it would give you access to well-ty
 
 But as is we manually supply the log to the SubLogSpace: at this point, the model is already set. Although the SubLogSpace can be selective about the exact kind of log passed into it.
 
+------------------------------
+
+When creating a SubLog, when applying to it its model, follow on updates should be set there and then - by the *model*
+But, in sending to another, the model of the one also determines the model of the other.
+
+Though - should it? Hmm... its more like, the sink should be the one doing the eavesdropping, with some kind of way of attaching itself to the events of others by pattern
+eg an Index will be set up that listens to all Product logs; the Product logs needn't know about this
+
+Then new indices could be added without altering the original entities. You'd have youor foundational logs, and then your derivative ones.
+
+The derivatives would be set to recalculate if the schemas of the upstream logs ever changed.
+
+We want schema versions - these would in the first instance be manually bumped.
+
+Given schema versioning, derivative logs and snapshots could be marked for recalculation
+
+But then the schema would have to be in one place... like, a single file maybe.
+- well, it wouldn't have to be: it could be dispersed and manually bumped. It only has to be in one place if we're going to automatically detect it changing!
+
+But if it was to be declared in one place - if aggregations and views and follow-ons were all declared together - as one single model covering the entire SubLogSpace...
+- then the SubLogSpace would be quite different from the overall LogSpace; as the LogSpace would have loosely-coupled logs listening to each other
+  and so, using this split as articulation, maybe in the SubLogSpace different log models would know precisely who to inform given an update.
+
+Though tightness needn't all be one side alone. The Logs could send messages to well-known addresses, while the SubLogs are more loosely observed.
+If everything's local, it's easier to implement the observer pattern, as everything can be tapped into without intrusion into another process.
+
+Observations require an overall umbrella schema, available everywhere. In fact, observations could be thought of as a separate component entirey - kinda ike a routing mechanism.
+But - the observation of the updates is always going to be accompanied with immediate aggregation: why separate em to be distinctly managed?
+
+Derivative logs - are they themselves very separate from top level logs? Yes, if we start mixing them, allowing arbitrary input into the same log, we can't then refresh them on schema changes
+
+------------
+
+So: observations will go into a separate system of logs, that can't arbitrarily receive updates from outside. They'd also need distinct storage. So the stored logs and snapshots could be
+cleared and totally replaced, even given the same first-level data.
+
+But all SubLog data goes into a single Log.
+
+If observed derivatives were stored to the main log also, they'd be interleaved with the good stuff, which is bad
+
+They could be aggressively snapshotted
+- but this is inefficient!
+  
+They could live and be aggregated by another Log, with its own SubLogSpace.
+Then the primary Log would send /all/ updates to the secondary Log
+The secondary Log would, in its own aggregator, match incoming messages to its model's patterns
+
+The big problem though is that if this is split between Logs, we can't persist them for certain at the same time.
+
+-------
+
+Or can we persist multiple logs at the same time? Yes, we can actually, as we'd have a single manifest. When the manifest's head changed, then the transaction would be complete.
+
+If we can actually save more than one file at once, then does that remove the need for SubLogs?
+
+Hmmm, without the manifest, we surely do need a single log for transactionality, but with it, its true, it seems we could upload loads of gumph at once in one atomic block.
+
+But the manifest is a complication. There'd be one per LogSpace, tracking the data and heads of all the known logs. It could also track whether a log were derivative or not.
+Dropping such a log would be a simple matter of removing it from the manifest.
+
+And if we had multiple top-level logs, the complication of SubLogs and their multiplexing could be removed. Trade one complexity/simplicity for another. And the manifest approach would in general
+be a handy thing to have about.
+
+----------
+
+So Products would be one log; Taxonomies another.
+
+Then observers would track updates to these. A ProductIndex Log would declare a watch on Products, and it would get to sniff all updates that get committed.
+
+Single logs would commit without needing any manifest involvement. While the LogSpace as a whole would have a central registry, that
 
 
+Log/SubLog
+Directed Message/Declared Observation
 
 
+If logs in a logspace could all be updated transactionally, then the pressure to nest inside a single log is removed. Why have logs inside logs if you can just have logs?
+
+This implies though that all logs will be stored similarly - each log will have its own collection of files. New updates will be uploaded as new files that are then linked together into an entire vertical history. An asynchronous scheduled service would then at intervals inspect the lumpy files and consolidate them.
 
 
+Observation would still be required. And such a feature requires logs to be specified up front, as part of an integral, centrally-declared model.
 
+*LogSpaceModel lays out all the Logs and their LogModels, as well as derivative Logs*
 
+-------
 
+How can derivative logs be cleared away and regenerated?
 
+If the manifest says that a log is a derivative, that means updates can't be manually sent to it, and it lets us pick it out and do what we like to it.
+Cleaning just requires removing it from the manifest. Then the next reader will see no data; although the observation is still in the model, and so will be respected in use.
 
+But how will it catch up? Well... on first meaningful access of the derivative...
+it'd have to check its upstream
 
+Based on the current manifest, it'd know whether it had read till the known end of its upstream. The manifest would be a dynamic thing, moving as log heads move
 
+-------
 
+Staging to one log would move the head in that one; but doing so should also stage to followers
 
+Resetting one log therefore should reset all logs
 
+Resetting and committing become operations for the entire LogSpace, instead of on individual logs
 
+A Log will be staged to. But even this staging isn't a matter for the Log alone. The LogSpace delegates to the Log to accept and aggregate the update. But the update is in the first place
+given to the LogSpace route as it wishes. Firstly it applies it to the destination Log, but doesn't actually stage the new data and update till follow-ons have been given a chance to apply it too.
 
+LogSpace
+- for each Log, stores data and updates - LogData
+- delegates to LogModel for aggregation and views
+- after destination aggregation, then finds observers to send update to 
+- only actually stages all data and updates (to various logs) if all work happily
 
+Log
+- a handle given to the consumer
+- staging still done on the Log itself; but commit done on the LogSpace
 
+------
 
+The web client will summon its LogSpace then
+and it will view() an index of products
 
+at this point,
+the manifest will be loaded
+hopefully an up-to-date snapshot will be seen
+or more basically, some files of events will be loaded based on the info in the manifest
+  these events will then be aggregated in the client
+  
+voila, a view of an index
 
+------
 
+perfectly, there'd be a consolidated, compressed log, and/or a snapshot
 
+a compressed log would in fact approximate a snapshot, in that all the extraneous historical information would have been purged
+it's a nice idea to be able to slowly tend to your data, culling old bits
+but in doing so, the idea of keeping a log of updates is lost - there'd be no point in keeping timestamps, for instance
 
+more problems:
+derivative logs will have to be re-aggregated on compressions(?)
+the rules to clean first-order logs are assumed to not kill needed info on the first log itself
+but can we be sure that they won't affect the integrity of its observers?
 
+Cleaners have to obey some laws. The question is whether those laws can be set in their scope.
 
+------
 
+An advantage of snapshots is that they can be saved in whatever way we like:
+but then a snapshot is a luxury
 
+----------------------------------------
 
+A compression has to fit with how a log is aggregated. And an observing follower is itself an aggregator of the first log's updates.
 
+So compressors would have to know what followers were in place, if they were to avoid corrupting shit; this goes against the idea of logs being their own worlds
 
+This is because derivatives intrude in the log's interior business. If the log were to instead make public only its own curated events, 
+then it'd be free to reform itself internally
+- but then these public excalamations would be immutable, and would pile up just as costly as the original interiors
+- and this special knowledge of what other parties want to be published - it amounts to the same intrusion, except now without a simple hierarchy: instead now both parties collaborate
 
+Then the dependence of derivatives on their upstream logs isn't just in their implicit understanding of aggregations, but also compressions.
 
+-------
 
+The compression of a single log, being a squinting misappropriation of the true facts, is actually itself the operation of a derivative - it's a mangling and culling of the source of truth to fit aggregate use; the canonical example of forgetting old product prices suits but one aggregation - that is, just one derivation out of possibly many.
 
+The log is truth, yet its primary aggregation is part of the circuit of truth: it validates incoming updates, and gives views that inform further additions. You can't then claim that the log alone is true: it sits in symbiosis with its aggregations and views. Similarly, any scheme of compression would form part of this circuit. A single, knotted, consistent model and datastore.
+
+As such, the possibility of having compression as part of the knot fits the plan, it is no abomination, given we have co-dependence already.
+
+The problem comes then instead from the dependence of exterior logs - these, we're now expecting, must fit their upstream logs' compactions, as well as their aggregations. Well - the upstream aggregation is only indirectly implicated in the contract; really the observer just sees what has been committed, and it forms its own opinions. But it is true that even in the bare log, the model is implicit. The log is a channel formed with an intent; it has been committed to in correspondence with a model's validation and view-making.
+
+So: the idea that a log's data is a pristine record, and is interpreted /freely/ by others is wrong; and with this we should release our hold on the idea that the data lives without the model.
+- well, the model still needs room to evolve - the data embodies something of the model, but not to the point of forever locking it into one precise form
+
+LogData/LogModel form a tight-knit circuit of consistency:they are interdependent
+
+Derivatives too, being party to LogData, are part of the circuit: they are additional add-on models of aggregation; but they don't rule the LogData like the LogModel does
+
+The original LogModel, in ruling the LogData, also rules over all attached Derivatives - this is necessary.
+- alternatively, the LogData could be /freed/ from the LogModel, but then it would still have an implicit model; and the erstwhile LogModel would become just another Derivative
+
+If there is to be one LogData, there must be one LogModel: unavoidable, has to be so, it's good that it is so, a relief in fact
+
+Derivatives: do they store their own data? It doesn't have to be so. If they were full Logs, then yes, they would have domain-specific LogData, appended via their own LogModel
+- but as a separate class of component, they could just aggregate data without their own LogData. 
+
+Then they'd be simplified in as much as they wouldn't actually then have a log to save - only aggregations, which would be persisted as an optimization
+- this would be snapshotting, which is a /luxury/: but without it, derivations would have to be rerun from scratch whenever we wanted to view them
+  and to rerun them from scratch, the upstream logs would have to be fully loaded: this becomes increasingly expensive
+
+Efficiency would be in snapshotting aggregate data. Such aggregates could be built on top of as normal.
+- though a snapshot like this would itself be costly in the saving, as say an entire index would be reconstituted and committed and loaded, even on a small inconsequential change.
+
+If derivatives were themselves agregated in a cheap way - ie, as part of a log - or even, a shared log... 
+Each Derivative would have its own log, and as likely changes were detected upstream, new updates would be incrementally appended to it.
+
+But, when consuming this log, still the entire thing would have to be downloaded
+- though a compressed log approximates the data structure it aggregates into
+
+I like the simplicity of avoiding all the additional serialization protocols of snapshots.
+
+In the case of Derivatives, this approach would require us to give them their own LogData and their own LogModels
+- there is again a simplicity to this
+
+Upstream compressions would have to take Derivatives into consideration
+- a model taken as a whole could be tested for consistency, by firing in synthetic inputs, cleaning etc - a la PBT
+  in short, rules could be enforced against the model as a whole: cleanings don't affect aggregations or derivations
+
+If cleaning (ie compression) becomes the thing, and derivations are their own logs,
+these can be loaded up in isolation,
+and, because of the cleaning, we don't have to worry about snapshots
+logs and snapshots are one and the same
+
+--------------------------------------------------
 

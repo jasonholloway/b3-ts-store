@@ -11,62 +11,94 @@ const testModel = declareModel({
     }
 })
 
-describe('LogSpace log', () => {
+describe('LogSpace', () => {
 
     let logSpace: LogSpace;
-    let getLog: () => Log<string, number>;
+    let log: Log<string, number>;
+    let store: FakeStore<string>;
+    let model = testModel;
+    let getLog: (name?: string) => Log<string, number>;
 
     beforeEach(() => {
-        logSpace = new LogSpace();
-        getLog = () => logSpace.getLog('test', testModel, new FakeStore());
+        store = new FakeStore();
+        logSpace = new LogSpace(store);
+        getLog = (name: string) => logSpace.getLog(name || 'test', testModel);
+        log = getLog();
     })
 
-    describe('simple', () => {
-        let log: Log<string, number>;
+    it('logs aggregates staged updates into view', async () => {
+        log.stage('1');
+        log.stage('2');
+        log.stage('3');
 
-        beforeEach(() => {
-            log = getLog();
-        })
+        const view = await log.view();
+        expect(view).toBe(6);
+    })
 
-        it('aggregates staged updates into view', async () => {
-            log.stage('1');
-            log.stage('2');
-            log.stage('3');
+    it('using same log key gets same log', async () => {
+        const log1 = getLog('hello');
+        log1.stage('123');
+        log1.stage('456');        
 
-            const view = await log.view();
-            expect(view).toBe(6);
-        })
+        const log2 = getLog('hello');
+        const view = await log2.view();
+
+        expect(view).toBe(123 + 456);
+    })
+
+
+    describe('logSpace commits and resets', () => {
 
         it('resets to zero', async () => {
             log.stage('9');
             log.stage('8');
-            log.reset();
+            logSpace.reset();
 
             const view = await log.view();
             expect(view).toBe(0);
         })
-    })
 
-    describe('commits', () => {
-        let store: FakeStore<string>;
+        describe('during and after commit', () => {
 
-        beforeEach(() => {
-            store = new FakeStore();
-            getLog = () => logSpace.getLog('test', testModel, store);
-        });
+            beforeEach(() => {
+                store.manualResponse = true;
+            })
 
-        it('updates persisted', async () => {
-            const log1 = getLog();
+
+            it('aggregated data stays same', async () => {
+                log.stage('5');
+                log.stage('5');
+                expect(await log.view()).toBe(10);
+
+                const committing = logSpace.commit();
+                expect(await log.view()).toBe(10);
+
+                store.respond();
+                await committing;
+                expect(await log.view()).toBe(10);
+            })
+
+        })
+
+
+        it('commits and loads updates', async () => {
+            const log1 = logSpace.getLog('hello', model);
             log1.stage('123');
             log1.stage('456');
-            await log1.commit();
+            await logSpace.commit();
 
-            const log2 = getLog();
+            const logSpace2 = new LogSpace(store);
+            const log2 = logSpace2.getLog('hello', model);
             await log2.load();
             const view = await log2.view();
 
             expect(view).toBe(123 + 456);
         })
+
+        it('multiple in-flight commits', () => {
+            //store will guarantee... something
+        })
+
 
         describe('on commit failure', () => {
 
@@ -75,11 +107,10 @@ describe('LogSpace log', () => {
             })
 
             it('staged updates left in place', async () => {
-                const log = getLog();
                 log.stage('999');
                 log.stage('1');
 
-                try { await log.commit(); }
+                try { await logSpace.commit(); }
                 catch {}
 
                 const view = await log.view();

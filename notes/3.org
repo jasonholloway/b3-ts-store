@@ -1,0 +1,51 @@
+
+Staged/Limbo/Committed
+
+So - each log should have 3 pointers:
+- head, top of staged entries (implicit)
+- head of limbo (marking updates that have been passed to server)
+- head of committed (these are vouchsafed by server)
+
+but, the logs don't actually (as of now, like) store committed updates;
+instead they store the aggregation that is the product of going through the committed logs
+this would suit the idea of snapshotting
+but the onus is no longer on snapshots!
+
+the concept of aggregated data being kept around as the state of the log is however kinda nice
+it means its always to hand when we want to do ingestion, views, etc
+
+so, we like data
+but what about historical log entries?
+
+can they be released??????
+
+follow-ons don't need em, as they will have their own logs
+
+but a follower does need to know where its followed to
+no - even more, the follower's update should be staged inline with the upstream log
+so when the upstream log stages an update, all of the downstream derived updates are simultaneously staged
+this means that, when attempting to apply an update, not only the upstreamlog should be fully loaded,
+but also all of its derivatives!
+
+the flipside of this: a derivative can be loaded in isolation
+it'd also be possible to load logs in isolation if there was a ReadOnly mode
+
+------------------------------
+
+Do we then have to save the individual updates of the past? Once committed, can they be forgotten?
+
+Well, having them about would make such operations as consolidations easier...
+probs better just to have them about, then.
+
+
+** Storage Reprise
+   A single commit will feature the updates of many logs
+   either we save each small bit of log data to a separate tiddly file
+   or the commit as a whole is saved, with different logs' updates intermixed
+   - the manifest would keep tabs on which bits of which logs were where, only with the update of the manifest would the transaction be complete
+     
+** Limbo etc
+   each log will track its CommittedHead, its LimboHead and its StagedHead
+   calling /commit()/ on the LogSpace should pass all staged updates to the store, and move the limbo pointers forwards
+
+
