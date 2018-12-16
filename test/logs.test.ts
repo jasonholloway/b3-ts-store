@@ -1,5 +1,5 @@
 import { LogSpace, Log, declareModel, Store } from "../lib/bits";
-import { FakeStore } from "./fakes/FakeStore";
+import FakeBlockStore from "./fakes/FakeBlockStore";
 
 const testModel = declareModel({
     zero: [],
@@ -15,12 +15,12 @@ describe('LogSpace', () => {
 
     let logSpace: LogSpace;
     let log: Log<string, number>;
-    let store: FakeStore<string>;
+    let store: FakeBlockStore;
     let model = testModel;
     let getLog: (name?: string) => Log<string, number>;
 
     beforeEach(() => {
-        store = new FakeStore();
+        store = new FakeBlockStore();
         logSpace = new LogSpace(store);
         getLog = (name: string) => logSpace.getLog(name || 'test', testModel);
         log = getLog();
@@ -49,21 +49,21 @@ describe('LogSpace', () => {
 
     describe('logSpace commits and resets', () => {
 
-        it('resets to zero', async () => {
-            log.stage('9');
-            log.stage('8');
-            logSpace.reset();
-
-            const view = await log.view();
-            expect(view).toBe(0);
+        describe('after reset', () => {
+            it('resets to zero', async () => {
+                log.stage('9');
+                log.stage('8');
+                logSpace.reset();
+    
+                const view = await log.view();
+                expect(view).toBe(0);
+            })
         })
 
         describe('during and after commit', () => {
-
             beforeEach(() => {
                 store.manualResponse = true;
             })
-
 
             it('aggregated data stays same', async () => {
                 log.stage('5');
@@ -76,6 +76,19 @@ describe('LogSpace', () => {
                 store.respond();
                 await committing;
                 expect(await log.view()).toBe(10);
+            })
+        })
+
+        describe('multiple sequential commits', () => {
+
+            it('data is committed', async () => {
+                log.stage('1');
+                await logSpace.commit();
+
+                log.stage('2');
+                await logSpace.commit();
+
+                expect(await log.view()).toBe(3);
             })
 
         })

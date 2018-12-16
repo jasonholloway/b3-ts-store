@@ -1,0 +1,77 @@
+
+* The Store
+
+Is it self-contained? ie can the Store interface be mocked without slicing up the subsystem?
+
+interface Store<U> {
+    readAll(name: string): Promise<U[]>;
+    persist(block: { [key: string]: any[] }): Promise<void>;
+}
+
+The complication comes in with the return of /persist()/ - as we're actually executing a transaction between the individual Log and the Store
+only when the Store says /yes/ then the Log commits properly. It is a system that cuts across the interface.
+
+But necessarily so: we'll really be transacting with a remote store, using a foreign API.
+- so there has to be an interface: that's the crux of the problem we're solving; we can't sidestep it
+
+But if the communication with the foreign API is what is central here, the Store interface should honestly map it
+  ie adapting logic that is really part of /our/ system shouldn't be squirreled in behind it.
+  and the foreigness should appear centrally, adhering to a minimal contract
+  
+The minimal contract for the external system would do something like this:
+
+interface Store {
+  readBlock(key: Key): Promise<Block>
+  saveBlock(key: Key, block: Block): Promise<Key>
+}
+
+-------
+
+then the management of blocks becomes part of our present problem
+which we might then modularise away
+
+instead of putting down a barrier then letting our intuition do the rest
+
+we think of the system in terms of flows
+the flow isn't violently partitioned into separate sub-worlds
+instead, it transcends little bubbles of activity within it
+
+- BlockFlow
+  The Log has its updates
+  these are then combined together into one block
+  the block is saved
+- CommitFlow
+  the logs affected have the new block appended to their histories
+  the manifest of histories is saved
+- ConfirmFlow
+  all affected logs move their committed pointers forwards
+
+The flow above begins in one place and ends in another
+in practice, there'd be a neutral context orhestrating from outside: this'd be the practical beginning and end
+the site of this orchestrator would be centred around where the user had pressed 'save' - this site invokes, and expects confirmation
+
+what'd happen if the flow was supposed to be continuous?
+each update into a log would flow into a derived space-wide block
+which, on intervention of the user ('save' is pressed) would send a commit request to the remote store
+
+the CommitFlow would listen for responses from the store, picking up the sending context by means of a dictionary (this would normally be done for us by netwrok stack)
+and flow these into the manifest store (which'd be reducing various bits of manifest state)
+
+but then there is also this state that should stay constantly available across the transaction
+splitting into flows takes away from the transaction
+and it is first and foremost a transaction!
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+

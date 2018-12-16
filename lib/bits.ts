@@ -19,69 +19,87 @@ export interface Log<U, V> {
 
 export interface Store<U> {
     readAll(name: string): Promise<U[]>;
-    persist(name: string, batch: U[]): Promise<void>;
+    persist(block: { [key: string]: any[] }): Promise<void>;
 }
 
 
-class Registry<K, A> {
-    private records = new Map<K, A>()
 
-    getOrCreate<B extends A>(key: K, create: () => B): B {
-        if(this.records.has(key)) {
-            return this.records.get(key) as B;
-        }
-        const log = create();
-        this.records = this.records.set(key, log);
-        return log;
+
+export type Block = {
+    [keys: string]: any[]
+}
+
+export interface BlockStore {
+    load(key: string): Promise<Block>;
+    save(key: string, block: Block);
+}
+
+
+//the Store 
+//
+//
+//
+
+
+
+class Registry<V> {
+    private records: { [key: string]: V } = {}
+
+    getOrCreate<W extends V>(key: string, create: () => W): W {
+        const found = this.records[key] as W;
+        return found        
+            || (this.records[key] = create());
     }
 
-    forEach(fn: (el: A, key: K) => void) {
-        this.records.forEach(fn);
+    entries(): { key: string, val: V }[] {
+        return Object.keys(this.records)
+                .map(key => ({ key, val: this.records[key] }));
     }
 
-    values(): A[] {
-        return Array.from(this.records.values());
+    values(): V[] {
+        return this.entries()
+                .map(({ val }) => val);
     }
 }
 
 
 export class LogSpace {
     
-    logs = new Registry<string, InnerLog>()
-    store: Store<any>
+    logs = new Registry<InnerLog>();
+    store: BlockStore
 
-    constructor(store: Store<any>) {
+    constructor(store: BlockStore) {
         this.store = store;
     }
 
     getLog<U, D, V>(name: string, model: Model<U, D, V>): Log<U, V> {
-        return this.logs.getOrCreate(name, () => new InnerLogImpl(model));
+        return this.logs[name]
+            || (this.logs[name] = new InnerLogImpl(model))
     }
 
     reset(): void {
-        this.logs.forEach(l => l.reset());
+        this.logs.values()
+            .forEach(l => l.reset());
     }
 
     async commit(): Promise<void> {
 
-        const staged = this.logs.values()
-                            .map(l => {
-                                
+        const beginCommit = (key: string) => this.logs[key]; 
+
+        const toCommit = this.logs.entries()
+                            .map(({ key, val: log }) => {
+                                return [key, log.beginCommit()];
                             });
 
-        //in committing,
-        //we want to get the staged updates of each log
-        //and store all of them
-        //
 
-        //how to stage while committing?
-        //its like updates should be provisionally half-labelled as persistent
-        
-        //there'd be committed, limbo, and staged sections of each log
-        //when a log is reset, it shouldn't get rid of its limbo entries
-        //but, if the server belatedly says 'no!'..
+        //the interface of store has to change
+        //everything packaged up into one commit, please
+
+        await this.store.save('wibble1', {});
 
 
+        //and on success, we should confirm to all the logs that all is ok
+        //...
     }
 }
 
@@ -101,6 +119,7 @@ class InnerLogImpl<U, D, V> implements Log<U, V>, InnerLog {
     constructor(model: Model<U, D, V>) {
         this.model = model;
         this.data = model.zero;
+        this.limbo = { updates: [], data: this.data };
         this.staged = { updates: [], data: this.data };
     }
 
