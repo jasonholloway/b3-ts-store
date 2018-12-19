@@ -1,19 +1,19 @@
-import { Store, BlockStore, Block } from "../../lib/bits";
+import { BlockStore, Block } from "../../lib/bits";
 
 class FakeBlockStore implements BlockStore {
 
-    data: any[] = [];
+    blocks: { [key: string]: Block } = {}
     errorsOnPersist = false;
     manualResponse = false;
 
     async load(key: string): Promise<Block> {
-        if(!this.data[key]) throw Error('Block not found!');
-        return this.data[key];
+        if(!this.blocks[key]) throw Error('Block not found!');
+        return this.blocks[key];
     }
 
     async save(key: string, block: Block): Promise<void> {
-        if(this.data[key]) throw Error('Blocks are immutable!');
-        this.data[key] = block;
+        if(this.blocks[key]) throw Error('Blocks are immutable!');
+        this.blocks[key] = block;
 
         if(this.manualResponse) {
             return new Promise<void>((resolve, reject) => {

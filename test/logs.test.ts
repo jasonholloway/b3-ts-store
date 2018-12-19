@@ -1,5 +1,7 @@
-import { LogSpace, Log, declareModel, Store } from "../lib/bits";
+import { LogSpace, Log, declareModel } from "../lib/bits";
 import FakeBlockStore from "./fakes/FakeBlockStore";
+import FakeManifestStore from "./fakes/FakeManifestStore";
+import { enumerate } from "../lib/utils";
 
 const testModel = declareModel({
     zero: [],
@@ -15,13 +17,15 @@ describe('LogSpace', () => {
 
     let logSpace: LogSpace;
     let log: Log<string, number>;
-    let store: FakeBlockStore;
+    let blockStore: FakeBlockStore;
+    let manifestStore: FakeManifestStore;
     let model = testModel;
     let getLog: (name?: string) => Log<string, number>;
 
     beforeEach(() => {
-        store = new FakeBlockStore();
-        logSpace = new LogSpace(store);
+        blockStore = new FakeBlockStore();
+        manifestStore = new FakeManifestStore();
+        logSpace = new LogSpace(blockStore, manifestStore);
         getLog = (name: string) => logSpace.getLog(name || 'test', testModel);
         log = getLog();
     })
@@ -62,7 +66,7 @@ describe('LogSpace', () => {
 
         describe('during and after commit', () => {
             beforeEach(() => {
-                store.manualResponse = true;
+                blockStore.manualResponse = true;
             })
 
             it('aggregated data stays same', async () => {
@@ -73,7 +77,7 @@ describe('LogSpace', () => {
                 const committing = logSpace.commit();
                 expect(await log.view()).toBe(10);
 
-                store.respond();
+                blockStore.respond();
                 await committing;
                 expect(await log.view()).toBe(10);
             })
@@ -81,7 +85,7 @@ describe('LogSpace', () => {
 
         describe('multiple sequential commits', () => {
 
-            it('data is committed', async () => {
+            it('data remains as it should be', async () => {
                 log.stage('1');
                 await logSpace.commit();
 
@@ -94,21 +98,51 @@ describe('LogSpace', () => {
         })
 
 
+        describe('on commit', () => {
+
+            beforeEach(async () => {
+                log.stage('4');
+                log.stage('5');
+                await logSpace.commit();
+            })
+
+            it('stores block', () => {
+                const [_, block] = enumerate(blockStore.blocks).pop();
+                expect(block[log.key]).toEqual([ '4', '5' ]);
+            })
+
+            it('stores manifest, referring to stored block', () => {
+                const blocks = manifestStore.saved.logs[log.key];
+                expect(blocks).toBeDefined();
+                expect(blocks.length).toBe(1);
+
+                const blockRef = blocks[0];
+                expect(blockStore.blocks[blockRef]).toHaveProperty(log.key, [ '4', '5' ]);
+            })
+
+            it('increments manifest version', () => {
+                expect(manifestStore.saved.version).toBe(1);
+            })
+
+        })
+
+
         it('commits and loads updates', async () => {
-            const log1 = logSpace.getLog('hello', model);
+            const space1 = new LogSpace(blockStore, manifestStore);
+            const log1 = space1.getLog('hello', model);
             log1.stage('123');
             log1.stage('456');
             await logSpace.commit();
 
-            const logSpace2 = new LogSpace(store);
-            const log2 = logSpace2.getLog('hello', model);
+            const space2 = new LogSpace(blockStore, manifestStore);
+            const log2 = space2.getLog('hello', model);
             await log2.load();
             const view = await log2.view();
 
             expect(view).toBe(123 + 456);
         })
 
-        it('multiple in-flight commits', () => {
+        it('multiple in-flight commits', () => {    
             //store will guarantee... something
         })
 
@@ -116,7 +150,7 @@ describe('LogSpace', () => {
         describe('on commit failure', () => {
 
             beforeEach(() => {
-                store.errorsOnPersist = true;
+                blockStore.errorsOnPersist = true;
             })
 
             it('staged updates left in place', async () => {

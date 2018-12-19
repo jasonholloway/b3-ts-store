@@ -1,0 +1,192 @@
+
+And so, a new day...
+
+the schema will be declared in one place, and given to all consumers to pick and choose from
+
+there'll be a LogSpaceCreator function
+that will take requisite resources
+and return the common interface for accessing logs
+
+this function will encapsulate consistent log setup - the wiring up of LogModels etc
+
+---------------------------------
+
+but before this, we need to get the tests passing,
+get the committing to blocks working
+
+which is what we were doing, up till the point
+where we have to also persist the manifest
+
+and the thought intruded that we should get rid of the log-level encapsulation,
+as then the persistence protocol is unnecessarily mediated by a call-and-response object interface
+
+but maybe we can roll with the current objectiness
+
+----------------------------
+
+Again, uncertainty...
+
+does the Log live as its own big thing, owning its own data, and staging, etc
+
+if commits will always be confirmed in sequence (in order, one at a time) then the beginConfirm/done mechanism would be fits for purpose
+the callback would refer to the limbo pending commit in its closure; wouldn't need a unique key at all
+(in fact if we can rely on the ordering, we could even blindly slice from the array of limbos!)
+
+what'd happen in the event of error?
+the first commit would fail;
+the limbo should go back to staging
+but if there were subsequent limbos in flight...
+then they too should be put back, wholesale
+
+but - the first commit would fail, and limbo[0] would go back
+then limbo[1], waiting on its predecessor, would fail in sequence(?)
+its fine for FIFO when we goin one direction, but on errors we want to do LIFO suddenly instead
+
+at that point, the entire commit of many parts must be aborted as one
+which requires an overarching orchestrator of commits
+instead of one-by-one callbacks with myopic concerns
+
+a committer would receive from several logs, and would flush its entire queue in the event of an error
+this is not a standpoint available to us from the callsite of a single beginCommit()
+
+the Log would expose resetCommit(), which'd do the overall job for us
+but again it'd be nicer here to have a central bit of functionality in the LogSpace
+
+Logs themselves house models, data and aggregations
+as you update to a log, it applies the aggregator of its model
+
+but aggregations are the 
+
+-------------------------------
+
+still, the idea is that there'd be a split: a Log facade, that was nicely typed, and a generic LogData
+both created as twin progeny of a well-typed constructor function.
+
+the constructor function would create the data and the facade, but return only the facade
+
+-------------------------
+
+if there's a deficiency - if we've loaded up our manifest, but not all the blocks of the log, then we have to rectify that on both stage and view
+
+so stage has to be async to include the requisite check
+
+and load() will be the prototype of this behaviour
+
+but, in the beginning, how do we know we have the latest manifest? well, we don't: it's up to us to manually load it; no other command will check automatically; the big test comes when we try to commit
+
+though an occasional check could indeed be made, every 30s or so - by some separate system - and then what would happenif we find our manifest to be outdated?
+then we have to bring it up to date... we'd download the new manifest, and apply it by firstly cancelling all commits, then setting all blocks to match the manifest
+limbos should be cleared through the cancellation; then we need to reset() all stagings
+
+there's the possibilty of data loss here if someone gazumps your own changes. In which case, the user should be given chance to approve or not (tho there's nothing they can actually do about it...)
+logs that haven't been gazumped can stay with their stagings in place
+
+--------------------------
+
+logs shouldn't store their own updates, apart from stageds and limbos
+committed updates should live on blocks, represented as such in the LogSpace
+
+when aggregating, the logs should enumerate through the loaded blocks
+
+/load()/ will firstly check the block list, and cross-compare it to those actually loaded
+it could iterate through the blocks in its list, trying to load each one in turn
+but:
+- we'd actually want toload them allin parallel
+- the repeated async dispatch in every call would be grossly inefficient
+
+so there has to be some sort of quick flag to tell us everything's loaded
+
+------------
+
+so Logs will be mostly metadata anyway, with the real stuff in the storage layer, ready to be summoned up
+
+/load()/ will incur a chain of promises, but this is no problem, as normally we'll be staging to a local array, and aggregating into a present aggregation
+
+what we really want, of course, is /loadBlock()/ - /load()/ will delegate to this (and they should be loaded in parallel)
+
+-----------
+
+so a Log should load itself by loading individual Blocks
+
+then we'll be great
+
+but we first of all need to know the blocks that are available (according to the manifest)
+but this itself is further functionality...
+
+nope, its part of the basic behaviour, part of the loop
+
+as soon as the manifest is needed, it should be loaded, with the option of preloading
+or: the LogSpace should always be explicitly preloaded
+
+-----
+
+what happens with bitty ad hoc constructed Logs (ie the schema defines a well-known log-creation function)?
+
+the manifest will be loaded, referring potentially to logs that haven't yet been locally constructed
+
+but if they haven't been constructed magically ahead of time, where will they live?
+
+LogData rises again! We have to have a manifest-driven representation of itself; we can't let the Logs store everything
+the Logs will aggregate and stage and limbo; the LogData will hold the block refs.
+
+The LogDatas will be as much owned by the LogSpace as the LogHeads 
+
+---
+
+except, there won't really be LogDatas, there'll just be a central BlockBank
+
+the BlockBank will tell Logs what Blocks belong to them, when the logs ask
+though: if the BlockBank is owning the registration of Blocks to Logs, then why do the
+Logs even need to know their Blocks? 
+
+Logs just want access to their Updates when they need them
+they also need to commit to the bank
+
+/beginCommit()/ returns limbo /Updates/;
+/Updates/ are pooled into a /Block/
+/Block/ is persisted to /BlockStore/, via /BlockCache/
+/BlockMap/ immutably updated and persisted
+/endCommit()/ on all relevant /Logs/
+
+LogSpace now composed of bitty components:
+/BlockMap/ <-> /ManifestStore/
+/BlockCache/ <-> /BlockStore/
+/Logs/
+
+the /BlockCache/ shouldn't include functionality to call the /BlockStore/ though: it should be a data structure, owned and accessed by the /LogSpace/
+
+similarly the /BlockMap/: a data structure, though perhaps with easy access
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

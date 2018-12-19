@@ -61,6 +61,56 @@ but then there is also this state that should stay constantly available across t
 splitting into flows takes away from the transaction
 and it is first and foremost a transaction!
 
+----------------------------------
+
+** Loading
+
+/Log.load()/
+
+most simply, this'd load all blocks from storage, relating only to the log in question
+ultimately, though, it'd preload downstream derivatives too: this'd allow for quick staging, which must cascade through all derivatives
+
+it does seem as though this should be done lazily, on staging.
+- but then, at the point of staging, there needs to be a way of detecting whether loading /needs/ to be done
+
+the manifest should keep track of heads... but these are the province of the logs themselves
+we've separated and encapsulated the log data
+complicating the ownership and communication between owners regarding the data
+
+the manifest shouldn't be separate from the cursors within the logs - we want one source of truth, with no problems of syncing between distinct spots
+
+so either:
+- the manifest is summoned up as and when needed, from the logs themselves, via a protocol of communication involving interfaces etc
+  known blocks would be stored by the logs themselves too? 
+- or the all data is stored centrally, with logs being just data, with object facades for consumers
+
+------
+
+So, we come to stage to another wise empty log. How do we know there's stuff we don't know about?
+- because we've loaded the manifest, which has loaded our known blocks, and also the known number of updates committed.
+
+What happens if the manifest has changed in the meantime?
+- well we won't know about it till we try committing: the new manifest will be unexpectedly found, then we'll have to drop(?) what we've accumulated in the meantime
+  (though other merging strategies are available!)
+- if the manifest has changed, we'll have to download it, and apply it to all the logs individually,purging all their old data. This, again, will be via an interface
+
+-------------------
+
+We can't just rely on the number of updates - compaction will cause this to change over time
+and we can't rely on a monotonic version either, as - again! - compaction may occur changing many things without any sign whatsoever
+
+Maybe, instead, on every meaningful change to a log, its clock should be incremented. If an update is staged: increment. If an update is culled: increment.
+
+Compaction could be done locally, but then how would we persist the newly compacted data?
+we'd need to save whatever affected blocks there were.
+
+
+
+
+
+
+
+
 
 
 

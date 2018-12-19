@@ -1,3 +1,4 @@
+import { Dict, getOrSet, enumerate, tup } from "./utils";
 
 export function declareModel<U, D, V>(m: Model<U, D, V>): Model<U, D, V> {
     return m;
@@ -10,18 +11,12 @@ export type Model<U, D, V> = {
 }
 
 
-export interface Log<U, V> {    
+export interface Log<U, V> {
+    key: string,
     stage(update: U): void;
     load(): Promise<void>;
     view(): Promise<V>;
 }
-
-
-export interface Store<U> {
-    readAll(name: string): Promise<U[]>;
-    persist(block: { [key: string]: any[] }): Promise<void>;
-}
-
 
 
 
@@ -31,128 +26,224 @@ export type Block = {
 
 export interface BlockStore {
     load(key: string): Promise<Block>;
-    save(key: string, block: Block);
+    save(key: string, block: Block): Promise<void>;
 }
 
 
-//the Store 
-//
-//
-//
-
-
-
-class Registry<V> {
-    private records: { [key: string]: V } = {}
-
-    getOrCreate<W extends V>(key: string, create: () => W): W {
-        const found = this.records[key] as W;
-        return found        
-            || (this.records[key] = create());
-    }
-
-    entries(): { key: string, val: V }[] {
-        return Object.keys(this.records)
-                .map(key => ({ key, val: this.records[key] }));
-    }
-
-    values(): V[] {
-        return this.entries()
-                .map(({ val }) => val);
-    }
+export type Manifest = {
+    version: number,
+    logs: Dict<LogBlocks>
 }
+
+export type LogBlocks = BlockRef[]
+
+
+export interface ManifestStore {
+    load(): Promise<Manifest>;
+    save(manifest: Manifest): Promise<void>
+}
+
+
+
+type BlockRef = string
 
 
 export class LogSpace {
     
-    logs = new Registry<InnerLog>();
-    store: BlockStore
+    private blockStore: BlockStore
+    private manifestStore: ManifestStore
 
-    constructor(store: BlockStore) {
-        this.store = store;
+    version = 0;
+    logs: { [key: string]: InnerLog } = {}
+
+
+    constructor(blockStore: BlockStore, manifestStore: ManifestStore) {
+        this.blockStore = blockStore;
+        this.manifestStore = manifestStore;
     }
 
-    getLog<U, D, V>(name: string, model: Model<U, D, V>): Log<U, V> {
-        return this.logs[name]
-            || (this.logs[name] = new InnerLogImpl(model))
+    getLog<U, D, V>(key: string, model: Model<U, D, V>): Log<U, V> {
+        return getOrSet(this.logs, key, () => createInnerLog(key, model));
     }
 
     reset(): void {
-        this.logs.values()
-            .forEach(l => l.reset());
+        enumerate(this.logs)
+            .forEach(([_, l]) => l.reset());
     }
 
-    async commit(): Promise<void> {
 
-        const beginCommit = (key: string) => this.logs[key]; 
+    //go on then: what happens if there'sa problem after we beginCommit()?
+    //well, we cancelCommits() on all logs...
 
-        const toCommit = this.logs.entries()
-                            .map(({ key, val: log }) => {
-                                return [key, log.beginCommit()];
-                            });
-
-
-        //the interface of store has to change
-        //everything packaged up into one commit, please
-
-        await this.store.save('wibble1', {});
-
-
-        //and on success, we should confirm to all the logs that all is ok
+    async commit(): Promise<void> { 
+        //serialize!
         //...
+
+        const [block, logs] = enumerate(this.logs)
+                                .reduce<[Block, InnerLog[]]>(
+                                    ([block, logs], [key, log]) => {
+                                        const pending = log.beginCommit();
+                                        return tup(
+                                            {...block, [key]: pending}, 
+                                            [...logs, log]
+                                        ); 
+                                    },
+                                    tup({}, []))
+        
+        const blockRef = `B${Math.ceil(Math.random() * 1000)}`;
+    
+        await this.blockStore.save(blockRef, block); //should do gazump-check before this...
+
+        const logBlocks = enumerate(this.logs)
+                            .reduce<Dict<LogBlocks>>(
+                                (ac, [key, log]) => ({ 
+                                    ...ac, 
+                                    [key]: log.blocks()
+                                }), {});
+
+        const manifest = {
+            version: this.version + 1,
+            logs: logBlocks
+        }
+
+        await this.manifestStore.save(manifest);
+
+        logs.forEach(l => l.confirmCommit([blockRef]));
+
+
+        //AND WHAT ABOUT ROLLBACK IN EVENT OF A FAILURE?????????????!!!!!
+
+        //but...
+        //cancelCommits should be called on all logs here
+        //not just the affected ones
+
+        //plus: what'd happen if we cancelled a limbo that wasn't our own? 
+        //it wouldn't be a problem, as long as the attempt at committing is also thrown out
     }
 }
+
+//
+//
+//
+//
 
 
 interface InnerLog {
-    reset(): void,
-    beginCommit(): { pending: any[], confirm: () => void }
+    reset(): void
+    beginCommit(): any[]
+    confirmCommit(refs: BlockRef[]): void
+    cancelCommits(): void
+    blocks(): BlockRef[]
 }
 
-class InnerLogImpl<U, D, V> implements Log<U, V>, InnerLog {
+type LogRef = string
 
-    model: Model<U, D, V>
-    data: D
-    limbo: { updates: U[], data: D }
-    staged: { updates: U[], data: D }
 
-    constructor(model: Model<U, D, V>) {
-        this.model = model;
-        this.data = model.zero;
-        this.limbo = { updates: [], data: this.data };
-        this.staged = { updates: [], data: this.data };
-    }
+type BlockBank = {
+    [logKey: string]: BlockRef[]
+}
 
-    stage(update: U): void {
-        this.staged.data = this.model.add(this.staged.data, update);
-        this.staged.updates.push(update);
-    }
+type BlockCache = {
+    [blockRef: string]: any[]
+}
 
-    reset(): void {
-        this.staged = { updates: [], data: this.data };
-    }
 
-    beginCommit(): { pending: any[], confirm: () => void } {
-        const pending = this.staged.updates as any[];
+function createBlockBank(blockStore: BlockStore): BlockBank {
 
-        this.limbo.updates.push(...this.staged.updates);
-        this.limbo.data = this.staged.data;
-        this.staged.updates = [];
 
-        return {
-            pending,
-            confirm: () => {}
-        };
-    }
 
-    async load(): Promise<void> {
-        // const updates = await this.store.readAll('blah');
-        // this.data = updates.reduce((d, u) => this.model.add(d, u), this.model.zero);
-        // this.reset();
-    }
 
-    async view(): Promise<V> {
-        //should load here?
-        return this.model.view(this.staged.data);
+    return {
+
+    };
+}
+
+
+
+
+function createInnerLog<U, D, V>(key: string, model: Model<U, D, V>): InnerLog & Log<U, V> {
+
+    let aggr = model.zero;
+    let limbos: { updates: U[], aggr: D }[] = [];
+    let staged: { updates: U[], aggr: D } = { updates: [], aggr };
+    let blocks: BlockRef[] = [];
+
+    return {
+        key,
+
+        stage(update: U): void {
+            staged.aggr = model.add(staged.aggr, update);
+            staged.updates.push(update);
+        },
+
+        reset(): void {
+            staged = { updates: [], aggr };
+        },
+
+        beginCommit(): U[] {
+            const pending = staged.updates;
+
+            limbos.push({
+                updates: pending,
+                aggr: staged.aggr
+            });
+
+            staged.updates = [];
+
+            return pending;
+        },
+
+        confirmCommit(blockRefs: BlockRef[]) {
+            blocks.push(...blockRefs);
+            //and promote head of limbos
+            //...
+        },
+
+        cancelCommits() {
+            //...
+        },
+
+        blocks() {
+            return blocks;
+        },
+
+        async load(): Promise<void> {
+            //if the blocks aren't populated, we should populate em
+            //how can we know they've been populated?
+            //
+            //well, first of all: they've been set at all
+            //then we know there's something at least in place
+            //
+            //
+
+
+
+
+            //we should know what blocks we have, at least
+            //but we only do if they've been loaded from outside
+            //and then, given the BlockRefs, we need to load the actual blocks, at will
+            //
+
+
+
+            //in loading,
+            //we first of all want to consult the manifest
+            //we shouldn't trigger any reloads of the manifest (it should have been downloaded once only)
+            //
+            //but the manifest is here...
+            //in that we should know how many updates we should have
+            //(but with compaction, the number of updates will change!)
+
+
+
+            // const updates = await this.store.readAll('blah');
+            // this.data = updates.reduce((d, u) => this.model.add(d, u), this.model.zero);
+            // this.reset();
+        },
+
+        async view(): Promise<V> {
+            //should load here?
+            return model.view(staged.aggr);
+        }
     }
 }
