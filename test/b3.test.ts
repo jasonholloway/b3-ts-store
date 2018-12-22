@@ -43,11 +43,11 @@ const b3Model = declareModel({
         products: Map<Id, Product>()
     }),
 
-    add(data: B3Data, up: B3Update): B3Data {        
-        switch(up.type) {
+    add(data: B3Data, [_, type, body]: B3Update): B3Data {        
+        switch(type) {
             case 'PutProduct':
                 return data.update('products', 
-                            ps => ps.update(up.id, p => p))
+                            ps => ps.update(body.id, p => p))
 
             default:
                 throw Error('Strange update!');
@@ -61,11 +61,3 @@ const b3Model = declareModel({
         }
     }
 })
-
-
-
-
-type Update = {
-    type: String
-}
-

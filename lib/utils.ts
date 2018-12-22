@@ -1,14 +1,13 @@
 
-export type UpdateCreator<Type extends string, Props = void> 
-            = ((props?: Props) => Readonly<{ type: Type } & Props>)
+export type UpdateCreator<Type extends string, Body = void> 
+            = ((version: number, body?: Body) => [number, Type, Body])
                 & { readonly type: Type }
    
-
 export function declareUpdate<Type extends string>(type: Type) {
     return {
-        withData<Props extends object>(): UpdateCreator<Type, Props> {
+        withData<Body>(): UpdateCreator<Type, Body> {
             return Object.assign(
-                ((props: Props) => Object.assign({}, props, { type })),
+                ((version: number, body: Body) => tup(version, type, body)),
                 { type });
         }
     }

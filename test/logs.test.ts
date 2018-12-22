@@ -1,39 +1,48 @@
-import { LogSpace, Log, declareModel } from "../lib/bits";
+import { createLogSpace, Log, declareModel, LogSpace, Update } from "../lib/bits";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import FakeManifestStore from "./fakes/FakeManifestStore";
-import { enumerate } from "../lib/utils";
+import { enumerate, declareUpdate } from "../lib/utils";
 
 const testModel = declareModel({
     zero: [],
-    add(data: number[], up: string) {
-        return data.concat([parseInt(up)]);
+    add(data: number[], [v, t, num]: AddUp) {
+        switch(t) {
+            case 'ADD':
+                return data.concat([parseInt(num)]);
+            default:
+                throw Error('Strange update!');
+        }
     },
     view(data) {
         return data.reduce((ac, v) => ac + v, 0);
     }
 })
 
+const addUp = declareUpdate('ADD').withData<string>();
+type AddUp = ReturnType<typeof addUp>
+
+
 describe('LogSpace', () => {
 
     let logSpace: LogSpace;
-    let log: Log<string, number>;
+    let log: Log<AddUp, number>;
     let blockStore: FakeBlockStore;
     let manifestStore: FakeManifestStore;
     let model = testModel;
-    let getLog: (name?: string) => Log<string, number>;
+    let getLog: (name?: string) => Log<AddUp, number>;
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
         manifestStore = new FakeManifestStore();
-        logSpace = new LogSpace(blockStore, manifestStore);
+        logSpace = createLogSpace(blockStore, manifestStore);
         getLog = (name: string) => logSpace.getLog(name || 'test', testModel);
         log = getLog();
     })
 
     it('logs aggregates staged updates into view', async () => {
-        log.stage('1');
-        log.stage('2');
-        log.stage('3');
+        log.stage(addUp(0, '1'));
+        log.stage(addUp(1, '2'));
+        log.stage(addUp(2, '3'));
 
         const view = await log.view();
         expect(view).toBe(6);
@@ -41,8 +50,8 @@ describe('LogSpace', () => {
 
     it('using same log key gets same log', async () => {
         const log1 = getLog('hello');
-        log1.stage('123');
-        log1.stage('456');        
+        log1.stage(addUp(0, '123'));
+        log1.stage(addUp(1, '456'));        
 
         const log2 = getLog('hello');
         const view = await log2.view();
@@ -55,8 +64,8 @@ describe('LogSpace', () => {
 
         describe('after reset', () => {
             it('resets to zero', async () => {
-                log.stage('9');
-                log.stage('8');
+                log.stage(addUp(0, '9'));
+                log.stage(addUp(1, '8'));
                 logSpace.reset();
     
                 const view = await log.view();
@@ -70,8 +79,8 @@ describe('LogSpace', () => {
             })
 
             it('aggregated data stays same', async () => {
-                log.stage('5');
-                log.stage('5');
+                log.stage(addUp(0, '5'));
+                log.stage(addUp(1, '5'));
                 expect(await log.view()).toBe(10);
 
                 const committing = logSpace.commit();
@@ -86,10 +95,10 @@ describe('LogSpace', () => {
         describe('multiple sequential commits', () => {
 
             it('data remains as it should be', async () => {
-                log.stage('1');
+                log.stage(addUp(0, '1'));
                 await logSpace.commit();
 
-                log.stage('2');
+                log.stage(addUp(1, '2'));
                 await logSpace.commit();
 
                 expect(await log.view()).toBe(3);
@@ -101,8 +110,8 @@ describe('LogSpace', () => {
         describe('on commit', () => {
 
             beforeEach(async () => {
-                log.stage('4');
-                log.stage('5');
+                log.stage(addUp(0, '4'));
+                log.stage(addUp(1, '5'));
                 await logSpace.commit();
             })
 
@@ -128,13 +137,13 @@ describe('LogSpace', () => {
 
 
         it('commits and loads updates', async () => {
-            const space1 = new LogSpace(blockStore, manifestStore);
+            const space1 = createLogSpace(blockStore, manifestStore);
             const log1 = space1.getLog('hello', model);
-            log1.stage('123');
-            log1.stage('456');
+            log1.stage(addUp(0, '123'));
+            log1.stage(addUp(1, '456'));
             await logSpace.commit();
 
-            const space2 = new LogSpace(blockStore, manifestStore);
+            const space2 = createLogSpace(blockStore, manifestStore);
             const log2 = space2.getLog('hello', model);
             await log2.load();
             const view = await log2.view();
@@ -154,8 +163,8 @@ describe('LogSpace', () => {
             })
 
             it('staged updates left in place', async () => {
-                log.stage('999');
-                log.stage('1');
+                log.stage(addUp(0, '999'));
+                log.stage(addUp(1, '1'));
 
                 try { await logSpace.commit(); }
                 catch {}

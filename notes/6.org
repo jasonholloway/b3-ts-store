@@ -1,0 +1,73 @@
+
+
+So the Log would receive an Observable<Update>
+
+
+---------------------------
+
+If the InnerLogs just projected their pure, upto-the-moment Updates outwards, instead of holding grimly on and only allowing access via a tight protocol
+
+then, I vaguely suspect now, we might not need the limbo mechanism
+
+the idea would be that all staged updates are beamed outwards
+
+---------------------------
+
+these beamed out staged updates are then incrementally streamed into a would-be imminent Block, ready to be sampled and sent to the server at any time
+
+instead of receiving back a commit confirmation directly to the InnerLog-as-data-owner
+
+when a commit is performed, the new LogSpec is cascaded to all Logs;
+
+it is at this point that all the Logs move their staged updates out, so that only bits poking above the new LogSpec persist
+
+----------------------------
+
+what then of Cancellation? Well, the new LogSpec isn't published, and so all the individual Logs know absolutely nothing of the attempt to commit in the first place
+
+all becomes one big circuit of update-mangling
+
+and instead of the OO ideal of /independent/ small components communicating at cost,
+we have trustworthy co-components, none of which are self-sufficient, forming an integrated system
+
+THE CIRCUIT
+which it'd be nice to draw out
+
+but this stream-based reasoning boils down to:
+- data is owned by a certain component; and this data is cleanly propagated to whoever wants to tap it
+- encapsulation is still implied by us calling them 'components': the difference is in the interface: on the one side, reliably spewing data, leaning on the framework; on the other, dog-eat-dog self-sufficiency
+
+
+
+OO is like Bear Grylls
+or the war of all against all: the state of nature
+streams are instead an efficient, trustworthy general mechanism for systems without the to-and-fro
+
+------------------------
+
+Frames of state are passed around
+
+which is great
+
+but to do this the stageds need projecting
+
+and what happens when we want to reset? then the central LogSpace will publish a backwards movement, and the Logs should then revert
+nope: the LogSpecs stay the same, but an impulse is communicated to all logs that their stagings should be cleared like.
+
+so, committing: as soon as InnerLogs are created, their stageds should be piped into a common sink, which reduces into a single map of staged updates by key
+
+---------
+
+Specs come in, and all we wanna do with these
+is memorise the last one seen
+
+then, to actually consume the log, we will hang off an observable interface
+
+
+
+
+
+
+
+
+
