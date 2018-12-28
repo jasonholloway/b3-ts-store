@@ -63,6 +63,176 @@ is memorise the last one seen
 
 then, to actually consume the log, we will hang off an observable interface
 
+------------------------------
+
+but even then, when we have all updates reduced to a stream of frames of stageds,
+how can we:
+- shrink the stageds on incoming specs?
+- reset the stageds on incoming reset impulses?
+
+two exterior streams need to pool into the central system
+
+---
+
+also, we have separate aggregations
+for committed (or saved) updates
+for staged updates
+
+when a reset impulse comes through, it should take the state of the committed aggr,
+and supply it to the staged aggr stream
+at exactly the same time,
+the reduction of staged updates
+should be cleared
+
+the problem here comes from everything having to be done in the proper order
+and if there's such a need for consistent application
+it suggests that the separate streams aren't really in parallel
+
+---------------
+
+there should be a middle ground
+where procedural code, with its happy guarantees of sequence
+is still used, but the advantages of rx still accrue
+
+a courser granularity, a single frame, not entirely atomised and reconstituted using rx operators
+
+/State/ should be aggregated, once per course frame;
+a reset command does one thing, a stage command another,
+an incoming published LogSpec another
+
+what we want here is an actor kinda setup
+
+how is this better than just receiving method invocations?
+javascript ensures everything happens sequentially, always in its own sequential frameof activity
+
+but we want our outputs to be observables... as the LogSpace should reduce them as it sees fit
+
+so overall Log state would be published bit by bit
+then the staged observable can be siphoned off this
+
+but to emit outputs like this, our inputs should also be sequentialized, like
+
+------------
+
+when a published LogSpec is received, we may need to cull our staged updates a tad
+
+though it'd be nice to seamlessly merge em in if possible
+how would it ever be possible?
+
+well, if two updates didn't interfere with each other... this'd require (as with prospective cleanings)
+some laws about the aggregation - these are possible, but let's leave em for now
+
+so, simplest first: a public spec ahead of our staging should...
+
+thereare two possible scenarios:
+the spec is showing us that our own updates have been committed
+or some foreign updates have gazumped our poor log
+
+if the foreign updates have gazumped us, our aggregation needs to be re-gathered from a known-good spot
+and the log should know what's safe: anything known to be commited is a good base to aggregate on top of
+
+if we are just finding out about our own commit
+maybe there's little difference
+how could we ever distinguish anyway?
+we could attach a token to the commit, so we can identify ourselves
+but - simpler to treat all equally instead of branching on different sub-classes of input
+
+------
+
+so the LogSpec will come in
+its head will be tested to see if it's beyond our savedHead
+if NO:
+  nothing needs to be done to our stageds
+  the block collection needs updating
+if YES:
+  ditch our staged updates
+  now the log will need to load its latest updated before it can stage afresh, or /view()/
+
+how will it load its blocks?
+views and stageds are streams of course - they're asynchronous as is
+so, if we want to consume views, we'll subscribe to a stream of em - and, eventually, a view fitting our staged updates will come through
+
+so, in the admin site, a product will be loaded, ... nah, it's ok
+
+--------
+
+BUT what of follow-ons?
+
+a LogSpec comes through removing an AddProduct - it can't be our local job to correct any follow-ons that have also been staged
+
+but - sibling LogSpecs should at the same time apply themselves to follow-ons
+
+--------
+
+what if a follow-on is nuked, but the upstream log isn't?
+say if an index reads from multiple other logs
+
+then our local upstreams - should they be nuked too? doubtful, as indices could cover many otherwise disconnected logs, and local updates to one log
+would still carry a weight of importance, unperturbable by disconnected others, you'd think, like.
+
+but nuking would cause this problem... unless, of course, we had some laws that'd allow index updates to move around
+
+another way out: just nuke everything. There's going to be very little contention here.
+
+but how would we solve it, vaguely?
+
+by /merging/ rather than /violently plonking/
+
+-------
+
+the index would have to match the saved index: at this point there's no argument
+
+the question is what to do with our local, staged updates
+
+merging requires laws: 
+
+but: why can't our local updates just be stuck on top of the newly saved ones?
+
+a renamed product would overwrite another renaming, maybe. You could get nonsense out of this,
+but it gives us an easy way out: just play our new stuff over the saved stuff
+
+----------
+
+in which case, what should happen when a fresh LogSpec rolls in?
+
+if its head is beyond ours, then we don't nuke owt, oh no...
+except for the rolling aggregation: we nuke that
+
+so our aggregation will no longer be up to date (and presumably too the versioning of our stageds would need to change)
+
+but why would we still need to know versions of updates?
+if history changes beneath our feet, it seems maybe our local versioning should just be local
+or even (shock!) non-existent
+
+but in its saving, updates should be versioned absolutely, stuck on top of the head
+
+---------
+
+- fresh LogSpec
+- if the head is beyond our head
+  - update our head
+  - clear our aggregation
+  - maybe emit some kind of event 'REBASED!'
+
+we need two rolling (but lazily initiated) aggregations:
+- firstly, representing saved state
+- secondly, saved state + staged updates
+
+given a fresh LogSpec, the first shouldn't be cleared, but it should be known to be behind the times
+similarly, the second should be reset to the saved state: it too will be recognisably behind
+
+
+when someone views (or rather, given an existing subscription) brand new aggregations should be loaded
+to supply new views
+
+so Views are served in a stream: what goes into the stream?
+specs -> blocks -> savedUpdates -> aggrs
+
+/StagedAggr/:
+aggrs -> stagedUpdates -> stagedAggrs
+
+------------
+
 
 
 
