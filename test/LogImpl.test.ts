@@ -3,6 +3,7 @@ import { testModel, addUp } from "./fakes/testModel";
 import { ReplaySubject, from, Subject, forkJoin } from "rxjs";
 import { LogSpec } from "../lib/LogSpace";
 import { reduce, last, delay, finalize, combineAll } from "rxjs/operators";
+import { gatherInArray } from "../lib/utils";
 
 describe('LogImpl', () => {
 
@@ -41,6 +42,17 @@ describe('LogImpl', () => {
 
         const { maxConcurrentLoads } = await x.complete();
         expect(maxConcurrentLoads).toBeGreaterThan(1);
+    })
+
+
+
+    it('emits view on staged update', async () => {
+        x.spec({ head: 0, blocks: [] });
+        x.update('1');
+        x.update('2');
+
+        const { views } = await x.complete(); 
+        expect(views).toEqual(['1:2']);
     })
 
 })
@@ -108,9 +120,3 @@ function createFixture() {
                 .pipe(finalize(() => loads.next(-1)))   
     }
 }
-
-
-function gatherInArray<V>() {
-    return reduce<V, V[]>((ac, v) => [...ac, v], []);
-}
-

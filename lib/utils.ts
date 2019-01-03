@@ -1,4 +1,4 @@
-import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap } from 'rxjs/operators';
+import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce } from 'rxjs/operators';
 import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction } from 'rxjs';
 
 
@@ -53,5 +53,10 @@ export function concatMapEager<A, B>(project: (a: A) => ObservableInput<B>) : Op
             tap(o => (o as ConnectableObservable<B>).connect()),
             concatMap(o => o)
         );
+}
+
+
+export function gatherInArray<V>() {
+    return reduce<V, V[]>((ac, v) => [...ac, v], []);
 }
 

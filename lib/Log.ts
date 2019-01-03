@@ -1,8 +1,8 @@
-import { reduce, map, flatMap, tap, mergeAll, scan, concatMap } from "rxjs/operators";
-import { OperatorFunction, Observable, Subject, merge, of, forkJoin, from, pipe } from "rxjs";
+import { reduce, map, flatMap, tap, mergeAll, scan, concatMap, publishReplay, shareReplay, combineLatest, withLatestFrom } from "rxjs/operators";
+import { OperatorFunction, Observable, Subject, merge, of, forkJoin, from, pipe, concat } from "rxjs";
 import { AnyUpdate, Model, Log } from "./bits";
 import { LogSpec } from "./LogSpace";
-import { publish, concatMapEager } from "./utils";
+import { publish, concatMapEager, gatherInArray } from "./utils";
 
 type LogState<D> = {
     aggr: D,
@@ -120,7 +120,15 @@ export function createLog<U extends AnyUpdate, D, V>(
                                         .pipe(concatMapEager(loadBlock))
                                     ));
 
+
+    //but!
+    //aggrs should only be aggr'd when we want to see them: as in, they shouldn't be eagerly aggregated for each and every frame...
+
+
+    const stageds = updates.pipe(shareReplay())
+
     const aggrs = committeds.pipe(
+        map(o => concat(o, stageds)),                           //requires committed to complete...
         flatMap(h => h.pipe(reduce(model.add, model.zero)))
     );
 
