@@ -36,11 +36,11 @@ describe('LogImpl', () => {
         expect(views).toEqual(['1:2:3:4:5']);
     })
 
-    it('loads blocks in parallel', async () => {
+    it('loads blocks concurrently', async () => {
         x.spec({ head: 0, blocks: [ '1:2;delay=100', '3:4:5;delay=100' ] });
 
-        const { maxLoadBlockAccesses } = await x.complete();
-        expect(maxLoadBlockAccesses).toBeGreaterThan(1);
+        const { maxConcurrentLoads } = await x.complete();
+        expect(maxConcurrentLoads).toBeGreaterThan(1);
     })
 
 })
@@ -71,11 +71,11 @@ function createFixture() {
             updates.complete();
             loads.complete();
 
-            const [views, maxLoadBlockAccesses] = await gatheringStats;
+            const [views, maxConcurrentLoads] = await gatheringStats;
 
             return {
                 views,
-                maxLoadBlockAccesses
+                maxConcurrentLoads
             }
         }
     }
