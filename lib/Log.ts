@@ -1,12 +1,13 @@
-import { reduce, map } from "rxjs/operators";
-import { OperatorFunction, Observable, Subject, merge } from "rxjs";
+import { reduce, map, flatMap, tap, mergeAll, scan, concatMap } from "rxjs/operators";
+import { OperatorFunction, Observable, Subject, merge, of, forkJoin, from, pipe } from "rxjs";
 import { AnyUpdate, Model, Log } from "./bits";
 import { LogSpec } from "./LogSpace";
+import { publish, concatMapEager } from "./utils";
 
 type LogState<D> = {
     aggr: D,
-    head: number,
-    staged: any[]
+    staged: any[],
+    spec: LogSpec
 }
 
 type Id<T> = ((t: T) => T)
@@ -20,15 +21,18 @@ export interface InnerLog {
     staged: Observable<AnyUpdate[]>
 }
 
-
-export function createInnerLog<U extends AnyUpdate, D, V>(
+export function createLog<U extends AnyUpdate, D, V>(
         key: string, 
         model: Model<U, D, V>, 
         specs: Observable<LogSpec>, 
         loadBlock: (ref: string) => Observable<U>
-    ): InnerLog & Log<U, V> {
+    ) {
 
-    const zero: LogState<D> = { aggr: model.zero, head: 0, staged: [] };
+    const zero: LogState<D> = { 
+        aggr: model.zero, 
+        staged: [], 
+        spec: { head: 0, blocks: [] }
+    };
 
     const updates = new Subject<U>();
     const resets = new Subject<void>();
@@ -51,6 +55,19 @@ export function createInnerLog<U extends AnyUpdate, D, V>(
     //the first update or attempt at a view has to call an upstream source of blocks
     //that will return a stream of updates that need to be merged into
 
+    //for every block we need,
+    //we should load updates for it
+    //and flatMap the resulting stream into one
+    //(but preserving the orderof the blocks!)
+    
+    //but we know our blocks before we want to load them
+    //on an update, we want to subscribe to the *cold* stream of updates from the store
+    //and we want to somehow merge into this new upstream
+    //there must be some premade operator that does exactly this
+    //but for this we need to look...
+    //
+
+
     const onUpdate: LogReduction<U, D>
         = update => state => ({
             //here we need all committed updates to be loaded
@@ -59,12 +76,26 @@ export function createInnerLog<U extends AnyUpdate, D, V>(
                 staged: [...state.staged, update]
             });
 
+    //when new spec comes in,
+    //we should store it in the state
+    //anyone listening for new aggrs
+    //should now pull through the latest state'n'spec
+    //which should load all blocks, aggregate these
+    //and pass them down
+
+    //not sure what the point of the LogState is, here;
+    //LogSpec + staging = all updates; simple as that
+    //the complication comes when we want to save effort,
+    //and just apply new updates on top of existing aggregations
+    //well - CommittedUpdates would be aggregated one by one as they come through
+    //and the CommittedAggr would be tapped by the StagedAggr, which would apply 
+    //staged updates freshly on top of it
     const onSpec: LogReduction<LogSpec, D>
         = spec => state => {
             //we don't need to aggregate here, just to change indices in the state
             return {
                 ...state,
-                head: spec.head
+                spec
             };
         };
 
@@ -77,18 +108,31 @@ export function createInnerLog<U extends AnyUpdate, D, V>(
             });
     
     const states = merge(
-                        updates.pipe(map(onUpdate)),
-                        specs.pipe(map(onSpec)),
-                        resets.pipe(map(onReset))
+                        updates.pipe(map(onUpdate)),                        
+                        resets.pipe(map(onReset)),
+                        specs.pipe(map(onSpec))
                     )
-                    .pipe(applyReductionsTo(zero));
+                    .pipe(applyScan(zero));
 
-    const views = states.pipe(map(s => model.view(s.aggr)));
 
+    const committeds = specs
+                        .pipe(map(s => from(s.blocks)
+                                        .pipe(concatMapEager(loadBlock))
+                                    ));
+
+    const aggrs = committeds.pipe(
+        flatMap(h => h.pipe(reduce(model.add, model.zero)))
+    );
+
+    const views = aggrs.pipe(
+        map(model.view)
+    );
 
     return {
         key,
         staged: states.pipe(map(s => s.staged)),
+
+        views,
 
         stage(update: U): void {
             updates.next(update);            
@@ -105,6 +149,6 @@ export function createInnerLog<U extends AnyUpdate, D, V>(
 }
 
 
-function applyReductionsTo<A>(seed: A): OperatorFunction<(ac: A) => A, A> {
-    return reduce<(ac: A) => A, A>((ac, fn) => fn(ac), seed);
+function applyScan<A>(seed: A): OperatorFunction<(ac: A) => A, A> {
+    return scan<(ac: A) => A, A>((ac, fn) => fn(ac), seed);
 }

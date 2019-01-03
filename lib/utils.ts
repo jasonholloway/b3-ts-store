@@ -1,3 +1,6 @@
+import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap } from 'rxjs/operators';
+import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction } from 'rxjs';
+
 
 export type UpdateCreator<Type extends string, Body = void> 
             = ((version: number, body?: Body) => [number, Type, Body])
@@ -35,3 +38,20 @@ export function getOrSet<V, W extends V>(dict: Dict<V>, key: string, fn: () => W
     return (dict[key]
         || (dict[key] = fn())) as W;
 }
+
+
+
+export function publish<T>(source: Observable<T>): ConnectableObservable<T> {
+  return publishOperator<T>()(source);
+}
+
+
+export function concatMapEager<A, B>(project: (a: A) => ObservableInput<B>) : OperatorFunction<A, B> {
+    return pipe(
+            map(a => from(project(a))),
+            map(o => o.pipe(publishReplay())),
+            tap(o => (o as ConnectableObservable<B>).connect()),
+            concatMap(o => o)
+        );
+}
+

@@ -1,8 +1,8 @@
-import { AnyUpdate, Model, Log, BlockStore, ManifestStore, Manifest, Block, LogBlocks } from "./bits";
+import { AnyUpdate, Model, Log, BlockStore, ManifestStore, Manifest, Block } from "./bits";
 import { Subject, from, Observable } from "rxjs";
 import { Dict, enumerate, tup, getOrSet } from "./utils";
 import { flatMap, map, withLatestFrom, reduce } from "rxjs/operators";
-import { InnerLog, createInnerLog } from "./InnerLog";
+import { InnerLog, createLog } from "./Log";
 
 
 export interface LogSpace {
@@ -52,50 +52,50 @@ export function createLogSpace(blockStore: BlockStore, manifestStore: ManifestSt
         })
     )
 
-    commits.pipe(
-        withLatestFrom(manifests, innerLogs),
-        map(([cid, manifest, innerLogs]) => {
-            const confirm = new Subject<LogSpec>();
+    // commits.pipe(
+    //     withLatestFrom(manifests, innerLogs),
+    //     map(([cid, manifest, innerLogs]) => {
+    //         const confirm = new Subject<LogSpec>();
 
-            from(enumerate(innerLogs)).pipe(
-                reduce<[string, InnerLog], Block>(
-                    (block, [key, log]) => 
-                    ({
+    //         from(enumerate(innerLogs)).pipe(
+    //             reduce<[string, InnerLog], Block>(
+    //                 (block, [key, log]) => 
+    //                 ({
 
-                    }), {})
-            )
+    //                 }), {})
+    //         )
                 
 
-            const newBlock = beginCommits(innerLogs, confirm);
+    //         const newBlock = beginCommits(innerLogs, confirm);
 
-            const ref = `B${Math.ceil(Math.random() * 1000)}`;
+    //         const ref = `B${Math.ceil(Math.random() * 1000)}`;
 
-            return tup(cid, manifest, tup(ref, newBlock), confirm);
-        }),
-        map(([cid, manifest, [blockRef, newBlock], confirm]) => {
+    //         return tup(cid, manifest, tup(ref, newBlock), confirm);
+    //     }),
+    //     map(([cid, manifest, [blockRef, newBlock], confirm]) => {
             
-            const newSpecs = enumerate(manifest.logs)
-                                .reduce(
-                                    (ac, [key, blocks]) => 
-                                        ({  ...ac, [key]: blocks }), 
-                                    {} as Dict<LogBlocks>);
+    //         const newSpecs = enumerate(manifest.logs)
+    //                             .reduce(
+    //                                 (ac, [key, blocks]) => 
+    //                                     ({  ...ac, [key]: blocks }), 
+    //                                 {} as Dict<LogBlocks>);
 
-            const newManifest = {
-                version: manifest.version + 1,
-                logs: newSpecs
-            };
+    //         const newManifest = {
+    //             version: manifest.version + 1,
+    //             logs: newSpecs
+    //         };
 
-            return tup(cid, newManifest, tup(blockRef, newBlock), confirm);
-        })
-    );
+    //         return tup(cid, newManifest, tup(blockRef, newBlock), confirm);
+    //     })
+    // );
 
-    function beginCommits(logs: Dict<InnerLog>, confirm: Observable<LogSpec>): Block {
-        return enumerate(logs)
-                .reduce(
-                    (block, [key, log]) => 
-                        ({ ...block, [key]: log.beginCommit(confirm) }), 
-                    {} as Block);
-    }
+    // function beginCommits(logs: Dict<InnerLog>, confirm: Observable<LogSpec>): Block {
+    //     return enumerate(logs)
+    //             .reduce(
+    //                 (block, [key, log]) => 
+    //                     ({ ...block, [key]: log.beginCommit(confirm) }), 
+    //                 {} as Block);
+    // }
 
 
         // flatMap(async ([cid, manifest, innerLogs]) => {
@@ -136,57 +136,57 @@ export function createLogSpace(blockStore: BlockStore, manifestStore: ManifestSt
     
 
         
-    async function doCommit(): Promise<void> {        
-        const confirm = new Subject<LogSpec>();
+    // async function doCommit(): Promise<void> {        
+    //     const confirm = new Subject<LogSpec>();
 
-        try {
-            const block = enumerate(logs)
-                            .reduce(
-                                (block, [key, log]) => 
-                                    ({ ...block, [key]: log.beginCommit(confirm) }), 
-                                {} as Block);
+    //     try {
+    //         const block = enumerate(logs)
+    //                         .reduce(
+    //                             (block, [key, log]) => 
+    //                                 ({ ...block, [key]: log.beginCommit(confirm) }), 
+    //                             {} as Block);
             
-            const blockRef = `B${Math.ceil(Math.random() * 1000)}`;
+    //         const blockRef = `B${Math.ceil(Math.random() * 1000)}`;
         
-            await this.blockStore.save(blockRef, block); //should do gazump-check before this...
+    //         await this.blockStore.save(blockRef, block); //should do gazump-check before this...
 
-            const logBlocks = enumerate(logs)
-                                .reduce<Dict<LogBlocks>>(
-                                    (ac, [key, log]) => ({ 
-                                        ...ac, 
-                                        [key]: log.blocks()
-                                    }), {});
+    //         const logBlocks = enumerate(logs)
+    //                             .reduce<Dict<LogBlocks>>(
+    //                                 (ac, [key, log]) => ({ 
+    //                                     ...ac, 
+    //                                     [key]: log.blocks()
+    //                                 }), {});
 
-            const manifest = {
-                version: this.version + 1,
-                logs: logBlocks
-            }
+    //         const manifest = {
+    //             version: this.version + 1,
+    //             logs: logBlocks
+    //         }
 
-            await this.manifestStore.save(manifest);
+    //         await this.manifestStore.save(manifest);
 
-            confirm.next(null); //publish new spec as confirmation
+    //         confirm.next(null); //publish new spec as confirmation
 
-            //and more generally publish???
-        }
-        catch(err) {
-            confirm.error(err);
-            throw err;
-        }
-        finally {
-            confirm.complete();
-        }
-    }
+    //         //and more generally publish???
+    //     }
+    //     catch(err) {
+    //         confirm.error(err);
+    //         throw err;
+    //     }
+    //     finally {
+    //         confirm.complete();
+    //     }
+    // }
 
 
 
     return {
         getLog<U extends AnyUpdate, D, V>(key: string, model: Model<U, D, V>): Log<U, V> {
-            return getOrSet(this.logs, key, () => createInnerLog(key, model, null));
+            return getOrSet(this.logs, key, () => createLog(key, model, null, null));
         },
 
         reset(): void {
-            enumerate(this.logs)
-                .forEach(([_, l]) => l.reset());
+            // enumerate(this.logs)
+                // .forEach(([_, l]) => l.reset());
         },
 
 
