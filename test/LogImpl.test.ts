@@ -1,9 +1,9 @@
-import { createLog } from "../lib/Log";
-import { testModel, addUp } from "./fakes/testModel";
-import { ReplaySubject, from, Subject, forkJoin } from "rxjs";
+import { createLogMachine } from "../lib/Log";
+import { testModel, addUp, AddUp } from "./fakes/testModel";
+import { ReplaySubject, from, Subject, forkJoin, of } from "rxjs";
 import { LogSpec } from "../lib/LogSpace";
 import { reduce, last, delay, finalize, combineAll } from "rxjs/operators";
-import { gatherInArray } from "../lib/utils";
+import { reduceToArray } from "../lib/utils";
 
 describe('LogImpl', () => {
 
@@ -45,14 +45,43 @@ describe('LogImpl', () => {
     })
 
 
-
-    it('emits view on staged update', async () => {
-        x.spec({ head: 0, blocks: [] });
-        x.update('1');
-        x.update('2');
+    it('LogSpecs don\'t gazump each other', async () => {  //or, maybe they should! or rather: the old one should just be ignored...
+        x.spec({ head: 0, blocks: [ '1:2;delay=100' ] });
+        x.spec({ head: 0, blocks: [ '3:4' ] });
 
         const { views } = await x.complete(); 
-        expect(views).toEqual(['1:2']);
+        expect(views).toEqual(['1:2', '3:4']);
+    })
+
+
+
+
+    it('zero view with empty spec', async () => {
+        x.spec({ head: 0, blocks: [] });
+
+        const { views } = await x.complete();
+        expect(views).toEqual(['']);
+    })
+
+
+    it('emits view on staged updates', async () => {
+        x.spec({ head: 0, blocks: [] });
+
+        x.stage(addUp(0, '1'));
+        x.stage(addUp(1, '2'));
+
+        const { views } = await x.complete(); 
+        expect(views).toEqual(['', '1', '1:2']);
+    })
+
+    it('staged updates simply rebased onto new commits', async () => {
+        x.spec({ head: 0, blocks: [] });
+        x.stage(addUp(0, '4'));
+        x.stage(addUp(1, '5'));
+        x.spec({ head: 0, blocks: [ '1:2:3' ] });
+
+        const { views } = await x.complete(); 
+        expect(views).toEqual(['', '4', '4:5', '1:2:3:4:5']);
     })
 
 })
@@ -61,13 +90,14 @@ describe('LogImpl', () => {
 
 function createFixture() {
     const specs = new ReplaySubject<LogSpec>();
-    const updates = new ReplaySubject<string>();
+    const updates = new Subject<AddUp>();
+    const resets = new Subject<void>();
     const loads = new Subject<number>();
 
-    const log = createLog('KEY', testModel, specs, loadBlock);
+    const log = createLogMachine('KEY', testModel, specs, updates, resets, loadBlock);
 
     const allViews = log.views
-                        .pipe(gatherInArray(), last());
+                        .pipe(reduceToArray(), last());
 
     const maxLoads = loads
                         .pipe(reduce((ac, v) => ac + v, 0));
@@ -76,7 +106,7 @@ function createFixture() {
 
     return {
         spec: (s: LogSpec) => specs.next(s),
-        update: (u: string) => updates.next(u),
+        stage: (u: AddUp) => updates.next(u),
 
         async complete() {
             specs.complete();

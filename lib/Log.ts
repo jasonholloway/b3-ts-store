@@ -1,8 +1,10 @@
-import { reduce, map, flatMap, tap, mergeAll, scan, concatMap, publishReplay, shareReplay, combineLatest, withLatestFrom } from "rxjs/operators";
-import { OperatorFunction, Observable, Subject, merge, of, forkJoin, from, pipe, concat } from "rxjs";
+import { reduce, map, flatMap, tap, mergeAll, scan, concatMap, publishReplay, shareReplay, defaultIfEmpty, withLatestFrom, combineAll, sample } from "rxjs/operators";
+import { OperatorFunction, Observable, Subject, merge, of, forkJoin, from, pipe, concat, combineLatest, empty } from "rxjs";
 import { AnyUpdate, Model, Log } from "./bits";
 import { LogSpec } from "./LogSpace";
-import { publish, concatMapEager, gatherInArray } from "./utils";
+import { publish, concatMapEager, reduceToArray, scanToArray, tup } from "./utils";
+import { connectableObservableDescriptor } from "rxjs/internal/observable/ConnectableObservable";
+import { mergeWith } from "immutable";
 
 type LogState<D> = {
     aggr: D,
@@ -17,14 +19,38 @@ type LogReduction<V, D> = Reduction<V, LogState<D>>
 
 
 export interface InnerLog {
-    reset(): void
-    staged: Observable<AnyUpdate[]>
+     reset(): void
+     staged: Observable<AnyUpdate[]>
 }
 
-export function createLog<U extends AnyUpdate, D, V>(
+
+export function createLogFacade<U extends AnyUpdate, D, V>(key: string, model: Model<U, D, V>, specs: Observable<LogSpec>, loadBlock: (ref: String) => Observable<U>): Log<U, V> & InnerLog {
+    const updates = new Subject<U>();
+    const resets = new Subject<void>();
+
+    const log = createLogMachine('', model, specs, updates, resets, loadBlock);
+
+    return {
+        ...log,
+        reset() {
+            resets.next();
+        },
+        stage(update: U) {
+            updates.next(update);
+        },
+        view(): Promise<V> {
+            return log.views.toPromise();
+        }
+    }
+}
+
+
+export function createLogMachine<U extends AnyUpdate, D, V>(
         key: string, 
         model: Model<U, D, V>, 
         specs: Observable<LogSpec>, 
+        updates: Observable<U>,
+        resets: Observable<void>,
         loadBlock: (ref: string) => Observable<U>
     ) {
 
@@ -33,9 +59,6 @@ export function createLog<U extends AnyUpdate, D, V>(
         staged: [], 
         spec: { head: 0, blocks: [] }
     };
-
-    const updates = new Subject<U>();
-    const resets = new Subject<void>();
 
     //aggregations can be derived from the latest state of the log
     //as in, updates can just be joined onto staging
@@ -115,22 +138,18 @@ export function createLog<U extends AnyUpdate, D, V>(
                     .pipe(applyScan(zero));
 
 
-    const committeds = specs
-                        .pipe(map(s => from(s.blocks)
-                                        .pipe(concatMapEager(loadBlock))
-                                    ));
+    const committeds = specs.pipe(
+                            map(s => from(s.blocks)
+                                    .pipe(concatMapEager(loadBlock)))
+                        );
 
 
-    //but!
-    //aggrs should only be aggr'd when we want to see them: as in, they shouldn't be eagerly aggregated for each and every frame...
+    const stageds = updates.pipe(scanToArray());
 
+    const aggrs = combineLatest(committeds, stageds)
+                    .pipe(map(([c, a]) => concat(c, a)))
+                    .pipe(concatMap(all => all.pipe(reduce(model.add, model.zero))))
 
-    const stageds = updates.pipe(shareReplay())
-
-    const aggrs = committeds.pipe(
-        map(o => concat(o, stageds)),                           //requires committed to complete...
-        flatMap(h => h.pipe(reduce(model.add, model.zero)))
-    );
 
     const views = aggrs.pipe(
         map(model.view)
@@ -139,20 +158,7 @@ export function createLog<U extends AnyUpdate, D, V>(
     return {
         key,
         staged: states.pipe(map(s => s.staged)),
-
-        views,
-
-        stage(update: U): void {
-            updates.next(update);            
-        },
-
-        reset(): void {
-            resets.next();
-        },
-
-        view(): Promise<V> {
-            return views.toPromise();
-        }
+        views
     }
 }
 

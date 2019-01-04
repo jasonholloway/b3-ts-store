@@ -1,8 +1,8 @@
 import { AnyUpdate, Model, Log, BlockStore, ManifestStore, Manifest, Block } from "./bits";
-import { Subject, from, Observable } from "rxjs";
+import { Subject, from, Observable, Observer } from "rxjs";
 import { Dict, enumerate, tup, getOrSet } from "./utils";
 import { flatMap, map, withLatestFrom, reduce } from "rxjs/operators";
-import { InnerLog, createLog } from "./Log";
+import { InnerLog, createLogMachine, createLogFacade } from "./Log";
 
 
 export interface LogSpace {
@@ -178,10 +178,12 @@ export function createLogSpace(blockStore: BlockStore, manifestStore: ManifestSt
     // }
 
 
-
     return {
         getLog<U extends AnyUpdate, D, V>(key: string, model: Model<U, D, V>): Log<U, V> {
-            return getOrSet(this.logs, key, () => createLog(key, model, null, null));
+            const entry = getOrSet(logs, key, () => { 
+                return createLogFacade(key, model, null, null);
+            });
+            return entry;
         },
 
         reset(): void {
