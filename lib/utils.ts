@@ -1,4 +1,4 @@
-import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce, scan, startWith } from 'rxjs/operators';
+import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce, scan, startWith, switchMap, groupBy } from 'rxjs/operators';
 import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction } from 'rxjs';
 
 
@@ -68,4 +68,20 @@ export function scanToArray<V>() {
 export function reduceToArray<V>() {
     return reduce<V, V[]>((ac, v) => [...ac, v], []);
 }
+
+export function reduceToDict<V>() {
+    return reduce<[string, V], Dict<V>>((ac, [k, v]) => ({ ...ac, [k]: v }), {});
+}
+
+
+export function switchHere<A, B>(b$: Observable<B>) : OperatorFunction<A, [A, Observable<B>]> {
+    return pipe(
+        switchMap(a => b$.pipe(
+            map(b => tup(a, b))
+        )),
+        groupBy(([a, _]) => a, ([_, b]) => b),
+        map(g => tup(g.key, g))
+    );
+}
+
 

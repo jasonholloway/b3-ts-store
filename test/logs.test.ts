@@ -18,7 +18,7 @@ describe('LogSpace', () => {
     beforeEach(() => {
         blockStore = new FakeBlockStore();
         manifestStore = new FakeManifestStore();
-        logSpace = createLogSpace(blockStore, manifestStore);
+        logSpace = createLogSpace(blockStore, manifestStore, null);
         getLog = (name: string) => logSpace.getLog(name || 'test', testModel);
         log = getLog();
     })

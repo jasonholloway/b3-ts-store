@@ -1,0 +1,599 @@
+
+how can the log know that the committed updates are the same as the staged ones?
+it would require a common means of measurement - a field of comparison like a vector clock
+but we also want stageds to be rebased 
+and for them to be unversioned until they're committed - this is because we want to easily rebase them...
+
+if competing users are also committing, their updates will have exactly the same numbering as ours
+so will be indistinguishable without further marks
+
+if stageds were to be unceremoniously culled on spec update, then fine, there'd be no problem -
+in fact, no - it'd still be a big problem...
+
+one approach would be to communicate local commits as well as global ones
+then we'd effectively have our commit workflow again
+but even then, our stageds might have in the meantime changed - further updates or resets...
+
+the shifting ground would have to be respected
+but we could be absolutely certain(!) that the commitables, if they haven't been cleared in the meantime,
+will be at the front of the staged buffer
+
+in fact here we waltz back to the idea of two-phase commit
+with a limbo store demarcating blobs that shouldn't be reset
+this conflicts with the nice idea of having a single self-updating loop
+
+but a limbo marker would stop us resetting the unresettable...
+and would therefore be pretty handy
+it'd get us away from the possibility of centrally resetting what had already been fired off for committing 
+and then updating on top of the new (but mistaken) tabula rasa
+as soon as the commit is confirmed, our new updates will be rebased on top of the newly shifted ground which was thought cleared
+
+if we press the button to commit, 
+that is as strong an indication of intent as we can get; it is the source of truth in this matter: the user wants this to be permanent! that'sthe implied contract
+
+-----
+
+to avoid the transaction,
+we want identifiable updates appearing in the specs
+and some way of recording limbos
+
+to even record limbos, there has to be some input of commit requests
+a notification of a starting commit comes in
+which the log receives; but then the failure of a commit also has to be communicated
+a failed commit should put the limbos back into staging
+
+but - with follow-on effects being a thing, we don't have freedom, at the level of the log,
+over our updates...
+
+commits and resets have to be performed against the whole LogSpace for it remain consistent
+a reset can't then be done at the log level
+commits are then always space-wide
+
+in this wider scope, resets could be disabled until commits were cleared
+this could take a very long time however, if saving were struggling
+
+but - how can we possibly reset what has already been put forward for committing
+simple, we can't, not reasonably anyway
+
+resets and commits, centrally managed, could be forceably linearized
+a reset request could be enqueued, but not actioned
+
+follow-on effects are themselves transactions, of course...
+it shouldn't just be a case of staging to multiple independent log streams
+a reverberating update to multiple logs is itself a single block (kinda)
+blocks are different in that they are themed by storage
+but their quality of transactionality is the same as what is here needed
+
+this then returns us to having a single shared linear log for the entire space
+and updates for different logs multiplexed
+but this doesn't suit our mode of consumption: in reading, we want to be able to load up small blocks of information closely suited to our need
+if everything were a single log, we'd have to download the entire thing
+
+but in practice everything is linear, even if its saved separately - at the level of the block. Within the block, who knows what the order is.
+though - updates within a block could indeed be cross-related
+
+when processing a reverberating update, there'd be a global clock, whereby different updates were correlated
+this would keep as much infoas possible about, which clutters but allows future flexibility
+
+and what would be the effect on our commit protocol?
+well, everything would be linear from the off; there'd be a shared clock for all updates, a single incremental register
+
+---
+
+even if there were a global index of updates, how wouldit help us?
+
+the update would only receive its number on commit(?)
+no - as cross-log operations are done as part of staging, we'd want numbers from that point
+
+the latest received LogSpaceState would tell us the next index available to use
+or even, the LogSpace itself would do the squirrelling away of the staging
+
+the staged slice would cross logs, though at the point of the log, all updates would need to be linearly available
+
+slices would be addressed as so: #Block/#Slice
+though notsure why we'd need numbering of them
+
+is it the same concern again, that updates and slices need ordering?
+or that commits need to be recognised by the logs themselves?
+
+----
+
+hmm: if slices cut across logs (so to speak) then it perhaps makes less sense for logs to manage their own stagings...
+
+a staging would then be given to the LogMachine to aggregate
+but... the LogMachine doesn't know about its follow-ons (well, it can be told at setup)
+or even, it can always publish to it knows not what - the space would set up the correct listeners
+
+but then, if all is to be held together in a slice, 
+each update given to a log has to know the slice it is bound for
+
+the LogMachine will vet the update, aggregate it...
+and, on success, will provide it back as something to be properly placed in the common slice
+
+but as each log is logically separate, we come again on the problem of distributed consistency
+two-phase commit again, eh?
+what about our simple loop of declaration?
+
+there'd be, as well as lists of blocks, propagated info re slices (one per reverberation of updates - potentially quite many)
+well, as slices would be consecutive, each block would be home to a range of slices
+because numbers would be centrally doled out - the block specs would become quite concise
+
+so, updates wouldn't have versions necessarily, but slices would - each one a slice of time across the LogSpace
+
+but in compression, then slices would inevitably be split between blocks: otherwise indices'd be impossible to split from
+their upstreams, which is essential to serving things piecemeal
+
+and so, blocks would get loads of odd slices stuck in them
+and the listing of slice ranges would fall down
+
+---
+
+a successful slice commit (local only!) would be published to all the individual logs listening in,
+these would use it as a basis for their aggregations (the first aggregation would have only been a test - no saving of state would be involved)
+
+so, logs would only update themselves when the space tells them to...
+slices would be managed outside of the logs
+
+and then we come to the actual point of committing/resetting
+
+'commit' would be called, and all the currently staged slices would be formed into a block
+when the block succeeds, it knows exactly which slices it contained, and therefore which slices can be unstaged
+the loop of confirmation is centralised and is much tighter, therefore easier to code
+
+info about slices needn't be stored in the actual block: all that matters is that the slices are there as part of staging
+staging has been centralised, and so the difficulty of recognising commits remote from the actual point of committing (ie in the separate logs) disappears
+
+what about *resets*?
+the slices can be simply purged;
+but the aggregations in the logs must themselves be reset
+most simply, these could simply be cleared, ready to be regathered
+resetting shouldnt happen frequently, so clearing out the aggrs shouldn't be great shakes
+
+why is it now so simple?
+before, we were combining the committeds with the stageds, as these were separate streams to the logs, with separate treatments proper to them
+now there'll just be one incoming stream of updates to aggregate
+
+or will there: what happens when we're gazumped, eh?
+so, slices are piled up in the LogSpace staging
+then we get a new LogSpec telling us new blocks have been registered to our logs
+
+the slices would presumably still be alive at this point, as we want to rebase em
+but they were approved, and now they might not fit
+so - if the LogSpec changes, do we have to try replaying them over the new ground?
+it seems so
+
+given a new LogSpec, all the previous slices should be replayed one by one
+(it'd be best to keep the structure of the slices here, though simpler just to stick all in one approvable slice)
+
+and if errors occurred, what then? then the slice wouldn't be committable
+it'd be sent to all interested logs for testing, and any errors would be diverted to an error stream
+
+the entire slice would be bad
+
+BUT! a new LogSpec would come through, this would, I dunno, reset all aggregations?
+
+--------------
+
+So: to stage an update:
+- we stage to the log
+- *log* dry-runs the aggregation
+  - gets *slice* from the space
+  - publishes to *slice*
+- *slice*
+  - gathers approved updates/errors from logs
+  - derives completion status
+  - on success, publishes updates to interested parties
+  - *log* aggregates /and stores aggregation for viewing/
+
+here the *log* has become a much smaller component in a wider system
+that system should be clearly and centrally represented, rather than implemented in its branches
+
+-------
+
+a bad slice will never be published to th *logs*
+it'll go into the error stream, so that the user knows about its failure
+but it won't taint state
+
+bad updates from elsewhere may cause catastrophic errors - but this just means we have to be careful with aligning models and data, which is inescapable
+
+-------
+
+given an update:
+- provision slice
+- test aggr on primary target
+- find follow-ons, test on these...
+
+nah, we've got two-phase commit again...
+
+all updates are provided either from the BlockCache or from Slices
+and if we have many slices (as we reasonably might) the updates should be indexed by log as much as by slice
+but here we have the reliable update, two source of truth problem in microcosm
+
+a log should have a list of Chunks to loop through and bring together, each one a small array specifically for itself
+blocks, when loaded, will proffer Chunks, as will Slices
+
+we have a choice here between a push-based invalidation of local caches
+and a check-and-catch-up strategy on read - lazy reading
+
+but if we're doing the catch-up thing, it means we have to make each individual update asynchronous,
+to allow for just-in-time loading of the aggregation
+and the same will be done for each and every follow-on
+
+how could they ever not be asynchronous?
+well,they already are, as updates are provided by stream; and errors are also asynchronously reported
+anything committed takes precedence in time
+
+----
+
+if a Slice is committed, it will reappear in the form of a Block, via the BlockStore
+as the new LogSpec comes in, it is advertised to each LogMachine (as the maintainer of aggregations)
+then the LogMachine can load it as it wishes
+
+as soon as the LogSpec is loaded, a new View will be emitted
+
+but there's also the matter the temporary, staged aggregation
+updates in local Slices must also be aggregated by the LogMachines
+
+on receiving a LogSpec, there should be some way of knowing whether our slices were
+ready for culling, as the updates of the LogSpec were now committed,
+and their updates would be provided by the usual means of loading from the store
+(the BlockCache would locally save the committed block so that it would be immediately available)
+
+----
+
+hmm... if the commit of the slice succeeds, we should pipe back confirmations of slice committals,
+the SliceStore could listen in on this and clear such the promoted Slices
+
+but there is a concern here for ordering
+each stream has its own separate, mysterious time
+and we need to order things properly:
+we can only clear a slice when it is provided by the BlockCache instead
+
+the switch has to be atomic: they can't be done as separate streams
+
+the publishing of the new Block must be what clears the Slice; it must also be precisely this moment
+that publishes the newly-confirmed updates
+
+so the joining of block and slice should be a kind of state-affecting reduction
+as in, the SliceStore should be a state machine
+like we had imagined the LogMachine to be; but this time centralized and shared
+
+the SliceStore will offer new updates to Logs as they need them
+will the Logs need LogSpecs, then?
+
+who knows, but the SliceStore needn't know anything about Models - it is simpler than that, self-contained
+it seems like a good component to get in place
+
+it won't do the testing and staging of updates, follow-ons, etc
+but it will provide a fresh, one-at-a-time Slice on request
+
+staging a slice will be async as always, as we have to load shite
+
+-------
+
+reading from the SliceStore:
+would request a tuple of streams:
+one a stream of committed updates; the second would be a stream of sliced updates
+the Log would concat these as needed
+
+when staging, a slice would be requested, and prepared by the Stager, via many individual Logs
+but these Logs would have to be up-to-date
+their aggregations would need to be of the right time frame
+otherwise updates may get approved that have actually been gazumped by upstream changes
+
+Slices have to be serial
+if we have a proto-Slice, then it can't be approved unless it sits right on top of the LogSpec
+when staging, the fresh Slice should have a provisional number,
+and preparation of the staging should proceed only if no fresher slice is known
+but we can proceed optimistically:
+the new Slice should be accepted only if it still fits
+
+basically, we can only (try to) commit what we know to be up-to-date with our latest LogSpec
+it may be that the ManifestStore knows better, but thats a matter for itself
+
+a Slice streams errors and aggreagtions out of it...
+this is so errors can reactively update given shifting sands
+errors are both pooled and potentially Log-specific
+
+each Slice builds on a previous Slice, or on the foundational layer of the BlockCache
+
+a stack of slices, each one its own world of updates and aggregations
+
+each Slice would be a vision of the world:
+each one would have a map of updates, which would be aggregated onto the previous layer's world
+
+but at the very top, facing the user, will be a single LogFacade,
+needing the very latest aggrs for each requested Log
+also, the SliceStore will need the same to vet the validity of a new slice
+(or - the Slice will self-validate as it sits there)
+
+but, at the very top, the user will receive views from the top of the stack of slices
+
+---------
+
+so, in staging, we will create a new Slice layer,
+and then how will we commit?
+
+LogSpecs power the base, rather the Slices in particular
+the movement of committing
+is in forming a new LogSpec including all the slices
+and then the new LogSpec is subject to an attempted commit
+if it succeeds, then the committed Slices can be lopped off
+
+but the base needs to have loaded the newly-committed block
+before the Slice is got rid of
+the culling of the Slices has to be done as the new LogSpec is given to the base
+
+but how can these be correlated?
+1) if the entire stack of Slices was in a single state machine
+   LogSpecs would be received by the same
+2) if the Slices subject to culling identified themselves in the new stream passing through them from below,
+   and they culled themselves: ie they wouldn't merge in their unneeded data
+3) if the merge operation just didn't merge in updates that already existed from below
+   this could be done more easily if updates were indexed; but this would then complicate rebasing
+
+the bit doing the switch-over has to be at the join (or beyond!) of the base and affected slice layers
+if not, one of the parties may chane its output while the other does not, leading to duplication or omission
+
+the thing with Slices self-detecting, is that they will only self-detect if they have an active stream going through them:
+and the LogFrame streams are lazily established, and bitty...
+
+maybe if there were a metadata stream that was always flowing as long as the slices were hooked up:
+the metadata stream would give the slices the means of knowing their own validity:
+if they saw themselves represented in the incoming metadata, they would be able to publish an 'Obsolete' status to the SliceManager
+and they wouldn't merge themselves in at all
+but the metadata stream would be parallel to the per-log data streams
+everything has to be in one consistent frame 
+
+ManifestFrames would be published, that were basically LogSpace states
+these frames would propagate metadata through, and give access to streams of updates and aggregations
+each Slice would therefore get a chance to apply itself in safety based on its current metadata and the upstream metadata
+
+any eventual consumer would have to re-request update streams
+but updates should be push-based... no re-registration should be necessary
+well, right at the top, in the LogFacade, on each new frame, the latest frame could be asked for its log and this would be merged into a single stream transparently
+but this delegation backup the stream would form a general protocol of communication - lazy data via /frame.getLog()/
+
+-----------
+
+a Slice that knew it was obsolete would just pass the logFrame request through to the base layer
+it'd also publish its own obsolescence, which would trigger a reactive SliceManager to remove it from the stack
+there'd be a determinate order here: an obsolete Slice would... *but only if there were again a single SliceFrame!*
+
+given a new Frame, a Slice would be obsolete or not, and it would pass LogFrame requests through or not
+the new Frame would trigger a new SliceMap, and any requesting of a LogFrame stream from the SliceManager would
+firstly require a new topology to be decided
+
+this new topology would be based on the old one, but would be determined before any other operation were performed
+the old topology, with its old individual slices, would have its special chance to reform itself before any new
+LogFrames were passed through
+
+reduction in the large - or rather, a /scan/ in the large!
+
+-----------
+
+how would the SliceMap know that some of its number were obsolete?
+it'd have to be picking out identifiers from the LogSpecs
+but these identifiers couldn't be linearly generated and maintained in a distributed manner
+ie, if the LogSpec was to say which Slices were done, it'd have a massive unmanageable set of GUIDs or somesuch
+
+there's no need for remote communication of commit results:
+instead, it's as if each new Frame (all of which will be serailly processed)
+should include info about its source, its trigger: 
+if the new Frame has been triggered by a successful commit,
+then this commit result can be picked up downstream
+
+what about failures to commit? this would generate errors, but
+nothing would be done to the Slices themselves: all would be left in place, pristine, unknowing
+
+-------
+
+instead of identifiers for nuking Slices, how about a monotonically-rising counter:
+if the counter were above the Slice number, we'd know the Slice was committed
+
+but what if Slices were reset? it wouldn't matter, because it wouldn't be a counter, only an incremental identifier
+with special powers for covering our arse if certain Frames for some reason didn't make it through
+well: a commit can be made up of multiple Slices, so we need the rising identifier
+to cover swathes of slices at once
+
+-------
+
+*Recapitulation*
+
+The LogSpace will have a stream of Frames: these will propagate LogSpecs /AND/ commit indices
+with these two bits of info, blocks can be loaded per log, and slices can remove themselves cleanly
+
+------------------------------------------------------------
+
+so in come SliceRequests and SavedSliceIds,
+SliceRequests are created and returned to the requestor(?) to fill up with bits
+but why do they have to be secretly created here? there's nothing to stop the requestor actually creating the slice,
+filling it up, errors and all...
+
+then the slice is published to the SliceBank, which gives it a unique ID
+
+in creating the fresh slice, it would however have to be wired up to the previous slice - or rather, it should be interpreted as such
+but - why go to the trouble of wiring it up, then rewiring it? this, i think, is why we'd want it to be provided by the SliceBank itself
+though then unpursued slices would accumulate messily, and we'd have to form a call-and-response endpoint, instead of sticking with the simplicity of streams
+
+so, as slices need to be moved about /as data/, let's try treating them as data, and not as objects. The problem with objects here is that they close over their set dependencies,
+as their logic is encapsulated, and the calling of their endpoints only by simple dispatch, a part of their interface is actually in the arguments to their ctors... which are untractable
+unless the object is fairly static
+
+if slices are data, then they must be interpreted, rather than delegated to
+
+-------
+
+so, in forming a new slice, the activity doing so must get the latest LogFrame(s) from the existing SliceStack
+with these LogFrames, new updates can be registered into the new Slice, vetted in their aggregations
+
+slices are to be formed one by one, and cleaned out of band
+
+rearranging them, cleaning them, etc, is impossible if their inferior is injected into them on creation, with it from then on being
+closed over and encapsulated away from poking about at
+again, this is the idea that we should interpret banks of data, rather than threading streams /through/ the data
+
+a Slice is a bit of data
+we'd thought before that errors would be published to per-slice streams, and yet errors are determined by te full combination of blocks and slices
+that is, errors are derived in toto: errors should be similarly gathered from incremental iteration
+
+so, a slice is created, but is itself not wired up to anything.
+well... the new slice would be published as data (actually a tributary stream) to the SliceStack
+
+all views of staged updates would now include all updates published to that particular slice
+the slice would actually be a ReplaySubject of staged updates, passed in unidirectionally to the SliceStack
+
+if the Slice created strange errors from follow-ons, etc, then...
+these errors would be routed into the main error stream
+maybe in the future there'd be the possibility of rolling back the bad inputs
+but this would be a matter for the SliceStack FSM
+
+-------
+
+*SliceStack*
+inputs:
+- *slices*: stream of /Map<LogRef,(LogModel,Updates)>/
+  the nested update streams are then published to (via ReplaySubject)
+  
+outputs:
+- *errors* should be automatically updated
+  but to do this, we need LogModels!
+  
+  
+err, but our idea was to scan over the data structure:
+so we don't want LogModels here, we just want the raw data
+then aggregation can be separated out as a distinct thing to manage
+
+the SliceStack will just receive commands telling it to reset the slices, and to cull committed slices
+each new command will create a newly reduced SliceStack for all to happily use
+
+all SliceStack cares about is giving us updates in order,
+and moving the slices about
+
+--
+
+so the *SliceStack* won't aggregate for us, and as such it doesn't need to lazily load base updates from the blockstore layer...
+all it has to do is serve frames of a SliceMap
+
+------------------------------
+
+should SliceStack return frames? it has to, how else can it express a reset?
+
+and if a new Slice appears?
+then it'd be best if the existing, established streams were used:
+downstream aggregations etc don't need to be reset or anything
+
+by passing through new frames for every change, we were overusing frames:
+they're needed, but not /always/
+
+and we had also built our testing strategy on top of them
+we were testing for a recognisable progression of frames through time
+yet, really, we should be streaming through changes as they occur, without any aggressive unneeded reductions and resubscriptions
+
+so, how do we test the behaviour through time?
+again, by aggregate outputs;
+if the right bits are in the right places at the end of the test, hurrah
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

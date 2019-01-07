@@ -45,6 +45,7 @@ export function createLogFacade<U extends AnyUpdate, D, V>(key: string, model: M
 }
 
 
+
 export function createLogMachine<U extends AnyUpdate, D, V>(
         key: string, 
         model: Model<U, D, V>, 

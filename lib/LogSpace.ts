@@ -23,17 +23,24 @@ export type LogSpec = {
 }
 
 
-export function createLogSpace(blockStore: BlockStore, manifestStore: ManifestStore): LogSpace {
+type Frame = {
+    spec: LogSpec,
+    lastCommit: number
+}
+
+type Confirm = {}
+
+type Slice = {}
+
+export function createLogSpace(blockStore: BlockStore, manifestStore: ManifestStore, frames: Observable<Frame>): LogSpace {
     let version = 0;
     let logs: { [key: string]: InnerLog } = {}
 
     const innerLogs = new Subject<Dict<InnerLog>>();
     const manifests = new Subject<Manifest>();
 
-
-    const commits = new Subject<number>();
-    let nextCommitId = 1;
-    
+    let nextCommitId = 0;
+    const commits = new Subject<Confirm>();
 
     //the manifests stream should be combined with a logs stream
     //to give a stream of latest 

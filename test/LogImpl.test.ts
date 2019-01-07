@@ -84,8 +84,22 @@ describe('LogImpl', () => {
         expect(views).toEqual(['', '4', '4:5', '1:2:3:4:5']);
     })
 
-})
 
+    it('staged updates swallowed if they appear in newly published spec', async () => {
+        x.spec({ head: 0, blocks: [] });
+
+        const { views } = await x.complete(); 
+        expect(views).toEqual(['', '4', '4:5', '1:2:3:4:5']);
+    })
+
+    //
+    //
+
+
+
+
+
+})
 
 
 function createFixture() {
@@ -95,6 +109,8 @@ function createFixture() {
     const loads = new Subject<number>();
 
     const log = createLogMachine('KEY', testModel, specs, updates, resets, loadBlock);
+
+
 
     const allViews = log.views
                         .pipe(reduceToArray(), last());
