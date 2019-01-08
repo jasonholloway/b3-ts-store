@@ -1,0 +1,31 @@
+what happens if, after we dispatch a Commit request
+(which samples the latest slices and commits based on this)
+
+a Reset is also dispatched, but before the Committer dispatches a SliceCommitted?
+then it's fine: the slices have been cleared for us
+the LogSpec will come through from below to sure everything up
+
+-------------------------
+
+if the Committer needs to know whether a Slice is completed, and what its number is also -
+then the /SliceStack/ shouldn't be suppressing the Slice articulation
+
+it'll output then an Observable<Era>
+
+-------------------------
+
+So the merging of all slices etc is for the consumer to do...
+
+the SliceStack then just handles /Reset/ and /SliceCommitted/
+and serves a stream of eras and slices, from which downstreams can bungle together a momentary view of state
+
+that's it...
+
+which means some of our tests, again, are misplaced...
+
+
+
+
+
+
+

@@ -1,5 +1,5 @@
-import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce, scan, startWith, switchMap, groupBy } from 'rxjs/operators';
-import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction } from 'rxjs';
+import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce, scan, startWith, switchMap, groupBy, finalize, buffer } from 'rxjs/operators';
+import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, forkJoin, Subject, Subscription } from 'rxjs';
 
 
 export type UpdateCreator<Type extends string, Body = void> 
@@ -73,15 +73,43 @@ export function reduceToDict<V>() {
     return reduce<[string, V], Dict<V>>((ac, [k, v]) => ({ ...ac, [k]: v }), {});
 }
 
+export function addIndex<V>() {
+    return pipe(map((v: V, i) => tup(i, v)));
+}
 
-export function switchHere<A, B>(b$: Observable<B>) : OperatorFunction<A, [A, Observable<B>]> {
+export function bufferAll<V>() : OperatorFunction<V, V[]> {
+    return buffer(empty());
+}
+
+
+export function capture<A, B>(project: (A) => Observable<B>) : OperatorFunction<A, [A, Observable<B>]> {
     return pipe(
-        switchMap(a => b$.pipe(
-            map(b => tup(a, b))
-        )),
-        groupBy(([a, _]) => a, ([_, b]) => b),
-        map(g => tup(g.key, g))
+        switchMap(a => project(a)
+                        .pipe(map(b => tup(a, b)))),
+        groupBy(([a, _]) => a, ([_, b]) => b),          //but as the eras accumulate, so will the groups...
+        map(g => tup(g.key, g))                         //this is bobbins
     );
 }
+
+
+export function capture2<A, B>(project: (A) => Observable<B>) : OperatorFunction<A, [A, Observable<B>]> {
+    return pipe(
+        scan<A, [A, Observable<B>, Subscription]>(
+            ([_, __, lastSub], a) => {
+                console.log('capturing for era', a)
+                const subject = new Subject<B>();
+                lastSub && lastSub.unsubscribe();
+                const subscription = project(a).subscribe(subject);                
+                return tup(a, subject, subscription);
+            }, 
+            tup(null, null, null)),
+        map(([a, o, _]) => tup(a, o))
+    );
+}
+
+//the problem with the above is that the final subject is never completed...
+//as its never unsubscribed (I think; but its subscription must end)
+//
+//
 
 

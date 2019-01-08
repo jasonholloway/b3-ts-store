@@ -1,64 +1,91 @@
-import { Observable, Subject, from, empty } from "rxjs";
-import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict, switchHere } from "../lib/utils";
-import { map, flatMap, groupBy, startWith, scan, concatAll } from "rxjs/operators";
+import { Observable, Subject, from, empty, of, OperatorFunction, ReplaySubject } from "rxjs";
+import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict, addIndex, bufferAll } from "../lib/utils";
+import { map, startWith, scan, concatMap, window, withLatestFrom, filter, share, concat, shareReplay, tap, publishReplay, flatMap, exhaustMap, mergeAll, buffer } from "rxjs/operators";
 
-type UpdateMap<U> = Dict$<Observable<U>>
-type Command = 'reset' | { commitId: number }
+type SliceRef = number;
+type Slice<V> = [SliceRef, V]
+type Slice$<V> = Observable<Slice<V>>
+
 type EraRef = number
+type Era<V> = [EraRef, Slice$<V>]
+
+
 
 type Dict$<V> = Observable<[string, V]>
-type SliceEra<U> = [EraRef, Dict$<Observable<U>>]
+type LogPart$<U> = Dict$<Observable<U>>
 
-function manageSlices<U>(commands: Observable<Command>, slices: Observable<UpdateMap<U>>): Observable<SliceEra<U>> {
-    //eras are currently triggered by all input commands
-    const eras = commands.pipe(
-        startWith(0), 
-        scan(ac => ac + 1, 0)
-    );
+function manageSlices<V>(cursors: Observable<number>, slices: Observable<V>): Observable<Era<V>> {
 
-    //!!!!!!!!
-    const numberedSlices = slices.pipe(map((sl, i) => tup(i, sl)));
-    //!!!!!!!!
+    cursors = cursors.pipe(share());    //this is shared as single subject to ensure ordering of subscriptions (needed for below)
 
-    return eras.pipe(
-        switchHere(slices.pipe(startWith(empty()))),
-        map(([era, partsPerSlice]) => tup(era, partsPerSlice.pipe(    
-            concatAll(),
-            groupBy(([logRef, _]) => logRef, ([_, updates]) => updates),
-            map(g => tup(g.key, g.pipe(concatAll())))
-        )))
-    );
+    return slices.pipe(addIndex())
+            .pipe(
+                window(cursors),
+
+                withLatestFrom(cursors.pipe(startWith(-1))),
+
+                scan(([_, prev]: [Slice$<V>, Observable<Slice<V>[]>], [curr, cursor]: [Slice$<V>, number]) => {
+                        const era = prev.pipe(
+                                        mergeAll(),
+                                        concat(curr),
+                                        filter(([id, _]) => id > cursor)
+                                    );
+                        
+                        return tup(era, era.pipe(bufferAll()));     //eagerly materializes for future use
+                    },                                              //BUT!!! needs to be subscribed to, dunnit! *****************
+                    tup(empty(), of([]))),
+
+                map(([o, _]) => o),
+
+                addIndex()
+            );
+
+    //***
+    //all slices must be complete before a new one is admitted...
+    //but how can we ensure this?
+    //
+    //otherwise it'd be possible to add to a slice from a previous era
+    //but maybe this is in fact ok
+    //what we can't have is *committing* an uncompleted slice
+    //even resetting such a slice would be fine: the publisher to the slice will be emitting into space
+    //
+    //as long as all slices up to the point of committing are complete, all is ok
+    //******
 }
 
 
 
 describe('manageSlices', () => {
 
-    let slices: Subject<UpdateMap<number>>
-    let commands: Subject<Command>
-    let gathering: Promise<Dict<number[]>[]>
+    let slices: Subject<LogPart$<number>>
+    let cursors: Subject<number>
+    let gathering: Promise<[EraRef, [SliceRef, Dict<number[]>][]][]>
 
     beforeEach(() => {
-        commands = new Subject<Command>();
-        slices = new Subject<UpdateMap<number>>();
-        gathering = manageSlices(commands, slices)
+        cursors = new Subject<number>();
+        slices = new Subject<LogPart$<number>>();
+        gathering = manageSlices(cursors, slices)
                     .pipe(
-                        flatMap(([era, parts]) => parts.pipe(
-                            flatMap(([logRef, updates]) => updates.pipe(reduceToArray(), map(r => tup(logRef, r))) ),
-                            reduceToDict()
-                        )),
-                        scanToArray()
-                    )
+                        concatMap(([era, slices]) => slices.pipe(
+                            concatMap(([ref, parts]) => parts.pipe(
+                                concatMap(([logRef, updates]) => updates.pipe(                                                                                                                            
+                                                                    reduceToArray(),
+                                                                    map(r => tup(logRef, r)))),
+                                reduceToDict(),
+                                map(u => tup(ref, u)))),
+                            reduceToArray(),
+                            map(r => tup(era, r)))),
+                        scanToArray())
                     .toPromise();
     })
-
 
     it('single slice appears in output', async () => {
         slice({ log1: [ 1, 2, 3 ] });
         
-        const r = await complete();
-        expect(r).toEqual([
-            { log1: [ 1, 2, 3 ] }
+        await expectEras([
+            [0, [
+                [0, { log1: [ 1, 2, 3 ] }]
+            ]]
         ])                
     })
 
@@ -66,63 +93,87 @@ describe('manageSlices', () => {
         slice({ log1: [ 1, 2, 3 ] });
         slice({ log2: [ 4, 5, 6 ] });
 
-        const r = await complete();
-        expect(r).toEqual([
-            { log1: [ 1, 2, 3 ], log2: [ 4, 5, 6] }
+        await expectEras([
+            [0, [
+                [0, { log1: [ 1, 2, 3 ] }],
+                [1, { log2: [ 4, 5, 6 ] }]
+            ]]
         ])                
     })
 
-    it('updates of same log are concatenated', async () => {
-        slice({ log1: [ 1, 2, 3 ], log2: [ 1 ] });
-        slice({ log1: [ 4, 5, 6 ], log2: [ 2 ] });
 
-        const r = await complete();
-        expect(r).toEqual([
-            { log1: [ 1, 2, 3, 4, 5, 6], log2: [ 1, 2 ] }
-        ])                
-    })
+    //capture() doesn't work as we want: a new era is only published
+    //when the first slice comes through to be captured
+    //whereas we want the new group to be eagerly pushed through
+    //
+
 
     it('on reset, starts new era', async () => {
         slice({ log1: [ 1, 2, 3 ] });
-        reset();
-        
-        const r = await complete();
-        expect(r).toEqual([
-            { log1: [ 1, 2, 3 ] },
-            {}
+        moveCursor(0);
+
+        await expectEras([
+            [0, [
+                [0, { log1: [ 1, 2, 3 ] }]
+            ]],
+            [1, []]
         ])
     })
 
 
     it('new era emits new slices', async () => {
         slice({ log1: [ 1, 2, 3 ] });
-        reset();
+        moveCursor(0);
         slice({ log1: [ 4 ] });
         
-        const r = await complete();
-        expect(r).toEqual([
-            { log1: [ 1, 2, 3 ] },
-            { log1: [ 4 ] }
+        await expectEras([
+            [0, [
+                [0, { log1: [ 1, 2, 3 ] }]
+            ]],
+            [1, [
+                [1, { log1: [ 4 ] }]
+            ]]
         ])
     })
 
 
+    describe('confirmCommit', () => {
 
-    //*******************
-    //NB we must commit using SliceRef! Not with EraRef!
-    //eras are created after commits... commits are specified using slices...
+        it('starts new era', async () => {
+            slice({ log1: [ 1, 2, 3 ] });
+            moveCursor(0);
+            slice({ log1: [ 4 ] });
+            
+            await expectEras([
+                [0, [
+                    [0, { log1: [ 1, 2, 3] }]
+                ]],
+                [1, [
+                    [1, { log1: [ 4 ] }]
+                ]]
+            ])
+        })
 
-    it('confirmCommit starts new era', async () => {
-        slice({ log1: [ 1, 2, 3 ] });
-        sliceCommitted(3);
-        slice({ log1: [ 4 ] });
-        
-        const r = await complete();
-        expect(r).toEqual([
-            { log1: [ 1, 2, 3 ] },
-            { log1: [ 4 ] }
-        ])
+        it('uncommitted slices live on', async () => {
+            slice({ log1: [ 1 ] });
+            slice({ log1: [ 2 ] });
+            slice({ log1: [ 3 ] })
+            moveCursor(1);
+            
+            await expectEras([
+                [0, [
+                    [0, { log1: [ 1 ] }],
+                    [1, { log1: [ 2 ] }],
+                    [2, { log1: [ 3 ] }]
+                ]],
+                [1, [
+                    [2, { log1: [ 3 ] }]
+                ]]
+            ])
+        })
+    
     })
+
 
     //*******************
     //NB make sure Slices are completed before committing!
@@ -134,25 +185,24 @@ describe('manageSlices', () => {
 
 
 
+    async function expectEras(expected: [EraRef, [SliceRef, Dict<number[]>][]][]) {
+        const r = await complete();
+        expect(r).toEqual(expected);
+    }
 
 
 
 
     function complete() {
-        commands.complete();
+        cursors.complete();
         slices.complete();
         return gathering;
     }
 
+    function moveCursor(n: number) {
+        cursors.next(n);
+    }
     
-    function reset() {
-        commands.next('reset');
-    }
-
-    function sliceCommitted(sliceId: number) {
-
-    }
-
     function slice(sl: Dict<number[]>) {
         slices.next(
             from(enumerate(sl))
