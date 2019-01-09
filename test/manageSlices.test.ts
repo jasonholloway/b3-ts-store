@@ -1,7 +1,7 @@
-import { Observable, Subject, from } from "rxjs";
+import { Observable, Subject, from, OperatorFunction, pipe } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap } from "rxjs/operators";
-import { EraRef, SliceRef, manageSlices } from "../lib/manageSlices";
+import { EraRef, SliceRef, manageSlices, Era, Slice } from "../lib/manageSlices";
 
 type Dict$<V> = Observable<[string, V]>
 type LogPart$<U> = Dict$<Observable<U>>
@@ -29,17 +29,7 @@ describe('manageSlices', () => {
         thresholds = new Subject<number>();
         slices = new Subject<LogPart$<number>>();
         gathering = manageSlices(slices, thresholds)
-                    .pipe(
-                        concatMap(([era, slices]) => slices.pipe(
-                            concatMap(([ref, parts]) => parts.pipe(
-                                concatMap(([logRef, updates]) => updates.pipe(                                                                                                                            
-                                                                    reduceToArray(),
-                                                                    map(r => tup(logRef, r)))),
-                                reduceToDict(),
-                                map(u => tup(ref, u)))),
-                            reduceToArray(),
-                            map(r => tup(era, r)))),
-                        scanToArray())
+                    .pipe(materializeEras())
                     .toPromise();
     })
 
@@ -135,5 +125,20 @@ describe('manageSlices', () => {
                 .pipe(map(([k, r]) => tup(k, from(r))))
         );
     }
+
+    function materializeEras() : OperatorFunction<Era<LogPart$<number>>, any> {
+        return pipe(
+            concatMap(([era, slices]) => slices.pipe(
+                concatMap(([ref, parts]) => parts.pipe(
+                    concatMap(([logRef, updates]) => updates.pipe(                                                                                                                            
+                                                        reduceToArray(),
+                                                        map(r => tup(logRef, r)))),
+                    reduceToDict(),
+                    map(u => tup(ref, u)))),
+                reduceToArray(),
+                map(r => tup(era, r)))),
+            scanToArray());
+    }
+
 
 })
