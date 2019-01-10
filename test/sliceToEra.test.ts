@@ -1,10 +1,10 @@
 import { Observable, Subject, from, OperatorFunction, pipe } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap } from "rxjs/operators";
-import { EraRef, SliceRef, manageSlices, Era, Slice } from "../lib/manageSlices";
+import { EraRef, SliceRef, sliceToEra, Era, Slice } from "../lib/sliceToEra";
 
 type Dict$<V> = Observable<[string, V]>
-type LogPart$<U> = Dict$<Observable<U>>
+type Ripple<U> = Dict$<Observable<U>>
 
 //***
 //all slices must be complete before a new one is admitted...
@@ -19,22 +19,22 @@ type LogPart$<U> = Dict$<Observable<U>>
 //******
 
 
-describe('manageSlices', () => {
+describe('sliceToEra', () => {
 
-    let slices: Subject<LogPart$<number>>
+    let ripples: Subject<Ripple<number>>
     let thresholds: Subject<number>
     let gathering: Promise<[EraRef, [SliceRef, Dict<number[]>][]][]>
 
     beforeEach(() => {
         thresholds = new Subject<number>();
-        slices = new Subject<LogPart$<number>>();
-        gathering = manageSlices(slices, thresholds)
+        ripples = new Subject<Ripple<number>>();
+        gathering = sliceToEra(ripples, thresholds)
                     .pipe(materializeEras())
                     .toPromise();
     })
 
     it('single slice appears in output', async () => {
-        slice({ log1: [ 1, 2, 3 ] });
+        ripple({ log1: [ 1, 2, 3 ] });
         
         await expectEras([
             [0, [
@@ -44,8 +44,8 @@ describe('manageSlices', () => {
     })
 
     it('multiple slices appears in output', async () => {
-        slice({ log1: [ 1, 2, 3 ] });
-        slice({ log2: [ 4, 5, 6 ] });
+        ripple({ log1: [ 1, 2, 3 ] });
+        ripple({ log2: [ 4, 5, 6 ] });
 
         await expectEras([
             [0, [
@@ -56,7 +56,7 @@ describe('manageSlices', () => {
     })
 
     it('on threshold move, starts new era', async () => {
-        slice({ log1: [ 1, 2, 3 ] });
+        ripple({ log1: [ 1, 2, 3 ] });
         threshold(0);
 
         await expectEras([
@@ -69,9 +69,9 @@ describe('manageSlices', () => {
 
 
     it('new slices into new era', async () => {
-        slice({ log1: [ 1, 2, 3 ] });
+        ripple({ log1: [ 1, 2, 3 ] });
         threshold(0);
-        slice({ log1: [ 4 ] });
+        ripple({ log1: [ 4 ] });
         
         await expectEras([
             [0, [
@@ -84,9 +84,9 @@ describe('manageSlices', () => {
     })
 
     it('obsolete slices disappear in new era', async () => {
-        slice({ log1: [ 1 ] });
-        slice({ log1: [ 2 ] });
-        slice({ log1: [ 3 ] })
+        ripple({ log1: [ 1 ] });
+        ripple({ log1: [ 2 ] });
+        ripple({ log1: [ 3 ] })
         threshold(1);
         
         await expectEras([
@@ -111,7 +111,7 @@ describe('manageSlices', () => {
 
     function complete() {
         thresholds.complete();
-        slices.complete();
+        ripples.complete();
         return gathering;
     }
 
@@ -119,14 +119,14 @@ describe('manageSlices', () => {
         thresholds.next(n);
     }
     
-    function slice(sl: Dict<number[]>) {
-        slices.next(
+    function ripple(sl: Dict<number[]>) {
+        ripples.next(
             from(enumerate(sl))
                 .pipe(map(([k, r]) => tup(k, from(r))))
         );
     }
 
-    function materializeEras() : OperatorFunction<Era<LogPart$<number>>, any> {
+    function materializeEras() : OperatorFunction<Era<Ripple<number>>, any> {
         return pipe(
             concatMap(([era, slices]) => slices.pipe(
                 concatMap(([ref, parts]) => parts.pipe(

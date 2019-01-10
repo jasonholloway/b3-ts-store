@@ -9,11 +9,11 @@ export type Slice$<V> = Observable<Slice<V>>
 export type EraRef = number
 export type Era<V> = [EraRef, Slice$<V>]
 
-export function manageSlices<V>(slices: Observable<V>, thresholds: Observable<number>): Observable<Era<V>> {
+export function sliceToEra<V>(vals: Observable<V>, thresholds: Observable<number>): Observable<Era<V>> {
 
     thresholds = thresholds.pipe(share());
 
-    return slices.pipe(addIndex())
+    return vals.pipe(addIndex())
             .pipe(
                 window(thresholds),
 
