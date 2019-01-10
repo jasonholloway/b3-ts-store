@@ -1,7 +1,7 @@
 import { Observable, Subject, from, OperatorFunction, pipe } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap } from "rxjs/operators";
-import { EraRef, SliceRef, sliceToEra, Era, Slice } from "../lib/sliceToEra";
+import { SliceRef, sliceToEra, Era } from "../lib/sliceToEra";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
@@ -23,7 +23,7 @@ describe('sliceToEra', () => {
 
     let ripples: Subject<Ripple<number>>
     let thresholds: Subject<number>
-    let gathering: Promise<[EraRef, [SliceRef, Dict<number[]>][]][]>
+    let gathering: Promise<[SliceRef, Dict<number[]>][]>
 
     beforeEach(() => {
         thresholds = new Subject<number>();
@@ -37,9 +37,9 @@ describe('sliceToEra', () => {
         ripple({ log1: [ 1, 2, 3 ] });
         
         await expectEras([
-            [0, [
+            [
                 [0, { log1: [ 1, 2, 3 ] }]
-            ]]
+            ]
         ])                
     })
 
@@ -48,10 +48,10 @@ describe('sliceToEra', () => {
         ripple({ log2: [ 4, 5, 6 ] });
 
         await expectEras([
-            [0, [
+            [
                 [0, { log1: [ 1, 2, 3 ] }],
                 [1, { log2: [ 4, 5, 6 ] }]
-            ]]
+            ]
         ])                
     })
 
@@ -60,10 +60,10 @@ describe('sliceToEra', () => {
         threshold(0);
 
         await expectEras([
-            [0, [
+            [
                 [0, { log1: [ 1, 2, 3 ] }]
-            ]],
-            [1, []]
+            ],
+            []
         ])
     })
 
@@ -74,12 +74,12 @@ describe('sliceToEra', () => {
         ripple({ log1: [ 4 ] });
         
         await expectEras([
-            [0, [
+            [
                 [0, { log1: [ 1, 2, 3 ] }]
-            ]],
-            [1, [
+            ],
+            [
                 [1, { log1: [ 4 ] }]
-            ]]
+            ]
         ])
     })
 
@@ -90,20 +90,20 @@ describe('sliceToEra', () => {
         threshold(1);
         
         await expectEras([
-            [0, [
+            [
                 [0, { log1: [ 1 ] }],
                 [1, { log1: [ 2 ] }],
                 [2, { log1: [ 3 ] }]
-            ]],
-            [1, [
+            ],
+            [
                 [2, { log1: [ 3 ] }]
-            ]]
+            ]
         ])
     })
 
 
 
-    async function expectEras(expected: [EraRef, [SliceRef, Dict<number[]>][]][]) {
+    async function expectEras(expected: [SliceRef, Dict<number[]>][][]) {
         const r = await complete();
         expect(r).toEqual(expected);
     }
@@ -128,15 +128,14 @@ describe('sliceToEra', () => {
 
     function materializeEras() : OperatorFunction<Era<Ripple<number>>, any> {
         return pipe(
-            concatMap(([era, slices]) => slices.pipe(
-                concatMap(([ref, parts]) => parts.pipe(
+            concatMap(slices => slices.pipe(
+                concatMap(([sliceId, parts]) => parts.pipe(
                     concatMap(([logRef, updates]) => updates.pipe(                                                                                                                            
                                                         reduceToArray(),
                                                         map(r => tup(logRef, r)))),
                     reduceToDict(),
-                    map(u => tup(ref, u)))),
-                reduceToArray(),
-                map(r => tup(era, r)))),
+                    map(u => tup(sliceId, u)))),
+                reduceToArray())),
             scanToArray());
     }
 
