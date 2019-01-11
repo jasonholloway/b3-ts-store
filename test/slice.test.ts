@@ -1,36 +1,27 @@
-import { Observable, Subject, from, OperatorFunction, pipe } from "rxjs";
+import { Observable, Subject, from, OperatorFunction, pipe, BehaviorSubject } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap } from "rxjs/operators";
-import { SliceRef, sliceToEra, Era } from "../lib/sliceToEra";
+import { SliceRef, Era, slice } from "../lib/slice";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
 
-//***
-//all slices must be complete before a new one is admitted...
-//but how can we ensure this?
-//
-//otherwise it'd be possible to add to a slice from a previous era
-//but maybe this is in fact ok
-//what we can't have is *committing* an uncompleted slice
-//even resetting such a slice would be fine: the publisher to the slice will be emitting into space
-//
-//as long as all slices up to the point of committing are complete, all is ok
-//******
+jest.setTimeout(500);
 
-
-describe('sliceToEra', () => {
+describe('slice', () => {
 
     let ripples: Subject<Ripple<number>>
-    let thresholds: Subject<number>
+    let eras: Subject<number>
     let gathering: Promise<[SliceRef, Dict<number[]>][]>
 
     beforeEach(() => {
-        thresholds = new Subject<number>();
+        eras = new BehaviorSubject<number>(0);
         ripples = new Subject<Ripple<number>>();
-        gathering = sliceToEra(ripples, thresholds)
-                    .pipe(materializeEras())
-                    .toPromise();
+
+        gathering = eras.pipe(
+                        slice(ripples),
+                        materializeEras()
+                    ).toPromise();
     })
 
     it('single slice appears in output', async () => {
@@ -57,7 +48,7 @@ describe('sliceToEra', () => {
 
     it('on threshold move, starts new era', async () => {
         ripple({ log1: [ 1, 2, 3 ] });
-        threshold(0);
+        threshold(1);
 
         await expectEras([
             [
@@ -70,7 +61,7 @@ describe('sliceToEra', () => {
 
     it('new slices into new era', async () => {
         ripple({ log1: [ 1, 2, 3 ] });
-        threshold(0);
+        threshold(1);
         ripple({ log1: [ 4 ] });
         
         await expectEras([
@@ -87,7 +78,7 @@ describe('sliceToEra', () => {
         ripple({ log1: [ 1 ] });
         ripple({ log1: [ 2 ] });
         ripple({ log1: [ 3 ] })
-        threshold(1);
+        threshold(2);
         
         await expectEras([
             [
@@ -110,19 +101,19 @@ describe('sliceToEra', () => {
 
 
     function complete() {
-        thresholds.complete();
         ripples.complete();
+        eras.complete();
         return gathering;
     }
 
     function threshold(n: number) {
-        thresholds.next(n);
+        eras.next(n);
     }
     
     function ripple(sl: Dict<number[]>) {
         ripples.next(
-            from(enumerate(sl))
-                .pipe(map(([k, r]) => tup(k, from(r))))
+             from(enumerate(sl))
+                 .pipe(map(([k, r]) => tup(k, from(r))))
         );
     }
 

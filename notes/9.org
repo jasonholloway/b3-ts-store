@@ -1,0 +1,113 @@
+* Committer
+** Inputs
+   - Commit requests
+   - Eras of slices
+
+to commit, it needs to know up to which Slice to go to
+
+based on the completedness of Slice observables in the Era,
+materialized views of these should be taken
+
+and it should be a given that only one committer is operating at a time:
+no race conditions whatsoever
+
+so, a DoCommit comes in, then the current era is sampled,
+and all slices at a point of completion are 'taken'
+
+instead of lopping off uncompleted slices, we should wait to take all of them curently in the era
+for the user, things are serialized up front: if there's an update being worked out, we should do that first, in order
+
+though we can never be sure that we have seen all slices...
+as a new slice may be emitted at any time by the current era
+
+as such, how can we even sample the era, if it's incomplete?
+(and preemptively closing the era is no good, as the new era will then be subject to changes)
+we are always faced with the possibility of new Slices being about - this is why we have the threshold in place
+
+we'd be constantly scanning slices into an array
+when DoCommit came in, we'd take the latest from this stream of arrays
+form it into a block, and send it on to be saved
+
+----------
+
+but, before saving, not only would each slice need to be completely materialized,
+each one would need to be verified
+
+in parallel (well!) current aggregations and errors will be constantly being emitted, based on all previous state too
+
+only if there are /no errors relating to the current frame/ can we commit
+
+but our frames are in motion...
+what we'd want would be a known up-to-date aggregation with each completed slice
+the aggregation would only be emitted as complete when the updates to a slice were themselves complete
+
+so the nice idea coming through is that aggregation goes on throughout the data: each slice becomes a part of the whole in a behaviourial fashion
+instead of being purely data
+but this then requires knowledge of models to be spread about
+
+can't we instead interpret all this beyond the Slice? although...
+the SliceStack is generic, in that it doesn't care about what the Slices themselves store
+if the aggregation was done on the slice itself,
+then they'd need to be set up consistently: each new Slice would need to refer to the previous slice in its creation
+though then the foundational slice would need to refer outside of the SliceStack entirely...
+and what would happen when the threshold changes era? suddenly what were intermediate Slices are now foundational, and have to refer elsewhere...
+
+wiring up Slices to each other makes them very difficult to rearrange, unless wiring were to be redone after each move
+actually this /necessarily/ has to be the case - the question is where the rewiring occurs
+by encapsulating it within the data structure
+
+---------
+
+so we don't want the data to know about the aggregations
+but: the Committer certainly needs to see time-aligned aggregations alongside the frames of LogParts that constitute its slices
+
+the Committer, then, can't use the SliceStack directly: it relies on another layer of information; it needs another foundation first
+is layering that bad a thing? we are building up an appropriate mileau for the proper algorithm
+
+--------
+
+our element is to be:
+slices with interpreted aggregations of views and errors
+
+the *Aggregator* is needed...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
