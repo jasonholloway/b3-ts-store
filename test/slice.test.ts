@@ -1,7 +1,7 @@
 import { Observable, Subject, from, OperatorFunction, pipe, BehaviorSubject } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap } from "rxjs/operators";
-import { SliceRef, Era, slice } from "../lib/slice";
+import { Range, Era, slice } from "../lib/slice";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
@@ -12,7 +12,7 @@ describe('slice', () => {
 
     let ripples: Subject<Ripple<number>>
     let eras: Subject<number>
-    let gathering: Promise<[SliceRef, Dict<number[]>][]>
+    let gathering: Promise<[Range, Dict<number[]>][]>
 
     beforeEach(() => {
         eras = new BehaviorSubject<number>(0);
@@ -29,7 +29,7 @@ describe('slice', () => {
         
         await expectEras([
             [
-                [0, { log1: [ 1, 2, 3 ] }]
+                [[0, 1], { log1: [ 1, 2, 3 ] }]
             ]
         ])                
     })
@@ -40,8 +40,8 @@ describe('slice', () => {
 
         await expectEras([
             [
-                [0, { log1: [ 1, 2, 3 ] }],
-                [1, { log2: [ 4, 5, 6 ] }]
+                [[0, 1], { log1: [ 1, 2, 3 ] }],
+                [[1, 2], { log2: [ 4, 5, 6 ] }]
             ]
         ])                
     })
@@ -52,7 +52,7 @@ describe('slice', () => {
 
         await expectEras([
             [
-                [0, { log1: [ 1, 2, 3 ] }]
+                [[0, 1], { log1: [ 1, 2, 3 ] }]
             ],
             []
         ])
@@ -66,10 +66,10 @@ describe('slice', () => {
         
         await expectEras([
             [
-                [0, { log1: [ 1, 2, 3 ] }]
+                [[0, 1], { log1: [ 1, 2, 3 ] }]
             ],
             [
-                [1, { log1: [ 4 ] }]
+                [[1, 2], { log1: [ 4 ] }]
             ]
         ])
     })
@@ -82,19 +82,19 @@ describe('slice', () => {
         
         await expectEras([
             [
-                [0, { log1: [ 1 ] }],
-                [1, { log1: [ 2 ] }],
-                [2, { log1: [ 3 ] }]
+                [[0, 1], { log1: [ 1 ] }],
+                [[1, 2], { log1: [ 2 ] }],
+                [[2, 3], { log1: [ 3 ] }]
             ],
             [
-                [2, { log1: [ 3 ] }]
+                [[2, 3], { log1: [ 3 ] }]
             ]
         ])
     })
 
 
 
-    async function expectEras(expected: [SliceRef, Dict<number[]>][][]) {
+    async function expectEras(expected: [Range, Dict<number[]>][][]) {
         const r = await complete();
         expect(r).toEqual(expected);
     }

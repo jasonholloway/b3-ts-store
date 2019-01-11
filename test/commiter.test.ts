@@ -37,9 +37,9 @@ describe('committer', () => {
 
     it('committing sends doStore', async () => {
         era([ 
-            [2, 12],
-            [3, 13],
-            [4, 14]
+            [[2, 3], 12],
+            [[3, 4], 13],
+            [[4, 5], 14]
         ]);
         doCommit();
 
@@ -51,7 +51,7 @@ describe('committer', () => {
 
 
 
-    function era(era: ObservableInput<[number, number]>) {
+    function era(era: ObservableInput<[[number, number], number]>) {
         era$.next(from(era));
     }
 
