@@ -22,7 +22,7 @@ export type sumReturnTypes<A extends ((...args: any[]) => any), B extends ((...a
 
 
 
-export type Dict<V> = { [key: string]: V }
+export type Dict<V = any> = { [key: string]: V }
             
 
 export function enumerate<V>(d: Dict<V>): [string, V][] {
@@ -69,7 +69,7 @@ export function reduceToArray<V>() {
     return reduce<V, V[]>((ac, v) => [...ac, v], []);
 }
 
-export function reduceToDict<V>() {
+export function reduceToDict<V>(): OperatorFunction<[string, V], { [key: string]: V }> {
     return reduce<[string, V], Dict<V>>((ac, [k, v]) => ({ ...ac, [k]: v }), {});
 }
 

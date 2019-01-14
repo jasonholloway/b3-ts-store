@@ -1,0 +1,278 @@
+
+
+So now the Committer needs to enforce integrity
+
+for this, it needs a way of evaluating the slice it tries to commit
+
+and whatever does the evalution needs a link to the BlockCache, so it can lazily request committed values out of it
+but we don't want the Committer to know all these things
+
+either we supply it with an interpreter of Slices, that can look at a Slice and figure out all previous slices, aggregate them and return
+or the (lazy memoised) evaluation is pinned onto the Slice somehow
+the pinning OO approach suits, as otherwise there'd be no immediate way of memoising; otherwise we'd have a lookup table for putting aggregations together
+
+--------
+
+So (to recapitulate an old discussion):
+Slices should be decorated with per-era evaluations
+
+each time a new era is formed, all slices are re-wrapped so as to provide a nice /evaluate()/ method
+this can then be used downstream to figure out exactly what a slice in situ /means/
+
+---
+
+but what of viewing clientside?
+
+then the slices aren't looked at, as there won't be any slices
+or rather, slices /will/ be sought, but none will be found
+
+the clientside viewer is of a different paradigm from the per-slice viewings;
+it will supply single logs; whereas the evaluations of slices will be holistic
+
+could a logRef be provided to the evaluation?
+
+---
+
+another use-case: server-side out-of-band compression
+
+this will also be per-log (though entire blocks will inevitably be loaded)
+
+the compressor will load entire log histories (or large tranches thereof)
+and digest em, presumably with the same evaluation framework
+
+in such case... the compressor will know which choose log to load,
+and its blocks will be loaded for it, /into a single slice/
+
+then the evaluator, with its digestive capabilities, will be let loose on it
+in fact: if the digestion works across logs (as seems reasonable, delegating to sub evaluators of course)
+
+hmmm, yes, let's leave this for now
+
+as long as what we use now is modular enough to be reused/reformed for this later use, we're a-ok
+
+---------------------
+
+AND SO!
+
+the Committer will, on each slice, be able to evaluate its contents
+
+will this be via subClass of Slice, or by putting the evaluative function in a tuple /within/ the Slice?
+I prefer the latter: let's keep subtyping out of this
+
+though: when it come to the combinability of Slices, isn't it the Slice itself we want to shove together?
+and doesn't this rely, in turn, on the combinability of its contents?
+
+yes, I think it does. But this is a kind of monoid typeclass: we want all slices to require combinability of its values
+but this also means that all arrays and simple values will need wrapping, or at least tampering with
+
+but: we don't want to destructively add numbers, for instance.
+nah, combination should be injectable, specificable.
+
+which means, wrapping, really (in the absence of typeclasses)
+
+or - because in practice we're just talking about arrays, it seems we should instead just inject in one place, instead of at each callsite:
+whatever is outputting Slices, should just inject in a combine function, suited to the parametised Slice type
+
+----
+
+or - just the digestor, as a distinct phase, could do the combinations
+why do they have to be everywhere?
+
+the idea of putting the capability on the data is nice, but it requires an intrusion into the creator of the data
+(unless the slice itself had a ctor which required such a combiner - though then this would be specified in multiple places)
+
+better to have a factory in that case that did the wrapping for you
+
+though now the wiring up of the different components becomes all important
+
+----
+
+what happens when combining evaluators?
+
+well: it's pretty easy actually!
+the second evaluation just takes the output of the previous
+
+though it'd be more efficient if there wasn't this chaining
+(ie composite slices would become less efficient than pristine large slices - which is not scalable behaviour!)
+
+really, the combined evaluator would want to combine its inputs, not chain together outputs to inputs
+but the input is almost entirely the Slice range and log values!
+
+range and logParts can be easily combined
+but then evaluation is wanted, on a per-slice basis, and with memoisation
+
+there are two cases:
+- if the latter is already evaluated, then can we presume that the previous slice has already been combined with? hmm...
+  hmm... if we can, then the idea of slices being monoidal evaporates: ie they're already implicitly in a chain;
+  the idea that they're free to be rearranged is wishful thinking
+  as soon as we get to evaluation, then the chain is implied
+  (but if so, then the idea of each slice having its freely-declared range is fanciful too: each slice makes sense only in the whole)
+
+really, then, if the Slice is not to pretend to be something it isn't,
+it wouldn't have ranges on at all; these could be calculated when needed from the entire stack of slices, allied with a single stack register
+as things are, Slices have memoised tags for ease of use
+but these tags give the impression that they're more free than they are...
+
+---
+
+one of the unavoidable things about Slices is that they're ordered
+there's always another before, or there's a base
+
+(in passing, the BlockCache itself will in reality just be storing Slices - though without the ranges as ranges are local concerns of the commit mechanism alone)
+
+so, a Slice (as in, an ordered value with a range) /is/ a matter for the commit system; it's not out of the bounds of SliceByEra to furnish these functionalities
+though, affixing a function to each and every item of data is wasteful (we could relate to prototypes, but then I fear for our tuplism)
+
+a Slice can be combined, as it's a Slice: this is what Slices do. Their ranges can be shunted together, immutably.
+but for a slice to be combinable, its contents need to be combinable to
+
+and this is distinct from digestion of values into simpler ones
+which doesn't need to have any knowledge of slices
+
+if combination is immutable, it seems like it shouldn't be on the object too, as this would give primacy to one input over the other, instead of the two of them
+being coequals in their combination. A combining function would therefore make most sense
+
+i'm coming to the conclusion that sliceByEra should just dollop out a single slice - ie it should do the combining itself,
+saving the work of slice combination for later layers
+
+the era articulation can nicely separate slices for downstream consumers
+
+and the single slice per era setup will also simplify
+
+could the slice be empty? no. better still to dealin sets
+
+but the more that could be bunched together, the better for all downstream operations.
+
+------------------------------
+
+slice unification is an /optimisation/
+we don't need it to get our scalable core functionality
+
+the Evaluator and Commiter should always be applied to a /stream/ of slices;
+not hard-coded to use just one
+
+which is fine.
+
+---
+
+so we should do other stuff before we whittle on about combinations of slices
+
+in the first instance, we need to aggregate Slices:
+how to lazily aggregate them?
+
+the first thought approach was to combine value and evaluator in a tuple
+(in fact, the value could be /completely replaced/ by the evaluator: a stream of evaluations)
+in fact, I like this interface: certainly the lack of raw updates will be niggly later
+
+dealing just in evaluations focuses in on the combination of evaluations
+
+an evaluation depends on the current value and the previous value
+(the concern we did have with the efficiency of piping in results from before goes away if we're going to simplify slices beforehand)
+
+so the stream of evaluations is in fact a reduction over all slices in the era...
+each era starts its evaluating afresh
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

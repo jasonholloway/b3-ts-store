@@ -94,6 +94,21 @@ describe('slice', () => {
     })
 
 
+    it('output slices can be combined', async () => {
+        ripple({ log1: [ 1, 2, 3 ] });
+        ripple({ log2: [ 4, 5, 6 ] });
+
+        await expectEras([
+            [
+                [[0, 1], { log1: [ 1, 2, 3 ] }],
+                [[1, 2], { log2: [ 4, 5, 6 ] }]
+            ]
+        ])
+    })
+
+
+
+
 
     async function expectEras(expected: [Range, Dict<number[]>][][]) {
         const r = await complete();
