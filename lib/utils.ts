@@ -1,5 +1,5 @@
 import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce, scan, startWith, switchMap, groupBy, finalize, buffer } from 'rxjs/operators';
-import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, forkJoin, Subject, Subscription } from 'rxjs';
+import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, forkJoin, Subject, Subscription, MonoTypeOperatorFunction } from 'rxjs';
 
 
 export type UpdateCreator<Type extends string, Body = void> 
@@ -107,9 +107,12 @@ export function capture2<A, B>(project: (A) => Observable<B>) : OperatorFunction
     );
 }
 
-//the problem with the above is that the final subject is never completed...
-//as its never unsubscribed (I think; but its subscription must end)
-//
-//
 
+export function log<T>(fn: (val: T) => string) : MonoTypeOperatorFunction<T> {
+    return tap(v => console.log(fn(v)));
+}
+
+export function logVal<T>(s: string) : MonoTypeOperatorFunction<T> {
+    return tap(v => console.log(s, v));
+}
 
