@@ -1,7 +1,7 @@
-import { Subject, Observable } from "rxjs";
+import { Subject, Observable, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict } from "../lib/utils";
 import { Era, sliceByEra, EraSpec, Slice } from "../lib/sliceByEra";
-import { withLatestFrom, map, share, mapTo, concatMap, take } from "rxjs/operators";
+import { withLatestFrom, map, share, mapTo, concatMap, take, tap, flatMap, scan } from "rxjs/operators";
 
 type TestRipple = Dict<number[]>
 
@@ -11,10 +11,6 @@ type DoStore<V> = {
     slice: Slice<V>
 }
 
-//TO DO:
-//refreshEra command (currently tests are bodged)
-
-
 function committer<V>(era$: Observable<Era<V>>, doCommit$: Observable<DoCommit>) {
     doCommit$ = doCommit$.pipe(share());
 
@@ -23,14 +19,14 @@ function committer<V>(era$: Observable<Era<V>>, doCommit$: Observable<DoCommit>)
                         concatMap(([_, [, slices]]) => 
                             slices.pipe(
                                 take(1),
-                                map(slice => ({ slice }))))
-                        );
-
+                                map(slice => ({ slice })))),
+                        share());
     return {
         doStore$,
-        refreshEra$: doStore$.pipe(mapTo(null))
+        newEra$: doStore$.pipe(map(() => {}))
     }
 }
+
 
 jest.setTimeout(400);
 
@@ -48,7 +44,10 @@ describe('committer', () => {
 
         const era$ = spec$.pipe(sliceByEra(ripple$));
 
-        const { doStore$ } = committer(era$, doCommit$);
+        const { doStore$, newEra$ } = committer(era$, doCommit$);
+
+        newEra$.pipe(scan<void, number>((ac, _) => ac + 1, 0))
+            .subscribe(spec$);
 
         gathering = doStore$
                     .pipe(reduceToArray())
@@ -63,7 +62,6 @@ describe('committer', () => {
         ripple({ a: [ 1, 2 ] });
         ripple({ b: [ 1 ] });
         doCommit();
-        spec$.next(1);
 
         await expectStores([{
             slice: [[0, 1], { a: [ 1, 2 ] }]
@@ -72,7 +70,15 @@ describe('committer', () => {
 
     it('does nothing if no slices', async () => {
         doCommit();
-        spec$.next(1);
+
+        await expectStores([]);
+    })
+
+    it('only commits if slice known good', async () => {
+        ripple({ a: [ 1, 2 ] });
+        doCommit();
+
+
 
         await expectStores([]);
     })
@@ -93,8 +99,8 @@ describe('committer', () => {
     }
 
     function complete() {
-        spec$.complete();
         ripple$.complete();
+        spec$.complete();
         doCommit$.complete();
         return gathering;
     }
