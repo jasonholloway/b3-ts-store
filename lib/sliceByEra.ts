@@ -1,5 +1,5 @@
 import { Observable, empty, OperatorFunction, zip } from "rxjs";
-import { scan, concat, filter, shareReplay, window, map, skip } from "rxjs/operators";
+import { scan, concat, filter, shareReplay, window, map, skip, tap } from "rxjs/operators";
 import { tup } from "./utils";
 
 export type Range = [number, number];
@@ -13,7 +13,7 @@ export function sliceByEra<V>(vals: Observable<V>): OperatorFunction<EraSpec, Er
 
         const windows = vals.pipe( 
                             map((v, i) => slice([i, i + 1], v)),
-                            window(eras),
+                            window(eras),                            
                             skip(1));
 
         return zip(eras, windows)
