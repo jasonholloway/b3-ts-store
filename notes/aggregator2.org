@@ -1,0 +1,335 @@
+
+
+
+the input to the Stager will be a simple stream of LogParts
+
+or even better, just a stream of addressed updates (effectively the same)
+that is grouped into a map of LogParts
+
+these are then diverted in to the latest Era, incrementally numbered
+and mulched together into a Wad of updates, but also with errors streaming out of em
+
+
+but a reset is just a clearing of an updates - this we will already have...
+we could then take an articulated stream of updates in the first place:
+instead of just updates, switched, we'd take raw eras of updates
+
+a Reset would then not be the receiving of a Reset command, bu the receiving of a new era of updates
+
+the current era could however be sampled into the staging era by a Stage command
+this would switch (and complete) the input
+
+if we just had a single input stream of updates, a Reset or Stage could occur half way through a Ripple...
+there has to be some way of grouping these atomic packets of updates (hello, Slice!)
+
+so, in switching to the staging zone, we have to be sure that we are dealing with atoms, with complete Ripples
+a Ripple is a single block of consistent updates
+
+each Ripple is given a consecutive absolute number, so we can state where we want to stage/commit up to
+nowt seeming wrong with this
+
+
+but the output of the current manageSlices seems messy:
+why does it give us all of the slices individually numbered?
+because we need these number to commit!
+
+but all the individual ripples can be happily grouped into a single map
+
+how do we though separate, at point of committing, the staged from the non-staged?
+it's like the Committer itself must do some bifurcating:
+
+at the point of Commit, then the stream of Ripples must be partitioned (hah!)
+
+to the left, will be the sac of commitables, to the right a growing pustule of excess
+
+
+how will these be aggregated and evaluated?
+the partitioning into staging and excess has to happen first, as the staging must make sense by itself;
+if it doesn't, then it can't proceed to being committed
+
+
+so, at the bottom layer, Ripples are sliced up into 'finished', 'limbo' and 'current'
+this can be expressed via a vector of thresholds: [2, 5], which says that anything before slice 2 is forgotten about, slices 2-4 are in the limbo stage, while everything 5+ is current
+
+on top of these articulations, the aggregator will do its aggregating
+and the committer will do its committing
+
+each 'Slice' will also wear its coordinates happily
+
+-------------------------------------
+
+
+an Era needs to say what its 
+
+
+when committing, the Committer must do two things:
+1) partition the updates it wishes to commit
+   - this lets them be evaluated in isolation: are there errors?
+2) on success, shift the bounds so that the 'staged' partition is empty
+
+it does this by emitting thresholds back to the partitioner
+each partition has a start and end index
+the start is the important one in each case
+
+we're building this slightly involved protocol with numbers
+that lacks context: really, the Committer just want to say, stage up to here please
+
+do we just want staging?
+the Committer will, on commit, want to separate out *first*
+this will allow the streams to be complete
+
+though we are back in the world of slices already: individual slices 
+will be complete, will be numbered, but the stream of slices will still run
+and needs to be staunched
+
+this can only be via a triggered windowing
+so, the equivalent of a staging command
+will separate out a tranche of slices
+which can then be vetted and committed
+
+the separating out of a new era of staging
+will begin a new era: all the later commit stages can then use this one era as a base;
+no other eras can be triggered until the attempt committing is over: or, commits can play well with each other as long as they build on each other
+
+if one staging begins, and a slow connection to the server means that its travel into storage is drawn-out,
+another staging may begin: that is, a further spec of thresholds will propagate down, 
+and another tranche of slices will be lopped off and rendered immobile for our purposes
+
+but meanwhile the original staging will still be in play; unless it is successfully committed,
+it can't be shuffled off leftwards. 
+
+committing should be a process that lops off a portion of era updates for itself
+a command comes in wanting to secure a section of slices for itself; it wants its own window
+this means it can have as many stagings as it wishes
+but not arbitrary windows, surely? maybe it has to be arbitrary windows, as how else can we enforce
+limits on requested ranges incoming? 
+if we're just reacting to window requests, then we have to honour what's wanted
+
+then the committer is becoming the centre; it wants to fire out commands to wrangle and sample the input stream
+as it wishes; whereas we were trying to build up the layers to give the committer an easier ground
+
+the committer wants to bark out orders for stagings
+these stagings must be consecutive (ie, always lopped off from the front)
+and they must be served only once to each requester
+ie when one has been requested and served, the whole reservoir of slices diminishes
+
+but if this is the case, responsiblity for the data is passed back and forth:
+if there is a failure, the window has to stitched back into the common pool
+
+whereas, if the pool remains in one place, we can minimise its management:
+only the threshold will really matter, and that is emitted only when (BANG!) a commit succeeds
+otherwise, the slices just build up in orderly fashion
+
+-----
+
+it sounds like, then, that we have atwo tier approach to data wrangling here:
+the hard commit threshold can be managed upstream, responding to infrequent but important threshold updates
+
+slightly downstream, the committer can sample windows as it likes: and in so doing, they can be finalised;
+it won't however be effecting the upstream data representation
+
+------
+
+and when a staging has to go back?
+
+-----
+
+if the Committer has to remove its stagings on save failure,
+then we have here a kind of call-and-response need
+its attempt at saving must receive confirmation
+and on confirmation, the threshold is published all-over
+
+when there's an error, then the staging should be torn down
+
+--
+
+if not the call-and-response within the component,
+then the problem could be passed on instead
+
+the staging is windowed; aggrs and errors are checked out;
+then the conclusion is to save
+
+if the actual mechanism of dealing with the stores is left out of the committer
+then the staging 'window' could just be let go of there and then: why do we need to keep hold of it?
+r e l a x . . .
+
+so the Committer is a machine for staging, approving, and emitting proper requests for storage
+something called the Storer would do the actual talking to the individual stores
+
+-----
+
+problem(?) of time consistency around the wider loop
+stores will protect us, plus the SliceStack - these are the two sources of truth, all other bits are just middlemen
+
+----
+
+would the Committer form part of the stack for actually serving views?
+it'd seem more efficient for it to be there, part of the mainline
+
+but committing is essentially a branch activity
+
+I suppose we just want to be sure that work isn't done twice:
+as soon as staging is done, there'll be a new partition to aggregate
+
+---------------
+
+should the Committer just send slices through to the store?
+i'd actually be happy with it digesting them first
+so the store just receives a single big composite slice: seems fair
+
+then the expectation is that a slice has to be combinable into a single value
+(forgot the name for it...)
+
+but this is it: slices need to be digested into a single block
+
+-----
+
+how could aggregation go through the commitable window?
+
+and, if digestion is to be a component after the Committer,
+how can the Committer know about the reasonableness of what it's committing?
+
+we were here before: the Committer needs to have access to aggregations decorated onto its input slices
+
+the Committer doesn't need to know about actual aggregations, of course,
+but it does definitely need to know about validation statuses, which can only themselves be absed on aggregations
+
+so something below the Committer should be aggregating
+but, by windowing an isolated tranche in its staging, the Committer needs to apply aggregation for this part only
+
+the Committer shouldn't know about data before the slices - ie there shouldn't be any direct poling about into committed history
+aggregation is something that should be nicely available on the matter flowing through the components
+the components aren't just operating on raw data; its data that can say something about itself
+
+the problem with this is that each slice therefore has to be able to link to its predecessor, and this stops the individual parts being so easily moved about
+
+the resource that the Committer requires for its own niceness must then itself be a facade, offered not by the individual slice, but by a kind of wrapped slice
+or - by the component's context as an interpretation of the data
+
+letting slices know about each other is great, super convenient,
+except for the pain point of the first slice, which must inherit its aggregation from its context rather than its sibling (as previously)
+its like each individual recursion back through the data must be via a mediator; but this then requires looking up by position, etc
+which isn't guaranteed to us as we're not transcendent wranglers of arrays, but firmly situated in the actual frame of data itself
+
+so, as such, aggregations do have to be done in the manner imagined: per element processing, using an inheritance from its previous sibling
+
+as a new era begins, slices are newly copied over
+at this point, their aggregations should be reapplied, relinked
+
+at the beginning of every era, there is then a latest aggregation from below: this goes with the latest thresholds, exists in the same time frame
+as the new eraSpec comes in, the linking together with the provided aggregator function begins
+
+but what of laziness?
+if an update exists in the slices, then aggregation *has to happen* its not optional or lazy
+the lazy efficiency comes in if data is in the BlockCache but not requested: the slices know nothing of this
+
+------------
+
+so: as a new era begins, the sliceManager will aggregate all slices of the new era, based on the base aggregation fetchable from the BlockCache
+
+this means the new block must be /firmly/ in place at the start of the new era (as it should be, as time is not independent any longer)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

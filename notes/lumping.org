@@ -1,0 +1,137 @@
+
+
+uncertainty now over whether we should eagerly group slices here...
+nah, they have to remain in their finest granularity
+afterwards they can digested into single wads like
+
+but, here, we want limbo and current;
+though limbo and current are only needed for committing
+
+limbo is needed for evaluation as part of committing: it doesn't need to hang around
+or be stored away from the Committer
+except that all slices must be complete when we try to commit them
+
+so - the committer should do its own lumping together
+except, we don't want to lump together twice
+
+-----
+
+we want to both digest together and lump together for committing /once/ 
+without re-digesting solely for the purposes of committing
+
+we want to be digesting together a /Lump/ from the simple stream of slices,
+and when we DoCommit, this lump should be separated off till its all complete and ready and evaluated
+
+so, splitting off the /Lump/ is a matter for the Committer alone
+though, dealing with the lump requires:
+ 1) it to be self-aggregating
+ 2) it has to be splittable
+
+------------------------------
+
+seems, firstly, we should get the self-aggregating shiz goin
+
+-------
+
+so the Zero in aggregating views will itself be async - ie it will be the single output of a stream
+
+plus, we want things to be as lazy as possible
+so, in fetching the zero, we want to be kinda specific: the value (or some derivative thereof) must be stated in getting the zero
+
+so the zero will be a lazy stream... it'll be a function that returns a stream
+
+whenever a zero is needed, then away we go...
+
+the passed aggregator function itself can do the stitching together; but the value *has* to be streamified; it can't be provided up front straight away
+then the actual implementation can be split between a generic component 'layer' and a specialised function that we can provide to the generic component
+the generic component is our glue: and splitting it up like this allows a gradual apprehension of the problem, layer by layer, with the copestone cherry on top
+
+------
+
+as is, seems like every single slice will be iterated through
+to gather together views
+
+each and every slice will be asked: do you have this?
+mostly, the subject slice won't
+
+slices should really be bunged into one before any views happen
+
+------
+
+and the Committer will do this: it will form a lumpen slice at the point of committing
+
+but before this, just to emit a view, the accumulated view will be via a lumping operation
+so the lump/slice will be involved throughout
+
+but - slices are both small and large: it seems alright to make aggregation work on them at all scales
+but for max efficiency, we'd lump all together before doing any evaluation
+
+tho for this, the aggregation absolutely /must/ be lazy - and, with this, either we pin localised interpreters onto the slices themselves (which would also give us memoisation)
+but I don't think memoisation is that needed here: the BlockCache will obviously memoise
+here we want the emphasis to be on lumpability and digestion
+
+so, if memoisation don't matter here, that's more impetus towards interpretation
+
+
+*slicer -> lumper -> evaluator -> committer*
+
+
+(the lumper is a luxury)
+but the evaluator is not: it is an interpreter serving views of all accumulated data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

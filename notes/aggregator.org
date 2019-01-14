@@ -1,0 +1,298 @@
+* Aggregator
+  
+the Aggregator will receive the stream of Slices from below,
+in combination with a stream of Blocks,
+and a schema of LogNames->Model,
+and will re-output a stream of slices with aggregations,
+so that Committer and Viewers can use them
+
+but:
+- does this have to be done per-Slice?
+- what of laziness in viewing?
+
+*Per-Slice?*
+if the Committer is to wait for all known slices to complete, then what matters is the overall aggregation, rather then per-slice views
+but aggregations have to be completely aligned with slices
+so the committer can look at a slice and know exactly what it amounts to
+
+if aggregation was done across the full span of slices, how could the committer be sure the aggregation it was looking at and judging
+wouldn't be including newer updates?
+
+with the per-Slice model, aggregations can be final, etched in stone: the Committer will just await the very latest aggregation
+
+*Laziness in Viewing*
+as soon as there are slices about, pertaining 
+
+
+
+
+
+
+
+
+---------------------------------
+
+* Validation
+
+as is, errors will flow through the system, to the point even of a Slice being created for the slightest, most dubious change
+so, if someone were to enter some data that didn't match up for whatever reason, then the only thing to be done would be
+to hit 'undo', which is quite an ask
+
+imagine keystrokes streaming in... loads of keystrokes streaming into a model
+they will just go all the way through
+
+or - a product without a name
+we can't let such an abomination be admitted
+
+if such errors are flowing out, the Slice itself should remain open...
+a reset would rightfully annihilate even erroneous slices
+and a commit (just now coming through, having been submitted earlier)
+will move known-good slices on
+
+but if a Slice has errors, it can't be final;
+that is, there's got to be something deciding when a Slice is done or not
+it will go off to work out, for instance, follow-on effects
+and it will apply models as it likes, working out errors as it likes
+
+if a bad update were sent into it (say, an absent product name)
+then the slice would be bad: it would know it was bad
+but how would it mend it?
+
+well - the user would receive an announcement of the error (hurrah)
+and the user would have to correct things
+so another update would be sent through, which might correct things (especially if the validation only cared about final state within the slice, which seems fair)
+
+if there were an error in actually aggregating the thing,
+then no user action except for undoing or resetting would actually fix anything
+
+undo couldn't work by lopping off slices if slices were being formed over time, rather than as single fell swoops
+the Slice is being formed by a stream of updates, which are being redigested into compressed, concise LogParts
+
+-----------
+
+the /normal/ way to approach this would be to have an outer layer that did smaller aggregations and enforced constraints spearate from the interior data store.
+but this just creates loads more work, as the constraints have to be kept up to date and enforced;
+the data store itself enforces them, of course; but it doesn't have to be done separately; we want it integrated throughout the realtime machine
+
+-----------
+
+so a control would stream in new ProductNames, say, and would be parsing in return the complaints of the store
+the store would be mouthing the input, but not swallowing it
+
+if bad intermediate updates were about,
+wouldn't follow-ons be getting an eyeful of their grot in passing?
+and aren't the constraints on source data leant on by derivative data?
+
+if an SKU had to be unique, but temporarily wasn't, then a follower might temporarily see and process this
+its index of SKUs would be overwritten in a crucial spot by this fleeting error,
+and wouldn't be properly corrected (though it could be, if the follower were coded right)
+the bad transient data might be leeched into an index or whatever
+
+if the slice as a whole were reset to fix the problem, then we'd be ok, as all derivatives would also be nuked in this manoeuvre
+this is a crucial role of the Slice: it groups together first-order updates and their derivative reverberations into a single manageable atom
+
+*how can we then tinker with a Slice?*
+a character can be piped in, but then, because it interferes with some (local) invariant,
+an error is emitted, and the Slice can't be finalised as it disagrees with the model.
+
+we want to be able to emit corrective updates into a Slice, but to do so raises the problem of keeping derivatives up to date
+
+Slices were conceived to be structured (and limited) by an original, first-order update to a log; this one update's reverberations would then be captured by the Slice.
+This gave slices a natural limit: a single update would give rise to a limited set of derivative events. The activity would be bounded; a Slice could be complete.
+
+A single product update would be enough: this would re-update various indices, each of which would have to be pre-loaded.
+(a shared constraint could be a kind of derivative that emitted errors)
+
+and then the idea struck me that it'd be nice to allow tinkering...
+
+if we still restricted Slices to being single-origin, then we could pile up many many slices as tinkering were received and integrated
+but tinkerings are corrections, simplifications: Slices couldn't be judged on their correctness if intermediate ones were about that
+were reasonably and expectably wrong
+
+to integrate and digest corrections, the digestive compression could be in place: this would realise straight away that one update overwrote another;
+then an old Slice could be binned in favour of a new; or merged into a completely fresh Slice
+but to do this, the latest Slice would have to be complete, for us to be able to deal with concrete things
+and reactive programming leads you towards wanting an eager integration, rather than waiting for full stable frames to appear
+
+-----
+
+eager integration: instead of relying on out-of-band digestions,
+on each input, all possible local digestions would be done
+
+but digestions: 1) affect derivatives, and 2) straddle slices
+
+why are slices numbered in the first place? so we can commit and reset them, even with new slices potentially being integrated
+this is fine; and digestions can't reasonably affect slices already sent off for saving
+
+here we see the simplicity of a two-way partitioning of updates: those that can be changed, and those that can't
+resetting would just clear those that were still changable
+
+-----
+
+but a digestion /by definition/ doesn't destroy any data
+so it could be run over LogParts already committed: it could even simplify them away
+but then if we had a reset, what could be reset to?
+committed LogParts have to be left pristine so we retain our fidelity: our view of stored state may otherwise go askew
+as resets in combination with commits could bifurcate our otherwise consistent larger slice
+
+one of the points of the slice is that it's an atomic unit: if we respect this it gives us a foundation
+
+but if slices were pre-commit, and after commit (well, this is an Era...)
+
+*within an Era, digestions are possible* (???)
+
+then what is a Slice? a consistent batch of updates+derivative updates
+
+------
+
+where was I going with this?
+
+Ripples in an era are eagerly digested down to simpler forms
+
+eagerly: as soon as an update is added, it is aggregated, propagated to derivatives, and simplified
+
+digestions only happen per-log; simplifications aren't done between logs.
+
+The Era is the simplest unit of time. But to commit, an era needs to be finalized, all of its tributaries need to be complete.
+And for that to be so, we must have moved on to a new era...
+
+so, an attempted commit starts a new era, but the commit may fail... and if it fails, there's no good reason for it not to be simplified on its merging back in.
+here we have something like a Slice. Era's aren't of interest in that they don't get stored - they're just a means to separate out befores and afters of commit attempts and resets
+
+a Slice is a Ripple: it is a genuine grouping of input
+a single character can then be a Slice, though then its integration with other single characters would be by a circuitous means: every slice is its own hashmap of logsections
+and digestions would be across Ripples, which is entirely reasonable
+
+but their function would be to reduce the original spread of input slices into a single era-wide amalgamation
+and this would be done before even any aggregation (though would digestion need to see aggrs? maybe)
+
+So the Slices would remain as inputs, but would feed into a big wobbly pyramid of digestive compression.
+This wobbly pyramid could later be applied to much bigger tranches of updates to work across commit boundaries.
+
+This means a commit would still operate on Slices - and complete slices at that
+but they would be digested into a small wad either as part of committing, or as part of distilling those slices
+
+distilling does seem like it would be slow... especially if there were no good way to memoise reductions (not sure there would be)
+
+---------
+
+but we still have a problem here in that bad inputs will ripple out to the derivative logs, within the input slices
+
+slices will be formed that break the rules
+derivatives could of course be tolerant of this
+though it'd be easier for them if they could concentrate on their own proper problem,
+instead of having to hedge bets against the validity of their inputs
+
+when a first-order log is digested down, what happens to its derivatives?
+its derivatives should be similarly mergable
+
+what of the ordering of the derivatives?
+the importance of order is something useful only to the log itself: some may be sensitive to it, others not.
+if it doesn't matter, then that can be used to facilitate compression
+
+but, just because one particular log doesn't care about order in time, a derivative in its own aggregation /might/ - it has to be a matter for it itself
+
+overall, we only care about the end result, and we must ensure that this doesn't change in our digestion per log
+
+---------
+
+this is a likely invariant to bear in mind:
+*digestions must not alter the end result*
+
+as in, we're losing the fidelity of our history in favour of a smaller eventual log: but the eventual aggregation must always be exactly the same.
+as we work back through time trying to find simplifications, every single move should not affect how the aggregation ends up (obvs)
+we can't enforce this in situ, but it's testable 
+
+--------
+
+a person enters a bad name, which creates a Ripple; then they correct it, via a second Ripple, so that the original log outputs, eventually, a legal value
+then no errors will arise from the era
+
+the bad name was advertised temporarily to the index; then it was changed: these were reasonable things to have occurred; the index needs to be resilient in the face of them
+
+maybe the derivative itself cried foul? only a derivative could know, for instance, about the uniqueness of names
+
+but then it would have also aggregated the name into its index.
+the original intrusion of the bad data would live on in its history,
+unless it were itself simplified away by the derivative log's own semantics.
+
+-------
+
+slices would fill up pretty fast, if each and every keystroke went into em
+its an inefficient way to store already over-detailed data
+
+i can imagine pre-processing, debouncing stages: but then why have this as an integrated thing? isn't it an outer nicety?
+as in, it's not essential, it can be lacquered on later
+
+on each keystroke, a new string would be sent in to the system;
+this would update indices /straight away/
+this would actually argue against including time-consuming indexing in the scheme
+
+for instance: proper search indexing couldn't be updated on each and every keypress
+
+but it could be reasonably updated as a batch operation
+maybe on each commit?
+or - maybe it could be added to cheaply on each keypress
+but only on bigger digestions could it be efficiently formulated
+
+and, in digestion, index updates would be digested too
+basically, there are ways of making this work, but it'd require digestive functionality as a priority
+
+------
+
+what roles do Slices now play?
+
+each and every update, as part of ingestion, would go via digestion
+
+but I'm really not sure why we need Slices - if we got rid of them, things would be simplified a bit,
+as we'd just take in from the era as a whole and redigest
+
+if we got rid of Slices, we'd need to somehow separate limbos and committeds...
+
+or we could leave it for now, and abstract the Slices away by concatting and merging all slices together
+
+replacement would have a limbo stage as of old, to which the existing era would be temporarily promoted
+but this is just a special case of the Slice architecture. Slices don't have a special limbo stage,
+every slice is potentially a limbo stage
+
+- Slices contain Ripples
+- Ripples are merged in realtime to give both a view and a source for commits; the SliceId is retained and propagated for the committer to use
+
+------
+
+So, the aggregator reads in all slices, furnishes a compressed view
+but in aggregating (which is needed for the committer) it should retain the articulation of the SliceSpace, which is also needed by the Committer
+
+the Committer needs to know what to commit, and what to leave in place
+the aggregator needs to only digest what it's allowed to digest...
+
+but the Digestor should be able to compress using the committed values of the past
+it can't change them, this is true
+but it knows of their intent
+
+the aggregation is in two parts:
+the committed past is aggregated; the staged portion is digested into a suitable 'wad'
+
+------------------------------------------
+
+
+And so...
+
+LogParts continuously emitted, via deriver that delivers follow on updates
+
+on Reset, input diverted to new era; 
+
+on Commit, input is diverted to a new era 
+
+
+
+
+
+
+
+
+
+
+
+
+

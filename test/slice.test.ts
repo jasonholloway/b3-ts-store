@@ -1,7 +1,7 @@
 import { Observable, Subject, from, OperatorFunction, pipe, BehaviorSubject } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
-import { map, concatMap } from "rxjs/operators";
-import { Range, Era, slice } from "../lib/slice";
+import { map, concatMap, startWith } from "rxjs/operators";
+import { Range, Era, sliceByEra } from "../lib/sliceByEra";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
@@ -15,11 +15,12 @@ describe('slice', () => {
     let gathering: Promise<[Range, Dict<number[]>][]>
 
     beforeEach(() => {
-        eras = new BehaviorSubject<number>(0);
+        eras = new Subject<number>();
         ripples = new Subject<Ripple<number>>();
 
         gathering = eras.pipe(
-                        slice(ripples),
+                        startWith(0),
+                        sliceByEra(ripples),
                         materializeEras()
                     ).toPromise();
     })
@@ -119,7 +120,7 @@ describe('slice', () => {
 
     function materializeEras() : OperatorFunction<Era<Ripple<number>>, any> {
         return pipe(
-            concatMap(slices => slices.pipe(
+            concatMap(([_, slices]) => slices.pipe(
                 concatMap(([sliceId, parts]) => parts.pipe(
                     concatMap(([logRef, updates]) => updates.pipe(                                                                                                                            
                                                         reduceToArray(),

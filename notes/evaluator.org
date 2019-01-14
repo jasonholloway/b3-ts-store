@@ -1,0 +1,260 @@
+* Evaluator (or Viewer, or Aggregator, or whatever)
+
+as an interpretor separate from the data
+
+which components want its services?
+- the end-user wants to view things on request (actually, not on request: if a view stream is established, then each incidental update should be generating a new frame of view)
+- the committer wants to see every single bit of the lump: every log that exists needs to be evaluated
+
+slightly different use-cases that need co-relating and co-structuring
+
+for end-user views, an established view stream should set up a particular aggregator
+this aggregator will be listening for eras and re-aggregating each era as it comes in
+
+the committer will listen for each log that appears in the /Lump/ (yes, everything has to be per-lump here)
+and set up an interpretor to yield a stream of aggregations; when all these streams are complete, they are checked for errors; and if all is OK - then, /COMMIT!/
+
+the lump is of course just itself a big slice
+so, there is to be /some/ lumping going on, just for committing to be a thing
+a lump is though just a slice... and the committer can operate first of all on simple slices
+
+save the lumper till later
+
+------------
+
+so the Committer will be subscribed to, what?
+it needn't subscribe to anything before commit is called
+
+but, even if things aren't being viewed, we need to know if there errors about
+so all of staging needs to be eagerly evaluated
+by some component or other
+
+the Evaluator will evaluate each and every log update that comes in;
+it will spew out errors per era (as slices stream in)
+it'll also spew out, happily, the latest views of everything in staging
+
+there'll be two parts to view aggregation, then:
+- at the outside, as a particular log is requested, we'll check to see if staging knows anything about it
+- if it does, we'll use the already-accumulated view in place in staging
+- and if not, the aggregator will go directly to the BlockCache - basically doing what the staging aggregators would be doing
+
+but the Committer will only see the staged aggregates
+though this view of staging will only be of a certain lump or enlarged slice
+
+here we're imagining a secondary processing stage that overlays aggregations onto slices
+with time, we'll do lumping before this stage
+
+*HOWEVER!* the lumping has to be under the control of the committer;
+or, lumping will be eagerly done: slices will be expanded to eat up all of their neighbours
+*EXCEPT!* when the committer says 'I want to protect the lump that's accumulated right now, to the exclusion of late comers'
+then the lumping has to take this into consideration
+
+this is the Slicer, or is it the Lumper?
+the Lumper will be told, please lump these slices together to give me a nice stable view of things
+(BUT!!! the lumper should be incrementally accumulating the lump already: the Committer will just cut the already-accumulated from current updates)
+
+then the Committer (which will be listening) will(?) fire its interpretors at the big bulk of the staged slices
+
+though, again, the lumpen slice should be being interpreted as it goes
+the lump doesn't have to know about this itself, of course - it can just be data
+but there should be a derivation of the lump on the go already
+that knows about its predecessor aggregations
+
+---------
+
+a Lump is a Slice
+it is digested into a compressed Slice
+
+as soon as the Lump exists, then the aggregation of its views begins
+the Lump is used by all, as it is just an intermediate articulation of the input slices
+
+the Committer only wants to know about the first articulated lump available
+(in the default case this will just be a single slice)
+
+and, if it's committing, it don't need know bout nothin else
+as in, even if other eras came along, and different slicings were made,
+as long as the Committer had its particular slice happily aggregated and approved
+all'd be good
+
+then the Committer wouldn't even need to request a new lump: it'd be provided for it
+with its dogteeth engaged into the pliant rump of the era,
+the committer would be careless of more recent updates, resets, etc:
+
+so, if a commit were begun, a DoReset would only temporarily remove it
+(though it's uncertain we'd want a reset to actually go so far: but nuance can be achieved later)
+as in, a reset would go back as far as the last commit
+
+------------
+
+but a new era wouldn't separate limboed from new...
+or rather - it would, but there'd be no easy way to put the limboed tranche back on the front
+
+nah, wait...
+it is true:
+if all of staging was lumped into one, and given to the committer
+the Commiter would trigger a new era, which would leave the old frame still available to it,
+encompassing all slices
+then we can stop any other commits happening while the first is ongoing
+which would avoid overlaps
+
+though it'd be more efficient if the Committer knew the slice span in which it was interested
+this range would be communicated to the Lumper, which would get only that span, and serve it back somehow
+
+or, we could go with the capturing the entire era thing, like, on commit, we just start a new era off.
+rather: on Commit, we affix ourselves to the current era, trigger a new one which means the current era
+will complete while things move on at their own pace
+
+-----
+
+the problem with the committer keeping track of ranges is that we would need a way for it to specify
+the range to be re-articulated for us: there'd be more communication with the layer below
+
+unless - there was an easy way to 'snapshot' the existing era, to sample it and not allow any more
+slices to appear in it
+
+(well - we were thinking of having everything bungled into a single slice - presumably this single slice would be constantly on the go, accumulating away to itself)
+
+how would the single staging-wide lump be finalised?
+well - we'd tell it to stop taking in more slices, somehow.
+but it would stop it, because the underlying stream of slices would be diverted away from it
+
+----------------------
+
+SO NOW: how to test this, how to begin???
+
+we don't even need the lumping stage, as the Committer can do its stuff on a single slice
+same goes for it: capture the era by triggering a new one, then take the first slice from the captured era
+
+though: when we say 'commit', we don't expect it to only save a single ripple!
+the definite expectation is that everything staged will be committed.
+
+so either the grouping of slices happens manually on commit (a fair expectation, tbf)
+or just loads of slices go into a block
+I like the idea of the manual application of lumping
+but it'd be more efficient if this were done at a lower stage
+in fact, yes, it's much better to just to this at the right time in the right place
+
+so we have two bits: lumping into a single slice, which is done pre-commit, and is therefore used by views also
+then a Committer that just captures a single slice to become a Block
+
+if the lumper guaranteed a single slice per era (as indeed it should), then we're laughing.
+
+---
+
+Proceeding:
+
+The Committer can go first
+  - on DoCommit
+    - it samples the latest era
+      - when this completes, a DoStore can be bundled off
+    - it sends a new EraSpec to the Slicer to start a new era
+      - this lets the captured era complete
+
+
+BUT WHAT IF OTHER ERA REQUESTS GAZUMP THIS ONE???
+then, that's no problem; as long as the /old/ era is left behind, all is good
+
+well... that'd only be the case if we were just saying 'TriggerNewEra'
+the problem here comes from sending the EraSpec along: by the time it gets to the Slicer, things may have moved onin a different direction
+
+EraSpecs could be defended against - ie only applied if in order;
+or we could be more parsimonious, and just send a simple trigger
+
+BUT a competing EraSpec could, for instance, gazump our entire commit operation
+another user could commit before we get chance to
+well, we have to leave that up to the store to manage
+
+all we know, is that retriggering an era is no problem whatsoever,
+but trying to enforce a spec, not from the source of truth above, is dangerous indeed
+
+that's it: the only thing that can tell us about Specs, is the ManifestStore
+
+-----
+
+but to validate what's being committed, the Committer needs access to aggregations...
+or at least it will do soon... for now it can just blindly commit, as a sub-MVP
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
