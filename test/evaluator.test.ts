@@ -1,29 +1,58 @@
 import { EraSpec, sliceByEra, Era, Slice, scanSlices } from "../lib/sliceByEra";
-import { Subject, OperatorFunction, Observable, pipe, from } from "rxjs";
+import { Subject, OperatorFunction, Observable, pipe, from, empty, of } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
-import { startWith, map, concatMap, groupBy } from "rxjs/operators";
-import { Model } from "../lib/bits";
+import { startWith, map, concatMap, groupBy, tap, flatMap, filter, scan, defaultIfEmpty } from "rxjs/operators";
+import { Model as LogModel } from "../lib/bits";
 
 
 type LogRef = string;
-    
 
-type Evaluable = {
-    logRefs: Observable<LogRef>,
-    evaluate(ref: LogRef) : Observable<any>
+type ExtractRefs<M extends Model>
+    = Extract<keyof M['logs'], string>;
+
+type ExtractAggr<M extends Model, K extends keyof M['logs']>
+    = M['logs'][K]['zero']
+
+
+type Evaluable<M extends Model> = {
+    logRefs: Observable<ExtractRefs<M>>,
+    evaluate<K extends ExtractRefs<M>>(ref: K) : Observable<ExtractAggr<M, K>>
 }
 
 
-function evaluate<U, A>() : OperatorFunction<Era<Keyed$<U>>, Era<Evaluable>> {
+type Model = {
+    logs: { [ref: string]: LogModel<any, any> }
+}
+
+const model = {
+    logs: {
+        myLog: {
+            zero: '',
+            add: (ac: string, v: number) => 
+                ac == '' ? v : (ac + ',' + v)
+        }        
+    }
+}
+
+
+
+function evaluate<U, A, M extends Model>(model: M) : OperatorFunction<Era<Keyed$<U>>, Era<Evaluable<M>>> {
     return pipe(
-        scanSlices<Keyed$<U>, Evaluable>(
-            (prev, curr) => ({
-                logRefs: curr.pipe(map(g => g.key)),
-                evaluate() {
-                    throw 123;
+        scanSlices<Keyed$<U>, Evaluable<M>>(
+            ( prev, curr$) => ({
+                logRefs: curr$.pipe(map(g => g.key)) as any,    //needed as model doesn't exist upstream - we could guard against strange data here?
+                evaluate(ref) {
+                    const m = model.logs[ref];
+                    
+                    return prev.evaluate(ref).pipe(
+                            defaultIfEmpty(m.zero),
+                            flatMap(ac => curr$.pipe(
+                                            filter(g => g.key == ref),                  //filtering without a map is lame
+                                            concatMap(u$ => u$.pipe(scan(m.add, ac))))
+                                            ));
                 }
             }),
-            null));
+            { logRefs: empty(), evaluate: () => empty() }));
 }
 
 
@@ -35,12 +64,6 @@ describe('evaluator', () => {
     let ripple$: Subject<Keyed$<number>>
     let gathering: Promise<Slice<Dict>[][]>
 
-    const model: Model<number, string> = {
-        zero: '',
-        add: (aggr, u) => aggr + u
-    }
-    
-
     beforeEach(() => {
         spec$ = new Subject<EraSpec>();
         ripple$ = new Subject<TestRipple>();
@@ -48,18 +71,18 @@ describe('evaluator', () => {
         gathering = spec$.pipe(
                         startWith(0),
                         sliceByEra(ripple$),
-                        evaluate())
+                        evaluate(model))
                     .pipe(materialize())                    
                     .toPromise();
     })
 
 
     it('evaluates single slice', async () => {
-        ripple({ a: [1, 2] });
+        ripple({ myLog: [1, 2] });
     
         await expectOut([
             [
-                [ [0, 1], { a: '1,2' } ]
+                [ [0, 1], { myLog: '1,2' } ]
             ]
         ]);
     })
@@ -86,7 +109,7 @@ describe('evaluator', () => {
         expect(r).toEqual(expected);
     }
 
-    function materialize() : OperatorFunction<Era<Evaluable>, Slice<Dict<any>>[][]> {
+    function materialize<M extends Model>() : OperatorFunction<Era<Evaluable<M>>, Slice<Dict<any>>[][]> {
         return pipe(
             concatMap(([_, slices]) => 
                 slices.pipe(

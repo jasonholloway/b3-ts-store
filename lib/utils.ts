@@ -143,5 +143,5 @@ export function logVal<T>(s: string) : MonoTypeOperatorFunction<T> {
 
 
 
-export type Keyed$<U = any> = Observable<GroupedObservable<string, U>>
+export type Keyed$<U> = Observable<GroupedObservable<string, U>>
 
