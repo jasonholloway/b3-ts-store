@@ -88,6 +88,34 @@ describe('evaluator', () => {
     })
 
 
+    it('evaluates second slice', async () => {
+        ripple({ myLog: [1, 2] });
+        ripple({ myLog: [3, 4] });
+
+        await expectOut([
+            [
+                [ [0, 1], { myLog: '1,2' } ],
+                [ [1, 2], { myLog: '1,2,3,4' } ]
+            ]
+        ]);
+    })
+
+    it('advertises known log refs', async () => {
+        ripple({ myLog1: [1, 2], myLog2: [] });
+    
+        await expectOut([
+            [
+                [ [0, 1], { myLog: '1,2' } ]
+            ]
+        ]);
+    })
+
+
+
+
+
+
+
     function ripple(rip: Dict<number[]>) {
         const ripple = from(enumerate(rip)).pipe(
                             concatMap(([k, r]) => from(r).pipe(
@@ -108,6 +136,19 @@ describe('evaluator', () => {
         const r = await complete();
         expect(r).toEqual(expected);
     }
+
+
+    //TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+    function materializeSlices<V>() : OperatorFunction<Era<V>, Slice<V>[]> {
+        return pipe(
+            concatMap(([_, slices]) =>
+                slices.pipe(
+                    map(([range, v]) => tup(range, null))
+                 ))
+        );
+    }
+
+
 
     function materialize<M extends Model>() : OperatorFunction<Era<Evaluable<M>>, Slice<Dict<any>>[][]> {
         return pipe(
