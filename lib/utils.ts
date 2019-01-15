@@ -1,5 +1,8 @@
 import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce, scan, startWith, switchMap, groupBy, finalize, buffer } from 'rxjs/operators';
-import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, forkJoin, Subject, Subscription, MonoTypeOperatorFunction } from 'rxjs';
+import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, forkJoin, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable } from 'rxjs';
+import { Slice } from './sliceByEra';
+
+
 
 
 export type UpdateCreator<Type extends string, Body = void> 
@@ -39,6 +42,27 @@ export function getOrSet<V, W extends V>(dict: Dict<V>, key: string, fn: () => W
         || (dict[key] = fn())) as W;
 }
 
+
+export const mergeDicts = <V>(mergeVals: (v0: V, v1: V) => V) => {
+    const merge = ([head, ...tail]: Dict<V>[]) => {
+        if(tail.length == 0) return head;
+        else {
+            const merged = { ...head };
+
+            enumerate(merge(tail))
+                .forEach(([k, v]) => {
+                    merged[k] = merged[k] 
+                                ? mergeVals(merged[k], v)
+                                : v; 
+                });
+
+            return merged;
+        }
+    };
+
+    return merge;
+}
+    
 
 
 export function publish<T>(source: Observable<T>): ConnectableObservable<T> {
@@ -82,6 +106,7 @@ export function bufferAll<V>() : OperatorFunction<V, V[]> {
 }
 
 
+
 export function capture<A, B>(project: (A) => Observable<B>) : OperatorFunction<A, [A, Observable<B>]> {
     return pipe(
         switchMap(a => project(a)
@@ -115,4 +140,8 @@ export function log<T>(fn: (val: T) => string) : MonoTypeOperatorFunction<T> {
 export function logVal<T>(s: string) : MonoTypeOperatorFunction<T> {
     return tap(v => console.log(s, v));
 }
+
+
+
+export type Keyed$<U = any> = Observable<GroupedObservable<string, U>>
 

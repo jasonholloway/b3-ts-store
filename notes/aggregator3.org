@@ -172,6 +172,296 @@ an evaluation depends on the current value and the previous value
 so the stream of evaluations is in fact a reduction over all slices in the era...
 each era starts its evaluating afresh
 
+---
+
+the interface in the first place:
+
+it'll be space-wide, and will furnish another function, that will resolve the actual requested log
+though: we also want to know the actual logs involved in the slices
+
+the returned value will therefore be a map of log evaluators (or a stream of keyed log evaluators)
+
+if we wanted a real-time representation of errors in our currently-staged updates, we'd want the incremental
+adding of log evaluators: each new one in the slice could be subscribed to
+
+----------------------------
+
+getting the evaluator to deal with multiple slices overlaps
+with combining slices into one: they both have to come to the same results
+
+on the one hand, the evaluator traverses its inputs
+on the other, the inputs join themselves together
+
+we could:
+1) always unify before evaluating
+2) not bother unifying, just get the evaluator to reduce over the bitty bits
+
+for now, let's do the second, but the first can still be done to optimise 
+
+-------
+
+for efficiency, the thought before was to make log reductions happen only on request,
+instead of eagerly reducing everything
+
+somehow the consumer (say, the committer) will have a set of logs to go through as it wishes
+well - the per-log reductions are emitted as they're encountered
+which achieves the same
+
+so, each sliceEvaluation will emit all of its log entries as potential reductions; but they will only be resolved as needed
+
+so: /evaluate(slice)/
+returns /Observable<GroupedObservable<LogRef, View>>/
+
+but not just /View/:
+actually, yes, just /View/; or we'd be better calling it /Aggr/
+
+but do we want to pass through each and every update? no! just the one aggregate, thoug asynchronously
+
+So: /evalute(slice): GroupedObservable<LogRef, View>/
+
+but the evaluation will of course not be dispatched exactly like the above:
+it's a contextualised operation across a set: i.e. we don't just call it against an individual /Slice/
+
+so it's like /evaluate(slices)/
+
+------------------------------------------------------------
+
+
+or, howabout, instead of aggregating as part of the reduction,
+we just get all of the updates together in the first place,
+and aggregate these after
+
+the problem with this is it doesn't broach the issue of memoisation
+plus it doesn't make as much use of the slice aggregation as we'd like
+
+---
+
+we need to put aggrs together with updates
+into convenient little tuples
+ready for scanning together
+
+the base aggr will itself be an Observable, but with a single value
+so our scanning of updates in the slice
+will be a concatMapping of the base aggr stream
+
+------------------------------------------------------------
+
+
+but, if the previous Keyed$ is incomplete
+then we can never decide that it is missing a certain key, as it might crop up whenever
+each slice will continuously merge in, even if nothing has been seen yet
+
+but how can we concat an incomplete stream?
+we can't, can we? maybe we could
+
+concatting complete streams is certainly plausible, and would allow us to use concat
+to just plonk things together in relative simplicity
+
+new interjections from below require streams to be restated from the beginning
+this is basically what eras are doing currently
+when new blocks come into the cache, a new era begins
+
+that's one way of doing it
+another would be to retain the articulation of blocks and slices through to the end
+then the consumer would bear responsibility for traversing this more complicated structure
+
+the using of complete streams alone lets us pass through a simpler structure to be consumed
+a kind of pre-digestion: flattening happens sooner, in place. This complicates the upstream components
+but also gives them all chance to determine layers of certainty
+
+in reality, all blocks and slices are prone to receive continuing updates
+well, blocks are, but not old slices, which /should/ be complete
+
+and if the blocks change, then the era changes; everything on top of the era should be a flat stream
+
+if streams were communicated through as incomplete lumps in an overall, interpretable input,
+then the notion of the era dissipates slightly
+
+instead of eras of stability, there'd be a continuing flexible movement
+the viewer of a log would itself be reaggregating as new inputs came into its component streams
+each sub-aggregation could then be memoised locally and most efficiently reused
+
+the current scheme doesn't grant perfect efficiency of memoisation as we're razing the ground on each era
+and beginning afresh
+(though the putative viewer would be doing the same if aggregations weren't commutative)
+
+though, having a single era gives a number to an entire space-wide epoch; it synchronises everything and simplifies storage
+as we don't then deal with individual per-log indices.
+
+---
+
+the current /Evaluator/ is complicated by the fact in deals in both outputs and inputs, at the same time as trying to match up groupings
+
+the /Committer/ needs to see aggregations of things (and on a per-slice basis!)
+so, how would it benefit from just receiving through an articulated stream of updates?
+
+well: there'd still be a pre-aggregation so that both it and the /Viewer/ can use the same partial per-slice aggregations
+but: the gathering of a per-log stream of streams would be done beforehand
+
+and then the pre-aggregation could still be done per slice
+
+but then how would we get the memoised partial aggregations to sit on the slices?
+if each slice just received the full log history each time?
+there is a necessary collocation of computation and data here - they interweave desirably
+
+we're building a system, not a pure structure of information:
+a pipeline, not a graph
+but the general way is to parse into a local graph; operate on this structure; then re-serialize out intothe lingua franca of our consumers
+in a system, however, multiple subcomputations are interleaved
+but the lingua franca(s) of these subcomputations should be aligned, so as to simplify the representation of the processing
+
+in the case of our current sub-computation (staging, viewing and committing updates),
+the perfect representation of the actual state of things (determining the outputs we wish to see)
+would be a stream of streams, articulated with fidelity, ready to be interpreted by our system
+
+but we /already have this/ - in SliceByEra
+everything after that is an act of interpretation
+
+--------------------
+
+so, where were we?
+
+in evaluating a slice, because we don't want to re-evaluate for each slice encountered, we must build on the aggregation of the previous slice
+
+but first, we need to split into per-log parts
+the issue here is that we're kinda half-treating the aggregation to be space-wide
+
+in fact, this space-wide part of the reduction is precisely the part that should be furninshing (as a separate part of processing) individual per-log reductions
+
+the space wide reduction deals in streams of GroupedObservables with unique keys
+
+so... lets furnish ourselves with per-log reductions first of all
+
+and there was a problem here with prior completions, wasn't there?
+nah, what it was, was that we wanted to merge on keyed groupings; but in doing so, we'd have to deal with missing upstream groupings, as a log might be completely new
+
+prior Keyed$<Aggr> would be subscribed to
+and if the immediate prior didn't have the key we wanted, it'd also be sucking from its ow prior, so everything available would be offered up
+
+but this means too that the foundational blocklayer would need to be up front in its full set of possible logs
+there'd be no lazy querying of the server
+instead, each and every log, however small, would appear in the manifest
+but the individual stream wouldn't actually be subscribed to until it was needed: this is what would trigger the slow loading of its data
+
+otherwise, a further layer of indirection could be introduced, in that a downstream request for a particularly-addressed log
+would have to be sent back down through all the slices, and matched against the accumulated logs of each slice
+
+---------------------
+
+
+problems:
+1) how is concatKeyeds supposed to output things?
+   should it output intermediate canned partial objects? yes - the answer has to be yes
+   though we can lean on the previous object being final
+
+only when prev$ is complete can we put dummy emptys() in place of actual logs
+
+------
+
+flowing through all keys from below means that for each and every small slice,
+all keys will have to be processed
+
+this is inevitable if we are to resolve all keyed logs
+but - why do they all have to flow through each and every item?
+
+we don't want to resolve all keyed logs.
+well, we do when committing, as we need to know that everything staged makes sense
+
+every single staged updates needs to be eagerly evaluated for this purpose
+its output can then be memoised for efficient viewing
+
+but there's a big schism between the needs of the committer with its staged updates
+and the big bulk of available, though very lazily evaluated /committed/ updates
+eager slices/lazy blocks
+
+as it is, we have a single, simple scheme running through both these disparate zones
+what matches the one might not match the other
+or - if we want a single scheme, it should be more nuanced to fit
+
+-----
+
+*A more nuanced approach...*
+
+each Slice emits a stream of log keys as advertisement of the logs within it
+these let the consumer ask for only the logs it cares about
+
+if the /Committer/ wants to aggregate all the updates in its slice, it just needs to get the list of known logs,
+and explicitly ask for keyed logs based on this
+
+the Evaluable will have an /evaluate()/ function that is wired up to previous evaluables
+so again, the Committer doesn't need to do it's own looking through slices etc
+but it can be selective
+
+the /evaluate()/ stage prepares the slices for viewing and committing - it itself is the interpretation needed by the later layers
+also it's an opportunity to memoise (as i keep on saying!)
+
+so no more eager merging together of logs
+in fact, the only thing to be received from upstream is an evaluator function
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

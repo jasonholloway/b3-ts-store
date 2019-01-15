@@ -1,6 +1,7 @@
-import { Observable, empty, OperatorFunction, zip } from "rxjs";
+import { Observable, empty, OperatorFunction, zip, GroupedObservable, pipe } from "rxjs";
 import { scan, concat, filter, shareReplay, window, map, skip, tap } from "rxjs/operators";
 import { tup } from "./utils";
+
 
 export type Range = [number, number];
 export type Slice<V> = [Range, V]
@@ -35,6 +36,23 @@ export function sliceByEra<V>(vals: Observable<V>): OperatorFunction<EraSpec, Er
 
 export function slice<V>([from, to]: [number, number], v: V): Slice<V> {
     return tup(tup(from, to), v);
+}
+
+
+
+export function scanSlices<V, Ac>(fn: (a: Ac, v: V) => Ac, zero: Ac): OperatorFunction<Era<V>, Era<Ac>> {
+    return pipe(
+        map(([spec, slices]) => tup(spec, 
+            slices.pipe(
+                scan<Slice<V>, Slice<Ac>>(
+                    ([_, ac], [range, v]) => tup(range, fn(ac, v)), 
+                    tup(null, zero)),
+            )))
+    );
+}
+
+export function mapSlices<A, B>(fn: (a: A) => B): OperatorFunction<Era<A>, Era<B>> {
+    return scanSlices((_, v) => fn(v), null);
 }
 
 

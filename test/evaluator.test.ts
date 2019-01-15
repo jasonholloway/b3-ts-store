@@ -1,26 +1,45 @@
-import { EraSpec, sliceByEra, Era, Slice } from "../lib/sliceByEra";
-import { Subject, OperatorFunction, Observable, pipe } from "rxjs";
-import { Dict, reduceToDict, tup, reduceToArray } from "../lib/utils";
-import { startWith, map, concatMap, single } from "rxjs/operators";
+import { EraSpec, sliceByEra, Era, Slice, scanSlices } from "../lib/sliceByEra";
+import { Subject, OperatorFunction, Observable, pipe, from } from "rxjs";
+import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
+import { startWith, map, concatMap, groupBy } from "rxjs/operators";
+import { Model } from "../lib/bits";
 
 
-type TestRipple = Dict<number[]>
 type LogRef = string;
+    
 
-type Evaluator = () => Observable<[LogRef, Observable<any>]>
-
-
-function evaluate<U>() : OperatorFunction<Era<U>, Era<Evaluator>> {
-    throw 123;
+type Evaluable = {
+    logRefs: Observable<LogRef>,
+    evaluate(ref: LogRef) : Observable<any>
 }
 
+
+function evaluate<U, A>() : OperatorFunction<Era<Keyed$<U>>, Era<Evaluable>> {
+    return pipe(
+        scanSlices<Keyed$<U>, Evaluable>(
+            (prev, curr) => ({
+                logRefs: curr.pipe(map(g => g.key)),
+                evaluate() {
+                    throw 123;
+                }
+            }),
+            null));
+}
+
+
+type TestRipple = Keyed$<number>
 
 describe('evaluator', () => {
 
     let spec$: Subject<EraSpec>
-    let ripple$: Subject<TestRipple>
+    let ripple$: Subject<Keyed$<number>>
     let gathering: Promise<Slice<Dict>[][]>
 
+    const model: Model<number, string> = {
+        zero: '',
+        add: (aggr, u) => aggr + u
+    }
+    
 
     beforeEach(() => {
         spec$ = new Subject<EraSpec>();
@@ -40,14 +59,19 @@ describe('evaluator', () => {
     
         await expectOut([
             [
-                [ [0, 0], {} ]
+                [ [0, 1], { a: '1,2' } ]
             ]
         ]);
     })
 
 
-    function ripple(rip: TestRipple) {
-        ripple$.next(rip);
+    function ripple(rip: Dict<number[]>) {
+        const ripple = from(enumerate(rip)).pipe(
+                            concatMap(([k, r]) => from(r).pipe(
+                                                    map(v => tup(k, v)))),
+                            groupBy(([k, _]) => k, ([_, v]) => v));
+                    
+        ripple$.next(ripple);
     }
 
     function complete() {
@@ -62,14 +86,14 @@ describe('evaluator', () => {
         expect(r).toEqual(expected);
     }
 
-    function materialize() : OperatorFunction<Era<Evaluator>, Slice<Dict>[][]> {
+    function materialize() : OperatorFunction<Era<Evaluable>, Slice<Dict<any>>[][]> {
         return pipe(
             concatMap(([_, slices]) => 
                 slices.pipe(
-                    concatMap(([range, evaluate]) => 
-                        evaluate().pipe(
-                            concatMap(([key, val$]) => 
-                                val$.pipe(single(), map(val => tup(key, val)))),
+                    concatMap(([range, { logRefs, evaluate }]) =>
+                        logRefs.pipe(
+                            concatMap(ref => evaluate(ref).pipe(
+                                                map(v => tup(ref, v)))),
                             reduceToDict(),
                             map(d => tup(range, d)))),
                     reduceToArray())),

@@ -5,10 +5,10 @@ export function declareModel<U extends AnyUpdate, D, V>(m: Model<U, D, V>): Mode
     return m;
 }
 
-export type Model<U extends AnyUpdate, D, V> = {
+export type Model<U, D, V = any> = {
     zero: D,
     add(data: D, update: U): D,
-    view(data: D): V
+    // view(data: D): V
 }
 
 
