@@ -11,9 +11,9 @@ export const testModel = declareModel({
                 throw Error('Strange update!');
         }
     },
-    view(data) {
-        return data.join(':');
-    }
+    // view(data) {
+    //     return data.join(':');
+    // }
 })
 
 export const addUp = declareUpdate('ADD').withData<string>();
