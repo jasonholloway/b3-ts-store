@@ -1,48 +1,32 @@
-import { Subject, Observable, MonoTypeOperatorFunction } from "rxjs";
-import { reduceToArray, Dict } from "../lib/utils";
-import { Era, sliceByEra, EraSpec, Slice } from "../lib/sliceByEra";
-import { withLatestFrom, map, share, mapTo, concatMap, take, tap, flatMap, scan } from "rxjs/operators";
+import { Subject, from, OperatorFunction, pipe } from "rxjs";
+import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
+import { sliceByEra, EraSpec } from "../lib/sliceByEra";
+import { map, concatMap, scan, groupBy } from "rxjs/operators";
+import { evaluate } from "../lib/evaluate";
+import { TestModel } from "./fakes/testModel";
+import { DoCommit, committer, DoStore } from "../lib/committer";
 
 type TestRipple = Dict<number[]>
-
-type DoCommit = {}
-
-type DoStore<V> = {
-    slice: Slice<V>
-}
-
-function committer<V>(era$: Observable<Era<V>>, doCommit$: Observable<DoCommit>) {
-    doCommit$ = doCommit$.pipe(share());
-
-    const doStore$ = doCommit$.pipe(
-                        withLatestFrom(era$),
-                        concatMap(([_, [, slices]]) => 
-                            slices.pipe(
-                                take(1),
-                                map(slice => ({ slice })))),
-                        share());
-    return {
-        doStore$,
-        newEra$: doStore$.pipe(map(() => {}))
-    }
-}
-
 
 jest.setTimeout(400);
 
 describe('committer', () => {
 
+    const model = new TestModel();
+
     let spec$: Subject<EraSpec>
-    let ripple$: Subject<TestRipple>
+    let ripple$: Subject<Keyed$<number>>
     let doCommit$: Subject<DoCommit>
-    let gathering: Promise<DoStore<TestRipple>[]>
+    let gathering: Promise<{ data: Dict<number[]>, extent: number }[]>
 
     beforeEach(() => {
         spec$ = new Subject<EraSpec>();
-        ripple$ = new Subject<TestRipple>();
+        ripple$ = new Subject<Keyed$<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        const era$ = spec$.pipe(sliceByEra(ripple$));
+        const era$ = spec$.pipe(
+                        sliceByEra(ripple$),
+                        evaluate(model));
 
         const { doStore$, newEra$ } = committer(era$, doCommit$);
 
@@ -50,13 +34,12 @@ describe('committer', () => {
             .subscribe(spec$);
 
         gathering = doStore$
-                    .pipe(reduceToArray())
+                    .pipe(materialize())
                     .toPromise();
 
         spec$.next(0);
     })
 
-    
 
     it('stores first slice', async () => {
         ripple({ a: [ 1, 2 ] });
@@ -64,7 +47,8 @@ describe('committer', () => {
         doCommit();
 
         await expectStores([{
-            slice: [[0, 1], { a: [ 1, 2 ] }]
+            data: { a: [ 1, 2 ] },
+            extent: 1
         }]);
     })
 
@@ -74,18 +58,20 @@ describe('committer', () => {
         await expectStores([]);
     })
 
-    it('only commits if slice known good', async () => {
+    xit('only commits if slice known good', async () => {
         ripple({ a: [ 1, 2 ] });
         doCommit();
-
-
-
         await expectStores([]);
     })
 
 
+
     function ripple(rip: TestRipple) {
-        ripple$.next(rip);
+        const ripple = from(enumerate(rip)).pipe(
+                        concatMap(([k, r]) => from(r).pipe(map(v => tup(k, v)))),
+                        groupBy(([k]) => k, ([_, v]) => v));
+                    
+        ripple$.next(ripple);
     }
 
     function doCommit() {
@@ -93,7 +79,7 @@ describe('committer', () => {
     }
 
 
-    async function expectStores(doStores: DoStore<TestRipple>[]) {
+    async function expectStores(doStores: { data: Dict<number[]>, extent: number }[]) {
         const r = await complete();
         expect(r).toEqual(doStores);
     }
@@ -103,6 +89,20 @@ describe('committer', () => {
         spec$.complete();
         doCommit$.complete();
         return gathering;
+    }
+
+
+    function materialize<U>() : OperatorFunction<DoStore<U>, { data: Dict<U[]>, extent: number }[]> {
+        return pipe(
+                concatMap(({ data, extent }) => 
+                    data.pipe(
+                        concatMap(g => g.pipe(
+                                        reduceToArray(),
+                                        map(r => tup(g.key, r)))),
+                        reduceToDict(),
+                        map(data => ({ data, extent })))),
+                reduceToArray()
+            );
     }
 
 })

@@ -1,24 +1,10 @@
 import { EraSpec, sliceByEra, Slice, concatMapSlices, materializeSlices, pullAllSlices } from "../lib/sliceByEra";
-import { Subject, from } from "rxjs";
+import { Subject, from, empty } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
 import { startWith, map, concatMap, groupBy } from "rxjs/operators";
 import { Era$, Evaluable, evaluate } from "../lib/evaluate";
+import { TestModel } from "./fakes/testModel";
 
-
-class TestModel {
-    logs = {
-        myLog: {
-            zero: '',
-            add: (ac: string, v: number) => 
-                ac == '' ? v : (ac + ',' + v)
-        },
-        myLog2: {
-            zero: '',
-            add: (ac: string, v: number) => 
-                ac == '' ? v : (ac + ',' + v)
-        }
-    }
-}
 
 type TestRipple = Keyed$<number>;
 
@@ -40,6 +26,17 @@ describe('evaluator', () => {
                         sliceByEra(ripple$),
                         evaluate(model))
                     .pipe(pullAllSlices());
+    })
+
+
+    it('passes through raw logs in tuple', async () => {
+        ripple({ myLog: [1, 2], myLog2: [ 9 ] });
+    
+        await expectLogRefs([
+            [
+                [ [0, 1], ['myLog', 'myLog2'] ]
+            ]
+        ]);
     })
 
 
@@ -120,6 +117,19 @@ describe('evaluator', () => {
     function complete() {
         ripple$.complete();
         spec$.complete();
+    }
+
+
+    async function expectData(expected: Slice<Dict<any[]>>[][]) {
+        complete();
+
+        const r = await gathering.pipe(
+                        concatMapSlices(({data}) =>
+                            empty()),
+                        materializeSlices()
+                    ).toPromise();
+
+        expect(r).toEqual(expected);
     }
 
 

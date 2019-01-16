@@ -1,5 +1,5 @@
 import { createLogMachine } from "../lib/Log";
-import { testModel, addUp, AddUp } from "./fakes/testModel";
+import { testLogModel, addUp, AddUp } from "./fakes/testModel";
 import { ReplaySubject, from, Subject, forkJoin, of } from "rxjs";
 import { LogSpec } from "../lib/LogSpace";
 import { reduce, last, delay, finalize, combineAll } from "rxjs/operators";
@@ -108,7 +108,7 @@ function createFixture() {
     const resets = new Subject<void>();
     const loads = new Subject<number>();
 
-    const log = createLogMachine('KEY', testModel, specs, updates, resets, loadBlock);
+    const log = createLogMachine('KEY', testLogModel, specs, updates, resets, loadBlock);
 
 
 

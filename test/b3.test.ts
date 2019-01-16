@@ -1,6 +1,6 @@
 import { Map } from 'immutable'
 import { declareUpdate } from '../lib/utils';
-import { declareModel } from '../lib/bits';
+import { declareLogModel } from '../lib/bits';
 
 
 describe('b3 model', () => {
@@ -37,7 +37,7 @@ type B3Data = Map<String, Map<Id, Product>>
 
 
 
-const b3Model = declareModel({
+const b3Model = declareLogModel({
 
     zero: Map({
         products: Map<Id, Product>()
@@ -54,10 +54,10 @@ const b3Model = declareModel({
         }
     },
 
-    view(data: B3Data) {
-        return {
-            products: data.get('products'),
-            taxonomy: null
-        }
-    }
+    // view(data: B3Data) {
+    //     return {
+    //         products: data.get('products'),
+    //         taxonomy: null
+    //     }
+    // }
 })

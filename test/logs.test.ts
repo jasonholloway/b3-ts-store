@@ -2,7 +2,7 @@ import { Log } from "../lib/bits";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import { enumerate } from "../lib/utils";
-import { testModel, AddUp, addUp } from "./fakes/testModel";
+import { testLogModel, AddUp, addUp } from "./fakes/testModel";
 import { LogSpace, createLogSpace } from "../lib/LogSpace";
 
 
@@ -12,14 +12,14 @@ describe('LogSpace', () => {
     let log: Log<AddUp, string>;
     let blockStore: FakeBlockStore;
     let manifestStore: FakeManifestStore;
-    let model = testModel;
+    let model = testLogModel;
     let getLog: (name?: string) => Log<AddUp, string>;
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
         manifestStore = new FakeManifestStore();
         logSpace = createLogSpace(blockStore, manifestStore, null);
-        getLog = (name: string) => logSpace.getLog(name || 'test', testModel);
+        getLog = (name: string) => logSpace.getLog(name || 'test', testLogModel);
         log = getLog();
     })
 

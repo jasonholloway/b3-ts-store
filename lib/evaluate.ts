@@ -22,15 +22,19 @@ type KnownAggr<M extends Model, K extends keyof M['logs']>
 
 
 export type Evaluable<M extends Model> = {
+    data: Keyed$<any>
     logRefs: Observable<KnownLogs<M>>,
     evaluate<K extends KnownLogs<M>>(ref: K) : Observable<KnownAggr<M, K>>
 }
+
+const emptyEvaluable = { data: empty(), logRefs: empty(), evaluate: () => empty() }
 
 
 export function evaluate<U, M extends Model>(model: M) : OperatorFunction<Era<Keyed$<U>>, Era<Evaluable<M>>> {
     return pipe(
         scanSlices<Keyed$<U>, Evaluable<M>>(
-            ( prev, curr$) => ({
+            (prev, curr$) => ({
+                data: curr$,
                 logRefs: curr$.pipe(
                             concatMap(g => isKnownLog(model, g.key) ? [g.key] : [])
                             ),
@@ -45,7 +49,7 @@ export function evaluate<U, M extends Model>(model: M) : OperatorFunction<Era<Ke
                                             ));
                 }
             }),
-            { logRefs: empty(), evaluate: () => empty() }));
+            emptyEvaluable));
 }
 
 function isKnownLog<M extends Model>(model: M, ref: string) : ref is KnownLogs<M> {
