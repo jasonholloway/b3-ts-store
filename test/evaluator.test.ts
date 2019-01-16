@@ -1,5 +1,5 @@
-import { EraSpec, sliceByEra, Era, Slice, scanSlices, concatMapSlices, materializeSlices, pullAllSlices } from "../lib/sliceByEra";
-import { Subject, OperatorFunction, Observable, pipe, from, empty } from "rxjs";
+import { EraSpec, sliceByEra, Era, Slice, scanSlices, concatMapSlices, materializeSlices, pullAllSlices, mapSlices } from "../lib/sliceByEra";
+import { Subject, OperatorFunction, Observable, pipe, from, empty, of, throwError } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
 import { startWith, map, concatMap, groupBy, flatMap, filter, scan, defaultIfEmpty, tap, shareReplay } from "rxjs/operators";
 import { Model as LogModel } from "../lib/bits";
@@ -10,16 +10,16 @@ type LogRef = string;
 type Era$<V> = Observable<Era<V>>
 
 
-type ExtractRefs<M extends Model>
+type KnownLogs<M extends Model>
     = Extract<keyof M['logs'], string>
 
-type ExtractAggr<M extends Model, K extends keyof M['logs']>
+type KnownAggr<M extends Model, K extends keyof M['logs']>
     = M['logs'][K]['zero']
 
 
 type Evaluable<M extends Model> = {
-    logRefs: Observable<ExtractRefs<M>>,
-    evaluate<K extends ExtractRefs<M>>(ref: K) : Observable<ExtractAggr<M, K>>
+    logRefs: Observable<KnownLogs<M>>,
+    evaluate<K extends KnownLogs<M>>(ref: K) : Observable<KnownAggr<M, K>>
 }
 
 
@@ -45,17 +45,16 @@ class TestModel {
 
 
 
-
-
-
-function evaluate<U, A, M extends Model>(model: M) : OperatorFunction<Era<Keyed$<U>>, Era<Evaluable<M>>> {
+function evaluate<U, M extends Model>(model: M) : OperatorFunction<Era<Keyed$<U>>, Era<Evaluable<M>>> {
     return pipe(
         scanSlices<Keyed$<U>, Evaluable<M>>(
             ( prev, curr$) => ({
-                logRefs: curr$.pipe(map(g => g.key)) as any,    //needed as model doesn't exist upstream - we could guard against strange data here?
+                logRefs: curr$.pipe(
+                            concatMap(g => isKnownLog(model, g.key) ? [g.key] : [])
+                            ),
                 evaluate(ref) {
                     const m = model.logs[ref];
-                    
+
                     return prev.evaluate(ref).pipe(
                             defaultIfEmpty(m.zero),
                             flatMap(ac => curr$.pipe(
@@ -66,6 +65,12 @@ function evaluate<U, A, M extends Model>(model: M) : OperatorFunction<Era<Keyed$
             }),
             { logRefs: empty(), evaluate: () => empty() }));
 }
+
+function isKnownLog<M extends Model>(model: M, ref: string) : ref is KnownLogs<M> {
+    return model.logs[ref] !== undefined;
+}
+
+
 
 
 type TestRipple = Keyed$<number>;
@@ -139,8 +144,18 @@ describe('evaluator', () => {
     })
 
 
-    xit('gives nice error if strange log encountered', async () => {
-        throw 'WIBBLE!';
+    describe('when strange log encountered', () => {
+
+        it('not listed in logRefs', async () => {
+            ripple({ flibble: [1] });
+
+            await expectLogRefs([
+                [
+                    [ [0, 1], [] ]
+                ]
+            ]);
+        })
+
     })
 
 
