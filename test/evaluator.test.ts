@@ -1,14 +1,17 @@
-import { EraSpec, sliceByEra, Era, Slice, scanSlices } from "../lib/sliceByEra";
-import { Subject, OperatorFunction, Observable, pipe, from, empty, of } from "rxjs";
+import { EraSpec, sliceByEra, Era, Slice, scanSlices, concatMapSlices, materializeSlices, pullAllSlices } from "../lib/sliceByEra";
+import { Subject, OperatorFunction, Observable, pipe, from, empty } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
-import { startWith, map, concatMap, groupBy, tap, flatMap, filter, scan, defaultIfEmpty } from "rxjs/operators";
+import { startWith, map, concatMap, groupBy, flatMap, filter, scan, defaultIfEmpty, tap, shareReplay } from "rxjs/operators";
 import { Model as LogModel } from "../lib/bits";
 
 
 type LogRef = string;
 
+type Era$<V> = Observable<Era<V>>
+
+
 type ExtractRefs<M extends Model>
-    = Extract<keyof M['logs'], string>;
+    = Extract<keyof M['logs'], string>
 
 type ExtractAggr<M extends Model, K extends keyof M['logs']>
     = M['logs'][K]['zero']
@@ -24,15 +27,24 @@ type Model = {
     logs: { [ref: string]: LogModel<any, any> }
 }
 
-const model = {
-    logs: {
+
+class TestModel {
+    logs = {
         myLog: {
             zero: '',
             add: (ac: string, v: number) => 
                 ac == '' ? v : (ac + ',' + v)
-        }        
+        },
+        myLog2: {
+            zero: '',
+            add: (ac: string, v: number) => 
+                ac == '' ? v : (ac + ',' + v)
+        }
     }
 }
+
+
+
 
 
 
@@ -56,13 +68,15 @@ function evaluate<U, A, M extends Model>(model: M) : OperatorFunction<Era<Keyed$
 }
 
 
-type TestRipple = Keyed$<number>
+type TestRipple = Keyed$<number>;
 
 describe('evaluator', () => {
 
+    const model = new TestModel();
+
     let spec$: Subject<EraSpec>
     let ripple$: Subject<Keyed$<number>>
-    let gathering: Promise<Slice<Dict>[][]>
+    let gathering: Era$<Evaluable<TestModel>>
 
     beforeEach(() => {
         spec$ = new Subject<EraSpec>();
@@ -72,47 +86,62 @@ describe('evaluator', () => {
                         startWith(0),
                         sliceByEra(ripple$),
                         evaluate(model))
-                    .pipe(materialize())                    
-                    .toPromise();
+                    .pipe(pullAllSlices());
     })
 
 
-    it('evaluates single slice', async () => {
-        ripple({ myLog: [1, 2] });
+    describe('logRefs', () => {
+        it('advertises known log refs', async () => {
+            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
+        
+            await expectLogRefs([
+                [
+                    [ [0, 1], ['myLog', 'myLog2'] ]
+                ]
+            ]);
+        })
+
+        it('ignores log refs without updates', async () => {
+            ripple({ myLog: [], myLog2: [ 9 ] });
+        
+            await expectLogRefs([
+                [
+                    [ [0, 1], ['myLog2'] ]
+                ]
+            ]);
+        })
+    })
+
+
+    describe('evaluate', () => {
+        it('single slice', async () => {
+            ripple({ myLog: [1, 2] });
+        
+            await expectAggrs([
+                [
+                    [ [0, 1], { myLog: '1,2' } ]
+                ]
+            ]);
+        })
     
-        await expectOut([
-            [
-                [ [0, 1], { myLog: '1,2' } ]
-            ]
-        ]);
-    })
-
-
-    it('evaluates second slice', async () => {
-        ripple({ myLog: [1, 2] });
-        ripple({ myLog: [3, 4] });
-
-        await expectOut([
-            [
-                [ [0, 1], { myLog: '1,2' } ],
-                [ [1, 2], { myLog: '1,2,3,4' } ]
-            ]
-        ]);
-    })
-
-    it('advertises known log refs', async () => {
-        ripple({ myLog1: [1, 2], myLog2: [] });
     
-        await expectOut([
-            [
-                [ [0, 1], { myLog: '1,2' } ]
-            ]
-        ]);
+        it('second slice', async () => {
+            ripple({ myLog: [1, 2] });
+            ripple({ myLog: [3, 4] });
+    
+            await expectAggrs([
+                [
+                    [ [0, 1], { myLog: '1,2' } ],
+                    [ [1, 2], { myLog: '1,2,3,4' } ]
+                ]
+            ]);
+        })
     })
 
 
-
-
+    xit('gives nice error if strange log encountered', async () => {
+        throw 'WIBBLE!';
+    })
 
 
 
@@ -128,41 +157,34 @@ describe('evaluator', () => {
     function complete() {
         ripple$.complete();
         spec$.complete();
-        return gathering;
     }
 
 
-    async function expectOut(expected: Slice<Dict<any>>[][]) {
-        const r = await complete();
+    async function expectAggrs(expected: Slice<Dict<any>>[][]) {
+        complete();
+
+        const r = await gathering.pipe(
+                        concatMapSlices(({logRefs, evaluate}) => 
+                            logRefs.pipe(
+                                concatMap(ref => evaluate(ref).pipe(
+                                                    map(v => tup(ref, v)))),
+                                reduceToDict())),
+                        materializeSlices()
+                    ).toPromise();
+
         expect(r).toEqual(expected);
     }
 
+    async function expectLogRefs(expected: Slice<string[]>[][]) {
+        complete();
 
-    //TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-    function materializeSlices<V>() : OperatorFunction<Era<V>, Slice<V>[]> {
-        return pipe(
-            concatMap(([_, slices]) =>
-                slices.pipe(
-                    map(([range, v]) => tup(range, null))
-                 ))
-        );
+        const r = await gathering.pipe(
+                        concatMapSlices(({logRefs}) => 
+                            logRefs.pipe(reduceToArray())),                            
+                        materializeSlices()
+                    ).toPromise();
+
+        expect(r).toEqual(expected);
     }
-
-
-
-    function materialize<M extends Model>() : OperatorFunction<Era<Evaluable<M>>, Slice<Dict<any>>[][]> {
-        return pipe(
-            concatMap(([_, slices]) => 
-                slices.pipe(
-                    concatMap(([range, { logRefs, evaluate }]) =>
-                        logRefs.pipe(
-                            concatMap(ref => evaluate(ref).pipe(
-                                                map(v => tup(ref, v)))),
-                            reduceToDict(),
-                            map(d => tup(range, d)))),
-                    reduceToArray())),
-            reduceToArray());
-    }
-
 
 })

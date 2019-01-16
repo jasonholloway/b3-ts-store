@@ -1,6 +1,6 @@
 import { Observable, empty, OperatorFunction, zip, GroupedObservable, pipe } from "rxjs";
-import { scan, concat, filter, shareReplay, window, map, skip, tap } from "rxjs/operators";
-import { tup } from "./utils";
+import { scan, concat, filter, shareReplay, window, map, skip, tap, concatMap } from "rxjs/operators";
+import { tup, reduceToArray } from "./utils";
 
 
 export type Range = [number, number];
@@ -53,6 +53,43 @@ export function scanSlices<V, Ac>(fn: (a: Ac, v: V) => Ac, zero: Ac): OperatorFu
 
 export function mapSlices<A, B>(fn: (a: A) => B): OperatorFunction<Era<A>, Era<B>> {
     return scanSlices((_, v) => fn(v), null);
+}
+
+export function concatMapSlices<A, B>(fn: (a: A) => Observable<B>) : OperatorFunction<Era<A>, Era<B>> {
+    return pipe(
+        map(([spec, slices]) => tup(spec, 
+            slices.pipe(
+                concatMap(([range, v]) => fn(v).pipe(
+                                            map(b => tup(range, b))))
+                )))
+    );
+
+}
+
+    
+export function materializeSlices<V>() : OperatorFunction<Era<V>, Slice<V>[][]> {
+    return pipe(
+        concatMap(([_, slices]) =>
+            slices.pipe(
+                reduceToArray()
+                )),
+        reduceToArray()
+        );
+}
+
+export function pullAllSlices<A>() : OperatorFunction<Era<A>, Era<A>> {
+    return eras => {
+        eras = eras.pipe(
+                map(([spec, slices]) => {
+                    slices = slices.pipe(shareReplay());
+                    slices.subscribe();
+                    return tup(spec, slices);
+                }),
+                shareReplay())
+
+        eras.subscribe();
+        return eras;
+    }
 }
 
 
