@@ -1,14 +1,14 @@
 import { Observable, Subject, from, OperatorFunction, pipe, BehaviorSubject } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap, startWith } from "rxjs/operators";
-import { Range, Era, sliceByEra } from "../lib/sliceByEra";
+import { Range, Era, slicer } from "../lib/slicer";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
 
 jest.setTimeout(500);
 
-describe('slice', () => {
+describe('slicer', () => {
 
     let ripples: Subject<Ripple<number>>
     let eras: Subject<number>
@@ -20,7 +20,7 @@ describe('slice', () => {
 
         gathering = eras.pipe(
                         startWith(0),
-                        sliceByEra(ripples),
+                        slicer(ripples),
                         materializeEras()
                     ).toPromise();
     })

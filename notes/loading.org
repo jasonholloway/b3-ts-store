@@ -1,0 +1,56 @@
+
+
+as well as storing commits, we want to work out how to load into blocks
+this is pretty high priority in getting a prototype working
+
+the block store only really comes into things when the Evaluator gets going
+the block store serves the very first evaluator
+
+also, new eras should be triggered by the ManifestStore
+
+this is how we know to reload
+
+before this, as part of committing, a new era is triggered, but this is just to separate off the staged slices;
+our only inkling that a commit has suceeded is when...
+
+nope! there are two inklings: either the ManifestStore has detected changes from elsewhere
+or the /Pusher/, on successful push, informs us that the spec has now changed, short-circuiting the polling
+
+in fact the polling isn't needed for now: as long as the /Pusher/ can trigger...
+
+or, maybe the Pusher needn't tell us anything:
+the store, as it would have to be in charge of polling anyway, could take on that responsibility
+narp, I like the Pusher doing it; it is defo part of the core app, whereas the stores are adaptors
+
+---------------
+
+we need multiplexing in the pipeline:
+all the different operators need some way of flowing informational messages out
+
+similarly, global commands need emitting
+
+everything is one big loop, around which various messages need passing;
+different top-level packets should have different names
+then different parts of the pipeline could be hooked in to differently-named 'channels', via some kind of higher-order wrapper operator
+
+alternatively, the pipeline could be decomposed:
+specs at the top, and everything after that as sub-pipelines.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

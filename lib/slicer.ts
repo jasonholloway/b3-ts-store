@@ -8,7 +8,7 @@ export type Slice<V> = [Range, V]
 export type Era<V> = [EraSpec, Observable<Slice<V>>]
 export type EraSpec = number;
 
-export function sliceByEra<V>(vals: Observable<V>): OperatorFunction<EraSpec, Era<V>> {
+export function slicer<V>(vals: Observable<V>): OperatorFunction<EraSpec, Era<V>> {
     return eras => {
         eras = eras.pipe(shareReplay(16));
 
