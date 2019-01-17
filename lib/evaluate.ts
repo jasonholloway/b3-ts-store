@@ -14,10 +14,10 @@ export type Model = {
 }
 
 
-type KnownLogs<M extends Model>
+export type KnownLogs<M extends Model>
     = Extract<keyof M['logs'], string>
 
-type KnownAggr<M extends Model, K extends keyof M['logs']>
+export type KnownAggr<M extends Model, K extends keyof M['logs']>
     = M['logs'][K]['zero']
 
 

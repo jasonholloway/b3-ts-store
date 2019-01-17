@@ -1,0 +1,108 @@
+
+Committing may have sidestepped the problem of aggregating slices by only taking the first,
+but viewing doesn't have that luxury: the end-user needs to see everything that's been staged
+/all stagesmust appear in the View!/
+
+and, in fact, doesn't the evaluator do this now anyway? I believe that it does...
+which means there's no need for the Committer to restrict itself to the first Slice only,
+as it can evaluate as many as it likes
+
+----------
+
+todo:
+- Viewer to offer single interface for requesting a view; without the concept of eras
+- Committer to commit all current slices
+
+----------------------------
+
+
+so, the Viewer will hide eras from the consuming user
+the user will just receive new aggregations one by one, having specified a ref to the view() function
+
+but I see here two problems:
+1) as eras are restated, then views will be restated
+   the client would then end up refreshing a lot as eras are churned
+2) when we first load up a view, each and every intermediate aggregation will be output:
+   this isn't just unsightly, but it's *wrong!* as we compress history, we lose the coherency of the past; only the present makes sense
+
+   so, we can't restate views as new eras kick in (and that's been a handy feature till now: it protects the committer(i think))
+
+   actually, why are eras restated? because with each era there're potentially new updates to dredge up from the blocks
+   and everything in the slices is built on the blocks
+
+   also, it enables resetting; a new era would be sliceless
+
+   so, eras are good - but, in viewing, at least, we want to avoid restatements
+   but this is the same in committing: there's no point in receiving intermediate aggregations if new ones are to be output
+
+   in this case, maybe we could just debounce, as a low-pass filter, which would introduce a very small delay in seeing up-to-date views come through
+   this would solve it, I think, though it's hardly elegant
+   
+   ---------------
+   
+   if a new block is loaded quickly, but then the next one slowly, 
+   the intermediate aggregation of the old block will therefore seep out momentarily
+   
+   /there has to be some typeof filtering.../ as upstream we're restating
+   better than debouncing would be to deterministically filter, using some kind of clock
+   though for any such filter, there'd have to be state, a remembrance of where we had been, and a foreknowledge of where we were going
+   not sure if such foreknowledge is a reasonable thing to expect
+   
+   better yet would to just not reaggregate if we didn't need to
+   the era would change, but somehow in swapping eras we'd just carry over the previous evaluations...
+   (though these evaluations would have been stitched together with the previous era in mind)
+
+   each slice, when created, would have a unique number assigned (not just range?)
+   oh, actually - the range does feature unique numbering already
+
+   but what happens in the event of a reset to the numbering?
+   the threshold is just moved forwards to lop off all accumulated slices
+
+   so - if slices are uniquely numbered, then subsequent operators (such as the /Evaluator)/ could zip together based on that numbering...
+   if there was already an evaluation with that numbering (with the same upper limit) - then the evaluation could just be reused
+   it'd even be feasible to build an aggregation on top of a previous era's slice: this would give us a base to aggregate onto
+
+   but are slices safe like that? can we trust them to be the same given their numbering is the same? if they are final, then yes...
+   in fact, even irrespective of the contents, we can trust them, as they will share an original source
+
+   this downstream zipping together needn't just happen in the /Slicer/ and /Evaluator/ stages; even the /Viewer/ too could do it
+   though the /Viewer/ would in fact just be consuming the /Evaluator/'s evaluate() function
+
+   the Evaluator, then... will do its zipping, and the /Committer/ and /Viewer/ will be none the wiser.
+
+   though the /Viewer/ still wants to obscure eras... in fact, it is separate from the /Evaluator/ here:
+   or is it? the underlying /Evaluable/ will be the same if the slice is the same...
+
+   -----------------------------------
+
+   so the Evaluable offers its evaluator; this tells you the story of the slice
+
+   but as the Viewer streams back era-less aggregates to the client, these evaluables will shift in position
+   well, as long as the slice is the last-seen slice, we're kinda fine
+
+   but if a new slice is seen, then that new slice must be asked for its aggregation
+
+   /view()/ therefore concats evaluations of the latest slice across eras
+   or, rather than concatting, it switches, and with debouncing to hide intermediate states that are being chugged through (zipping will hopefully get rid of many of these)
+
+
+
+
+
+
+
+
+   
+   
+  
+
+
+
+
+
+
+
+
+
+
+

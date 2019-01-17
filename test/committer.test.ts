@@ -24,14 +24,10 @@ describe('committer', () => {
         ripple$ = new Subject<Keyed$<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        const era$ = spec$.pipe(
-                        sliceByEra(ripple$),
-                        evaluate(model));
-
-        const { doStore$, newEra$ } = committer(era$, doCommit$);
-
-        newEra$.pipe(scan<void, number>((ac, _) => ac + 1, 0))
-            .subscribe(spec$);
+        const doStore$ = spec$.pipe(
+                            sliceByEra(ripple$),
+                            evaluate(model),
+                            committer(doCommit$, null));
 
         gathering = doStore$
                     .pipe(materialize())
