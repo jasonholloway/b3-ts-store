@@ -1,7 +1,7 @@
 import { Observable, OperatorFunction, pipe, empty } from "rxjs";
 import { Era, scanSlices } from "./sliceByEra";
 import { Keyed$ } from "./utils";
-import { concatMap, defaultIfEmpty, flatMap, filter, scan } from "rxjs/operators";
+import { concatMap, defaultIfEmpty, flatMap, filter, scan, tap } from "rxjs/operators";
 import { Model as LogModel } from './bits'
 
 export type LogRef = string;

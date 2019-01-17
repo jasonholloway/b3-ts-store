@@ -85,6 +85,56 @@ but I see here two problems:
    /view()/ therefore concats evaluations of the latest slice across eras
    or, rather than concatting, it switches, and with debouncing to hide intermediate states that are being chugged through (zipping will hopefully get rid of many of these)
 
+   -----
+
+   what do we finally want out of the /Viewer/?
+
+   we want a new view each time something happens to our particular log;
+   ideally, we don't want to see new things when we commit, and when updates to /other/ logs occur
+   
+   -----
+
+   so, our /Viewer/ will do its own zipping: if the slice range is the same, we don't need to emit it
+
+   but what about the intermediates as we replay the previous era?
+   well - the thought occurs that if the encountered slice is from earlier than where we're up to now, we can just ignore it
+
+   except - what if we undo a slice? then the threshold will tumble backwards
+   
+   the problem here is that, because we are always working forwards in discrete slices of time, 
+   at any one of these moments, we can't tell where we're heading: just serving a single view is an optimisation
+   that we can perform only if we know full details of the movement /in sweep/
+   
+   but - we do know what we're doing /in-sweep/: it's just that we don't pass that info around
+   when we reset, or undo, then the new /Era/ is specially to perform this /regression/
+   each /Era/ is to perform a going forwards or backwards:
+   if we knew which way things were heading, then the /Viewer/ could behave appropriately
+   
+   though: once we have clumping working, everything will be happening in a single slice
+   for as long as the era lasts
+
+   there's no problem with this, except....
+
+   in fact, the only time there will be a new era will be when we're regressing or rebasing
+   except for on commits: these are just restatements and incur waste (waste that will be passed all the way onto the client)
+   
+   a restatement should incur no re-evaluation, and no more re-emitting
+   
+   hmm... 
+   there are two indices to care about when zipping/cacheing: the era number, and the slice number
+   if the manifest number and the slice number
+   if the manifest has changed, then everything has to be re-evaled
+   (unless we were to have per-log cursors, which is actually a good point, that)
+
+   but - it seems that measures such of these could be sorted out with some re-vamping later: it all requires more info flowing through as part of the log spec
+   
+   as a basic measure, we can just debounce;
+   this will make things usable
+   
+   ---
+
+
+
 
 
 

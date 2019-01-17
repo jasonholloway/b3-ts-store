@@ -23,12 +23,12 @@ export class TestModel {
         myLog: {
             zero: '',
             add: (ac: string, v: number) => 
-                ac == '' ? v : (ac + ',' + v)
+                ac == '' ? v.toString() : (ac + ',' + v)
         },
         myLog2: {
             zero: '',
             add: (ac: string, v: number) => 
-                ac == '' ? v : (ac + ',' + v)
+                ac == '' ? v.toString() : (ac + ',' + v)
         }
     }
 }
