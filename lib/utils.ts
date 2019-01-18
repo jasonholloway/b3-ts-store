@@ -1,6 +1,6 @@
 import { publish as publishOperator, map, publishReplay, concatMap, flatMap, tap, reduce, scan, startWith, switchMap, groupBy, finalize, buffer } from 'rxjs/operators';
 import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, forkJoin, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable } from 'rxjs';
-import { Slice } from './sliceByEra';
+import { Slice } from './slicer';
 
 
 

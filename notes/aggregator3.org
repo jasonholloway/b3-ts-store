@@ -120,7 +120,7 @@ there's always another before, or there's a base
 
 (in passing, the BlockCache itself will in reality just be storing Slices - though without the ranges as ranges are local concerns of the commit mechanism alone)
 
-so, a Slice (as in, an ordered value with a range) /is/ a matter for the commit system; it's not out of the bounds of SliceByEra to furnish these functionalities
+so, a Slice (as in, an ordered value with a range) /is/ a matter for the commit system; it's not out of the bounds of slicer to furnish these functionalities
 though, affixing a function to each and every item of data is wasteful (we could relate to prototypes, but then I fear for our tuplism)
 
 a Slice can be combined, as it's a Slice: this is what Slices do. Their ranges can be shunted together, immutably.
@@ -132,7 +132,7 @@ which doesn't need to have any knowledge of slices
 if combination is immutable, it seems like it shouldn't be on the object too, as this would give primacy to one input over the other, instead of the two of them
 being coequals in their combination. A combining function would therefore make most sense
 
-i'm coming to the conclusion that sliceByEra should just dollop out a single slice - ie it should do the combining itself,
+i'm coming to the conclusion that slicer should just dollop out a single slice - ie it should do the combining itself,
 saving the work of slice combination for later layers
 
 the era articulation can nicely separate slices for downstream consumers
@@ -314,7 +314,7 @@ in the case of our current sub-computation (staging, viewing and committing upda
 the perfect representation of the actual state of things (determining the outputs we wish to see)
 would be a stream of streams, articulated with fidelity, ready to be interpreted by our system
 
-but we /already have this/ - in SliceByEra
+but we /already have this/ - in slicer
 everything after that is an act of interpretation
 
 --------------------

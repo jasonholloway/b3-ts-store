@@ -1,8 +1,8 @@
-import { EraSpec, sliceByEra, Slice, concatMapSlices, materializeSlices, pullAllSlices } from "../lib/sliceByEra";
-import { Subject, from, empty } from "rxjs";
+import { EraSpec, slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices } from "../lib/slicer";
+import { Subject, from, empty, Observable } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
 import { startWith, map, concatMap, groupBy } from "rxjs/operators";
-import { Era$, Evaluable, evaluate } from "../lib/evaluate";
+import { Evaluable, evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 
 
@@ -15,15 +15,15 @@ describe('evaluator', () => {
 
     let spec$: Subject<EraSpec>
     let ripple$: Subject<Keyed$<number>>
-    let gathering: Era$<Evaluable<TestModel>>
+    let gathering: Observable<EraWithSlices<Evaluable<TestModel>>>
 
     beforeEach(() => {
         spec$ = new Subject<EraSpec>();
         ripple$ = new Subject<TestRipple>();
 
         gathering = spec$.pipe(
-                        startWith(0),
-                        sliceByEra(ripple$),
+                        startWith({ thresh: 0}),
+                        slicer(ripple$),
                         evaluate(model))
                     .pipe(pullAllSlices());
     })

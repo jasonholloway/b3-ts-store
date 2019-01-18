@@ -1,6 +1,6 @@
 import { Subject, from, OperatorFunction, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
-import { sliceByEra, EraSpec } from "../lib/sliceByEra";
+import { slicer, EraWithThresh } from "../lib/slicer";
 import { map, concatMap, groupBy, shareReplay, mapTo } from "rxjs/operators";
 import { evaluate, KnownLogs } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
@@ -30,7 +30,7 @@ describe('viewer', () => {
 
         const era$ = command$.pipe(
                         specifier(),
-                        sliceByEra(ripple$),
+                        slicer(ripple$),
                         evaluate(model),
                         pullAll());
 
@@ -111,10 +111,10 @@ describe('viewer', () => {
 })
 
 
-function specifier() : OperatorFunction<EraCommand, EraSpec> {
+function specifier() : OperatorFunction<EraCommand, EraWithThresh> {
     return command$ => {
         return command$.pipe(
-            mapTo(0)
+            mapTo({ thresh: 0 })
             //scan<EraCommand, number>((ac, _) => ac + 1, -1)
         );
     }
