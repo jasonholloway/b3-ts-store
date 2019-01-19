@@ -27,7 +27,7 @@ describe('committer', () => {
         const doStore$ = spec$.pipe(
                             slicer(ripple$),
                             evaluate(model),
-                            committer(doCommit$, null));
+                            committer(model, doCommit$, null));
 
         gathering = doStore$
                     .pipe(materialize())

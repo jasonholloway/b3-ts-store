@@ -4,7 +4,13 @@ import { tup, reduceToArray } from "./utils";
 
 
 export type Range = [number, number];
-export type Slice<V> = [Range, V]
+
+export interface Slice<V> extends Array<Range | V> {
+    0: Range
+    1: V
+    length: 2
+}
+
 export type Slice$<V> = Observable<Slice<V>>
 export type EraSpec = number;
 
@@ -35,8 +41,8 @@ export function slicer<
                     map(([era, slices]) => ({ ...era as EraWithThresh, slices })),
 
                     //merge in previous eras slices
-                    scan<I & EraWithSlices<V>, Observable<O>>(   
-                        (prev$, era) => {
+                    scan(   
+                        (prev$: Observable<O>, era: EraWithSlices<V> & EraWithThresh) => {
                             const slices = prev$.pipe(
                                                 flatMap(prev => prev.slices),
                                                 concat(era.slices),
@@ -110,8 +116,7 @@ export function concatMapSlices<
     A, B, I extends EraWithSlices<A>, O extends EraWithSlices<B> & I>
     (fn: (a: A) => Observable<B>) : OperatorFunction<I, O>
 {
-    return eras => {     
-        return eras.pipe(
+    return pipe(
             map(era => {
                 const slices = era.slices.pipe(
                                 concatMap(([range, v]) => fn(v).pipe(
@@ -119,9 +124,7 @@ export function concatMapSlices<
                                 )
 
                 return { ...era as object, slices } as O;
-            })
-        );   
-    }
+            }));   
 }
 
     

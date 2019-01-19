@@ -1,14 +1,13 @@
 import { Dict, getOrSet, enumerate, tup } from "./utils";
 import { LogBlocks, LogSpec } from "./LogSpace";
 
-export function declareLogModel<U extends AnyUpdate, D, V>(m: Model<U, D, V>): Model<U, D, V> {
+export function declareLogModel<U extends AnyUpdate, D>(m: Model<U, D>): Model<U, D> {
     return m;
 }
 
-export type Model<U, D, V = any> = {
+export type Model<U, D> = {
     zero: D,
-    add(data: D, update: U): D,
-    // view(data: D): V
+    add(data: D, update: U): D
 }
 
 

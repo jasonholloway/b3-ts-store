@@ -1,7 +1,7 @@
 import { Subject, from, OperatorFunction, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
 import { slicer, EraWithThresh } from "../lib/slicer";
-import { map, concatMap, groupBy, shareReplay, mapTo } from "rxjs/operators";
+import { map, concatMap, groupBy, shareReplay, mapTo, tap } from "rxjs/operators";
 import { evaluate, KnownLogs } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/committer";
@@ -34,7 +34,7 @@ describe('viewer', () => {
                         evaluate(model),
                         pullAll());
 
-        view = createViewer(era$);
+        view = createViewer<TestModel>(era$);
 
         command$.next();
     })

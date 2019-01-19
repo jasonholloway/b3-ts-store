@@ -5,7 +5,7 @@ import { LogSpec } from "../lib/LogSpace";
 import { reduce, last, delay, finalize, combineAll } from "rxjs/operators";
 import { reduceToArray } from "../lib/utils";
 
-describe('LogImpl', () => {
+xdescribe('LogImpl', () => {
 
     jest.setTimeout(500);
 

@@ -9,7 +9,7 @@ export type Viewer<M extends Model> =
 export type ViewableEra<M extends Model> = EraWithSlices<Evaluable<M>>
 
 
-export function createViewer<M extends Model>(era$: Observable<ViewableEra<M>>) : Viewer<M> {
+export function createViewer<M extends Model>(era$: Observable<EraWithSlices<Evaluable<M>>>) : Viewer<M> {
     era$ = era$.pipe(shareReplay(1));
     era$.subscribe();
 

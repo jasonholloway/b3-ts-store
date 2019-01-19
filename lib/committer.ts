@@ -1,7 +1,7 @@
 import { Keyed$ } from "./utils";
 import { Evaluable, Model } from "./evaluate";
 import { Observable, OperatorFunction, Observer } from "rxjs";
-import { share, withLatestFrom, concatMap, take, map, mapTo } from "rxjs/operators";
+import { share, withLatestFrom, concatMap, take, map, mapTo, tap } from "rxjs/operators";
 import { EraWithSlices } from "./slicer";
 
 export type DoCommit = {}
@@ -11,8 +11,9 @@ export type DoStore<U> = {
     extent: number
 }
 
-export function committer<M extends Model>
-    (doCommit$: Observable<DoCommit>, command$: Observer<void>) : OperatorFunction<EraWithSlices<Evaluable<M>>, DoStore<any>> {
+export const committer =
+    <M extends Model, I extends EraWithSlices<Evaluable<M>>>
+    (_: M, doCommit$: Observable<DoCommit>, command$: Observer<void>) : OperatorFunction<I, DoStore<any>> => {
     return era$ => {
         doCommit$ = doCommit$.pipe(share());
 

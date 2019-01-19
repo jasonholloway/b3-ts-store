@@ -1,10 +1,8 @@
-import { reduce, map, flatMap, tap, mergeAll, scan, concatMap, publishReplay, shareReplay, defaultIfEmpty, withLatestFrom, combineAll, sample } from "rxjs/operators";
-import { OperatorFunction, Observable, Subject, merge, of, forkJoin, from, pipe, concat, combineLatest, empty } from "rxjs";
+import { reduce, map, scan, concatMap } from "rxjs/operators";
+import { OperatorFunction, Observable, Subject, merge, from, concat, combineLatest } from "rxjs";
 import { AnyUpdate, Model, Log } from "./bits";
 import { LogSpec } from "./LogSpace";
-import { publish, concatMapEager, reduceToArray, scanToArray, tup } from "./utils";
-import { connectableObservableDescriptor } from "rxjs/internal/observable/ConnectableObservable";
-import { mergeWith } from "immutable";
+import { concatMapEager, scanToArray } from "./utils";
 
 type LogState<D> = {
     aggr: D,
@@ -12,7 +10,6 @@ type LogState<D> = {
     spec: LogSpec
 }
 
-type Id<T> = ((t: T) => T)
 
 type Reduction<V, A> = (v: V) => (ac: A) => A;
 type LogReduction<V, D> = Reduction<V, LogState<D>>
@@ -24,7 +21,7 @@ export interface InnerLog {
 }
 
 
-export function createLogFacade<U extends AnyUpdate, D, V>(key: string, model: Model<U, D, V>, specs: Observable<LogSpec>, loadBlock: (ref: String) => Observable<U>): Log<U, V> & InnerLog {
+export function createLogFacade<U extends AnyUpdate, D>(model: Model<U, D>, specs: Observable<LogSpec>, loadBlock: (ref: String) => Observable<U>): Log<U, any> & InnerLog {
     const updates = new Subject<U>();
     const resets = new Subject<void>();
 
@@ -38,7 +35,7 @@ export function createLogFacade<U extends AnyUpdate, D, V>(key: string, model: M
         stage(update: U) {
             updates.next(update);
         },
-        view(): Promise<V> {
+        view(): Promise<any> {
             return log.views.toPromise();
         }
     }
@@ -46,9 +43,9 @@ export function createLogFacade<U extends AnyUpdate, D, V>(key: string, model: M
 
 
 
-export function createLogMachine<U extends AnyUpdate, D, V>(
+export function createLogMachine<U extends AnyUpdate, D>(
         key: string, 
-        model: Model<U, D, V>, 
+        model: Model<U, D>, 
         specs: Observable<LogSpec>, 
         updates: Observable<U>,
         resets: Observable<void>,
@@ -153,7 +150,7 @@ export function createLogMachine<U extends AnyUpdate, D, V>(
 
 
     const views = aggrs.pipe(
-        map(model.view)
+        //map(model.view)
     );
 
     return {

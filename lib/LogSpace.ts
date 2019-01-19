@@ -1,12 +1,12 @@
-import { AnyUpdate, Model, Log, BlockStore, ManifestStore, Manifest, Block } from "./bits";
-import { Subject, from, Observable, Observer } from "rxjs";
-import { Dict, enumerate, tup, getOrSet } from "./utils";
-import { flatMap, map, withLatestFrom, reduce } from "rxjs/operators";
-import { InnerLog, createLogMachine, createLogFacade } from "./Log";
+import { AnyUpdate, Model, Log, BlockStore, ManifestStore, Manifest } from "./bits";
+import { Subject, from, Observable } from "rxjs";
+import { Dict, enumerate, getOrSet } from "./utils";
+import { flatMap, map } from "rxjs/operators";
+import { InnerLog, createLogFacade } from "./Log";
 
 
 export interface LogSpace {
-    getLog<U extends AnyUpdate, D, V>(key: string, model: Model<U, D, V>): Log<U, V>;
+    getLog<U extends AnyUpdate, D>(key: string, model: Model<U, D>): Log<U, any>;
     commit(): Promise<void>;
     reset(): void;
 }
@@ -30,34 +30,15 @@ type Frame = {
 
 type Confirm = {}
 
-type Slice = {}
 
-export function createLogSpace(blockStore: BlockStore, manifestStore: ManifestStore, frames: Observable<Frame>): LogSpace {
-    let version = 0;
+export function createLogSpace(): LogSpace {
     let logs: { [key: string]: InnerLog } = {}
 
     const innerLogs = new Subject<Dict<InnerLog>>();
-    const manifests = new Subject<Manifest>();
 
     let nextCommitId = 0;
     const commits = new Subject<Confirm>();
 
-    //the manifests stream should be combined with a logs stream
-    //to give a stream of latest 
-
-
-    //create a block
-    //create a new manifest
-
-
-    const newBlocks = innerLogs.pipe(
-        flatMap(m => {
-            const logs = from(enumerate(m));
-            return logs.pipe(
-                map(([key, log]) => log.staged)
-            );
-        })
-    )
 
     // commits.pipe(
     //     withLatestFrom(manifests, innerLogs),
@@ -186,9 +167,9 @@ export function createLogSpace(blockStore: BlockStore, manifestStore: ManifestSt
 
 
     return {
-        getLog<U extends AnyUpdate, D, V>(key: string, model: Model<U, D, V>): Log<U, V> {
+        getLog<U extends AnyUpdate, D>(key: string, model: Model<U, D>): Log<U, any> {
             const entry = getOrSet(logs, key, () => { 
-                return createLogFacade(key, model, null, null);
+                return createLogFacade(model, null, null);
             });
             return entry;
         },

@@ -1,7 +1,7 @@
-import { EraSpec, slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices } from "../lib/slicer";
+import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices, EraWithThresh, mapSlices } from "../lib/slicer";
 import { Subject, from, empty, Observable } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
-import { startWith, map, concatMap, groupBy } from "rxjs/operators";
+import { startWith, map, concatMap, groupBy, tap } from "rxjs/operators";
 import { Evaluable, evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 
@@ -13,12 +13,12 @@ describe('evaluator', () => {
 
     const model = new TestModel();
 
-    let spec$: Subject<EraSpec>
+    let spec$: Subject<EraWithThresh>
     let ripple$: Subject<Keyed$<number>>
     let gathering: Observable<EraWithSlices<Evaluable<TestModel>>>
 
     beforeEach(() => {
-        spec$ = new Subject<EraSpec>();
+        spec$ = new Subject<EraWithThresh>();
         ripple$ = new Subject<TestRipple>();
 
         gathering = spec$.pipe(
@@ -124,8 +124,7 @@ describe('evaluator', () => {
         complete();
 
         const r = await gathering.pipe(
-                        concatMapSlices(({data}) =>
-                            empty()),
+                        concatMapSlices(({data}: Evaluable<TestModel>) => empty()),
                         materializeSlices()
                     ).toPromise();
 
@@ -137,7 +136,7 @@ describe('evaluator', () => {
         complete();
 
         const r = await gathering.pipe(
-                        concatMapSlices(({logRefs, evaluate}) => 
+                        concatMapSlices(({logRefs, evaluate}: Evaluable<TestModel>) => 
                             logRefs.pipe(
                                 concatMap(ref => evaluate(ref).pipe(
                                                     map(v => tup(ref, v)))),
@@ -152,7 +151,7 @@ describe('evaluator', () => {
         complete();
 
         const r = await gathering.pipe(
-                        concatMapSlices(({logRefs}) => 
+                        concatMapSlices(({logRefs}: Evaluable<TestModel>) => 
                             logRefs.pipe(reduceToArray())),                            
                         materializeSlices()
                     ).toPromise();
