@@ -1,12 +1,14 @@
 import { Subject, from, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
 import { slicer } from "../lib/slicer";
-import { map, concatMap, groupBy, shareReplay } from "rxjs/operators";
+import { map, concatMap, groupBy, shareReplay, startWith } from "rxjs/operators";
 import { evaluate, KnownLogs } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/committer";
 import { Viewer, createViewer } from "../lib/viewer";
-import { specifier, Signal } from "../lib/specifier";
+import { specifier, Signal, newEra, emptyManifest, newManifest } from "../lib/specifier";
+import FakeBlockStore from "./fakes/FakeBlockStore";
+import { serveBlocks } from "../lib/serveBlocks";
 
 type TestRipple = Dict<number[]>
 
@@ -16,6 +18,8 @@ describe('viewer', () => {
 
     const model = new TestModel();
 
+    let blockStore: FakeBlockStore
+
     let signal$: Subject<Signal>
     let ripple$: Subject<Keyed$<number>>
     let doCommit$: Subject<DoCommit>
@@ -23,19 +27,21 @@ describe('viewer', () => {
     let view: Viewer<TestModel>
     
     beforeEach(() => {
+        blockStore = new FakeBlockStore();
+
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Keyed$<number>>();
         doCommit$ = new Subject<DoCommit>();
 
         const era$ = signal$.pipe(
+                        startWith(newEra()),
                         specifier(),
+                        serveBlocks(blockStore),
                         slicer(ripple$),
                         evaluate(model),
                         pullAll());
 
         view = createViewer<TestModel>(era$);
-
-        signal$.next();
     })
 
     afterEach(() => complete())
@@ -60,8 +66,8 @@ describe('viewer', () => {
             const viewing = getView('myLog');
 
             emit({ myLog: [ 13 ] });
-            signal$.next();
-            signal$.next();
+            signal$.next(newEra());
+            signal$.next(newManifest(emptyManifest));
 
             complete();
 

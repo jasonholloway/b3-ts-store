@@ -6,6 +6,8 @@ import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, DoStore } from "../lib/committer";
 import { EraWithSpec, emptyManifest } from "../lib/specifier";
+import FakeBlockStore from "./fakes/FakeBlockStore";
+import { serveBlocks } from "../lib/serveBlocks";
 
 type TestRipple = Dict<number[]>
 
@@ -14,6 +16,7 @@ jest.setTimeout(400);
 describe('committer', () => {
 
     const model = new TestModel();
+    let blockStore: FakeBlockStore
 
     let spec$: Subject<EraWithSpec>
     let ripple$: Subject<Keyed$<number>>
@@ -21,12 +24,15 @@ describe('committer', () => {
     let gathering: Promise<{ data: Dict<number[]>, extent: number }[]>
 
     beforeEach(() => {
+        blockStore = new FakeBlockStore();
+
         spec$ = new Subject<EraWithSpec>();
         ripple$ = new Subject<Keyed$<number>>();
         doCommit$ = new Subject<DoCommit>();
 
         const doStore$ = spec$.pipe(
                             slicer(ripple$),
+                            serveBlocks(blockStore),
                             evaluate(model),
                             committer(model, doCommit$, null));
 

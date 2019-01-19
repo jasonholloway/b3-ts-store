@@ -4,7 +4,10 @@ import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../li
 import { startWith, map, concatMap, groupBy, tap } from "rxjs/operators";
 import { Evaluable, evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
-import { EraWithSpec, emptyManifest } from "../lib/specifier";
+import { EraWithSpec, emptyManifest, specifier, Signal, newEra, newManifest } from "../lib/specifier";
+import { serveBlocks } from "../lib/serveBlocks";
+import { sinkErrors } from "../lib/sinkErrors";
+import FakeBlockStore from "./fakes/FakeBlockStore";
 
 
 type TestRipple = Keyed$<number>;
@@ -14,16 +17,22 @@ describe('evaluator', () => {
 
     const model = new TestModel();
 
-    let spec$: Subject<EraWithSpec>
+    let signal$: Subject<Signal>
     let ripple$: Subject<Keyed$<number>>
+    let blockStore: FakeBlockStore
+
     let gathering: Observable<EraWithSlices<Evaluable<TestModel>>>
 
     beforeEach(() => {
-        spec$ = new Subject<EraWithSpec>();
+        blockStore = new FakeBlockStore();
+
+        signal$ = new Subject<Signal>();
         ripple$ = new Subject<TestRipple>();
 
-        gathering = spec$.pipe(
-                        startWith({ id: 0, thresh: 0, manifest: emptyManifest}),
+        gathering = signal$.pipe(
+                        startWith(newEra()),
+                        specifier(),
+                        serveBlocks(blockStore),
                         slicer(ripple$),
                         evaluate(model))
                     .pipe(pullAllSlices());
@@ -87,6 +96,32 @@ describe('evaluator', () => {
                 ]
             ]);
         })
+
+
+        it('loads blocks first, given manifest', async () => {
+            ripple({ myLog: [ 5, 6 ] });
+
+            blockStore.blocks = {
+                block0: { myLog: [ 1, 2 ] },
+                block1: { myLog: [ 3, 4 ] }
+            };
+
+            signal$.next(newManifest({
+                id: 1,
+                logBlocks: {
+                    myLog: ['block0', 'block1']
+                }
+            }));
+
+            await expectAggrs([
+                [
+                    [ [0, 1], { myLog: '5,6' } ]
+                ],
+                [                
+                    [ [0, 1], { myLog: '1,2,3,4,5,6' } ]
+                ]
+            ]);
+        })
     })
 
 
@@ -117,7 +152,7 @@ describe('evaluator', () => {
 
     function complete() {
         ripple$.complete();
-        spec$.complete();
+        signal$.complete();
     }
 
 

@@ -5,7 +5,6 @@ import { map, concatMap, groupBy, mapTo, tap } from "rxjs/operators";
 import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, DoStore } from "../lib/committer";
-import { ManifestStore, BlockStore } from "../lib/bits";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { Signal, specifier } from "../lib/specifier";

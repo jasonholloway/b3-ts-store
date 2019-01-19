@@ -1,8 +1,10 @@
-import { Observable, OperatorFunction, pipe, of } from "rxjs";
+import { Observable, OperatorFunction, pipe, of, empty, concat, from } from "rxjs";
 import { EraWithSlices, scanUnwrapSlices } from "./slicer";
 import { Keyed$ } from "./utils";
-import { concatMap, defaultIfEmpty, filter, scan } from "rxjs/operators";
+import { concatMap, defaultIfEmpty, filter, scan, concatAll, map, tap } from "rxjs/operators";
 import { Model as LogModel } from './bits'
+import { EraWithBlocks } from "./serveBlocks";
+import { EraWithSpec } from "./specifier";
 
 export type LogRef = string;
 
@@ -28,34 +30,45 @@ function createEvaluable<M extends Model>(raw: Evaluable<M>) : Evaluable<M> {
     return raw;
 }
 
+export const evaluate =
+    <U, M extends Model, I extends EraWithSlices<Keyed$<U>> & EraWithBlocks & EraWithSpec, O extends EraWithSlices<Evaluable<M>> & I>
+    (model: M) : OperatorFunction<I, O> => 
+        pipe(
+            scanUnwrapSlices(
+                (prev$: Observable<Evaluable<M>>, curr$: Keyed$<U>, era: I) => of(
+                    createEvaluable({
+                        data: curr$,
+                        logRefs: curr$.pipe(
+                                    concatMap(g => isKnownLog(model, g.key) ? [g.key] : [])
+                                    ),
+                        evaluate(ref) {
+                            const m = model.logs[ref];
+
+                            return prev$.pipe(
+                                map(prev => prev.evaluate(ref)),
+                                
+                                defaultIfEmpty( 
+                                    loadFromBlocks(era, ref).pipe(
+                                        scan(m.add, m.zero),
+                                        defaultIfEmpty(m.zero))),
+
+                                concatAll(),
+
+                                concatMap(ac => curr$.pipe(
+                                    filter(g => g.key == ref),                  //filtering without a map is lame
+                                    concatMap(u$ => u$.pipe(scan(m.add, ac))))
+                                ));
+                        }
+                    })))
+            );
 
 
-export function evaluate<
-    U, M extends Model, I extends EraWithSlices<Keyed$<U>>, O extends EraWithSlices<Evaluable<M>> & I>
-    (model: M) : OperatorFunction<I, O>
-{
-    return pipe(
-        scanUnwrapSlices(
-            (prev$: Observable<Evaluable<M>>, curr$: Keyed$<U>) => of(
-                createEvaluable({
-                    data: curr$,
-                    logRefs: curr$.pipe(
-                                concatMap(g => isKnownLog(model, g.key) ? [g.key] : [])
-                                ),
-                    evaluate(ref) {
-                        const m = model.logs[ref];
-
-                        return prev$.pipe(
-                            concatMap(prev => prev.evaluate(ref)),
-                            defaultIfEmpty(m.zero),
-                            concatMap(ac => curr$.pipe(
-                                filter(g => g.key == ref),                  //filtering without a map is lame
-                                concatMap(u$ => u$.pipe(scan(m.add, ac))))
-                            ));
-                    }
-                })))
-        );
+function loadFromBlocks(era: EraWithSpec & EraWithBlocks, logRef: string) : Observable<any> {
+    const blockRef$ = from(era.manifest.logBlocks[logRef] || []);
+    return blockRef$.pipe(
+            concatMap(blockRef => era.blocks.load(blockRef)(logRef)));
 }
+
 
 function isKnownLog<M extends Model>(model: M, ref: string) : ref is KnownLogs<M> {
     return model.logs[ref] !== undefined;

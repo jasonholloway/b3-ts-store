@@ -1,27 +1,13 @@
-import { Subject, OperatorFunction, pipe, Observable, Observer, of, forkJoin } from "rxjs";
+import { Subject, Observable, of, forkJoin } from "rxjs";
 import { reduceToArray } from "../lib/utils";
 import { pullAll } from "../lib/slicer";
-import { map, concatMap } from "rxjs/operators";
+import { concatMap } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { EraWithErrors, EraWithBlocks, serveBlocks } from "../lib/serveBlocks";
+import { EraWithBlocks, serveBlocks } from "../lib/serveBlocks";
 import { Signal, specifier } from "../lib/specifier";
-
+import { sinkErrors, EraWithErrors } from "../lib/sinkErrors";
 
 jest.setTimeout(400);
-
-
-function sinkErrors
-    <I extends object, O extends EraWithErrors & I>
-    (sink: Observer<Error>) : OperatorFunction<I, O> 
-{
-    return pipe(
-        map(era => ({
-            ...era as object,
-            errors: sink
-        } as O))
-    );
-}
-
 
 describe('serveBlocks', () => {
 

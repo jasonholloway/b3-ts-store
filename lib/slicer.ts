@@ -85,17 +85,19 @@ export function scanSlices<
 
 export function scanUnwrapSlices<
     V, Ac, I extends EraWithSlices<V>, O extends EraWithSlices<Ac> & I>
-    (fn: (a: Observable<Ac>, v: V) => Observable<Ac>): OperatorFunction<I, O> {
+    (fn: (a: Observable<Ac>, v: V, era: I) => Observable<Ac>, zero: Observable<Ac> = empty()): OperatorFunction<I, O> {
     return pipe(
         map(era => {
+            const zeroWrapped = zero.pipe(map(z => slice([0, 0], z)));
+
             const slices = era.slices.pipe(
                             scan(
                                 (prev$: Observable<Slice<Ac>>, [range, v]: Slice<V>) => 
-                                    fn(prev$.pipe(map(([_, prev]) => prev)), v)
+                                    fn(prev$.pipe(map(([_, prev]) => prev)), v, era)
                                         .pipe(
                                             map(result => tup(range, result))
                                         ),                                                 
-                                empty()),
+                                zeroWrapped),
                             concatAll()
                             );
 
