@@ -1,15 +1,10 @@
-import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer, GroupedObservable, of, ReplaySubject, Subscriber, forkJoin } from "rxjs";
-import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
-import { slicer, EraSpec, EraWithThresh, EraWithSlices, pullAllSlices, pullAll } from "../lib/slicer";
-import { map, concatMap, groupBy, mapTo, tap, flatMap, single, catchError, shareReplay, subscribeOn, delay } from "rxjs/operators";
-import { evaluate, Evaluable, KnownLogs, LogRef } from "../lib/evaluate";
-import { TestModel } from "./fakes/testModel";
-import { DoCommit, committer, DoStore } from "../lib/committer";
-import { ManifestStore, BlockStore } from "../lib/bits";
-import FakeManifestStore from "./fakes/FakeManifestStore";
+import { Subject, OperatorFunction, pipe, Observable, Observer, of, forkJoin } from "rxjs";
+import { reduceToArray } from "../lib/utils";
+import { EraWithThresh, pullAll } from "../lib/slicer";
+import { map, concatMap, mapTo } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
+import { EraWithErrors, EraWithBlocks, serveBlocks } from "../lib/serveBlocks";
 
-type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
 
@@ -18,9 +13,6 @@ type RefreshEra = ['RefreshEra']
 type NewManifest = ['NewManifest', {}]
 
 type Signal = RefreshEra | NewManifest
-
-
-type BlockRef = string
 
 
 function sinkErrors
@@ -44,52 +36,10 @@ function specifier() : OperatorFunction<Signal, EraWithThresh> {
         );
     }
 }
-    
-interface EraWithErrors {
-    errors: Observer<Error>
-}
-
-interface EraWithBlocks { 
-    blocks: BlockFrame
-}
-
-interface BlockFrame {
-    load: (blockRef: BlockRef) => (logRef: LogRef) => Observable<any>
-}
-
-
-function divertErrors<V>(era: EraWithErrors, fallback: Observable<V> = empty()) {
-    return catchError(err => {
-        era.errors.next(err);
-        return fallback;
-    });
-}
-
-
-function serveBlocks
-    <I extends EraWithThresh & EraWithErrors, O extends EraWithBlocks & I>
-    (blockStore: BlockStore) : OperatorFunction<I, O>
-{
-    return pipe(
-        map(era => ({
-            ...era as object, 
-            blocks: {
-                load: (blockRef: BlockRef) => (logRef: LogRef) =>
-                        from(blockStore.load(blockRef))                            
-                            .pipe(
-                                divertErrors(era, of({})),                  //but if this defaulting to serving nothing
-                                concatMap(b => b[logRef] || empty()))       //that'd then mean big chunks of data would be lost
-
-            } as BlockFrame
-        } as O))
-    );
-}
-
 
 
 describe('serveBlocks', () => {
 
-    let manifestStore: FakeManifestStore
     let blockStore: FakeBlockStore
 
     let signal$: Subject<Signal>
@@ -100,7 +50,6 @@ describe('serveBlocks', () => {
     let errors: Error[], blocks: any[];
 
     beforeAll(() => {
-        manifestStore = new FakeManifestStore();
         blockStore = new FakeBlockStore();
     })
 
