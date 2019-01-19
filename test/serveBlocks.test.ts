@@ -4,15 +4,10 @@ import { EraWithThresh, pullAll } from "../lib/slicer";
 import { map, concatMap, mapTo } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { EraWithErrors, EraWithBlocks, serveBlocks } from "../lib/serveBlocks";
+import { Signal } from "../lib/specifier";
 
 
 jest.setTimeout(400);
-
-type RefreshEra = ['RefreshEra']
-
-type NewManifest = ['NewManifest', {}]
-
-type Signal = RefreshEra | NewManifest
 
 
 function sinkErrors
@@ -31,7 +26,7 @@ function sinkErrors
 function specifier() : OperatorFunction<Signal, EraWithThresh> {
     return signal$ => {
         return signal$.pipe(
-            mapTo({ thresh: 0 })
+            mapTo({ id: 0, thresh: 0 })
             //scan<EraCommand, number>((ac, _) => ac + 1, -1)
         );
     }

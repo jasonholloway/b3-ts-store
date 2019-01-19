@@ -14,11 +14,15 @@ export interface Slice<V> extends Array<Range | V> {
 export type Slice$<V> = Observable<Slice<V>>
 export type EraSpec = number;
 
-export interface EraWithThresh {
+export interface Era {
+    id: number
+}
+
+export interface EraWithThresh extends Era {
     thresh: EraSpec
 }
 
-export interface EraWithSlices<V> {
+export interface EraWithSlices<V> extends Era {
     slices: Slice$<V>
 }
 
@@ -49,7 +53,7 @@ export function slicer<
                                                 filter(([[from, to], _]) => from >= era.thresh),                                
                                                 shareReplay()
                                             );
-                                            
+
                             slices.subscribe();
 
                             return of({ ...era as object, slices } as O);

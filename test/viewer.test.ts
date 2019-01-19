@@ -114,7 +114,7 @@ describe('viewer', () => {
 function specifier() : OperatorFunction<EraCommand, EraWithThresh> {
     return command$ => {
         return command$.pipe(
-            mapTo({ thresh: 0 })
+            mapTo({ id: 0, thresh: 0 })
             //scan<EraCommand, number>((ac, _) => ac + 1, -1)
         );
     }

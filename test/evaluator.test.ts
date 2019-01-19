@@ -22,7 +22,7 @@ describe('evaluator', () => {
         ripple$ = new Subject<TestRipple>();
 
         gathering = spec$.pipe(
-                        startWith({ thresh: 0}),
+                        startWith({ id: 0, thresh: 0}),
                         slicer(ripple$),
                         evaluate(model))
                     .pipe(pullAllSlices());

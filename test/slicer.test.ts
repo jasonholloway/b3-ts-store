@@ -19,7 +19,7 @@ describe('slicer', () => {
         ripples = new Subject<Ripple<number>>();
 
         gathering = eras.pipe(
-                        startWith({ thresh: 0 }),
+                        startWith({ id: 0, thresh: 0 }),
                         slicer(ripples),
                         materializeEras()
                     ).toPromise();
@@ -123,7 +123,7 @@ describe('slicer', () => {
     }
 
     function threshold(n: number) {
-        eras.next({ thresh: n });
+        eras.next({ id: 0, thresh: n });
     }
     
     function ripple(sl: Dict<number[]>) {

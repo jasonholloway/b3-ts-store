@@ -37,7 +37,7 @@ type Signal = void
 function specifier() : OperatorFunction<Signal, EraWithThresh> {
     return signal$ => {
         return signal$.pipe(
-            mapTo({ thresh: 0 })
+            mapTo({ id: 0, thresh: 0 })
             //scan<EraCommand, number>((ac, _) => ac + 1, -1)
         );
     }

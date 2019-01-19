@@ -33,7 +33,7 @@ describe('committer', () => {
                     .pipe(materialize())
                     .toPromise();
 
-        spec$.next({ thresh: 0 });
+        spec$.next({ id: 0, thresh: 0 });
     })
 
 
