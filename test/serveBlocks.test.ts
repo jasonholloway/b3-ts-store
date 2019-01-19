@@ -1,10 +1,10 @@
 import { Subject, OperatorFunction, pipe, Observable, Observer, of, forkJoin } from "rxjs";
 import { reduceToArray } from "../lib/utils";
-import { EraWithThresh, pullAll } from "../lib/slicer";
-import { map, concatMap, mapTo } from "rxjs/operators";
+import { pullAll } from "../lib/slicer";
+import { map, concatMap } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { EraWithErrors, EraWithBlocks, serveBlocks } from "../lib/serveBlocks";
-import { Signal } from "../lib/specifier";
+import { Signal, specifier } from "../lib/specifier";
 
 
 jest.setTimeout(400);
@@ -20,16 +20,6 @@ function sinkErrors
             errors: sink
         } as O))
     );
-}
-
-
-function specifier() : OperatorFunction<Signal, EraWithThresh> {
-    return signal$ => {
-        return signal$.pipe(
-            mapTo({ id: 0, thresh: 0 })
-            //scan<EraCommand, number>((ac, _) => ac + 1, -1)
-        );
-    }
 }
 
 
@@ -58,7 +48,7 @@ describe('serveBlocks', () => {
                     serveBlocks(blockStore),
                     pullAll());
 
-        signal$.next(['NewManifest', {}]);
+        signal$.next(['NewManifest', { id: 0, logBlocks: {} }]);
 
         [errors, blocks] = await forkJoin(
                                     error$.pipe(

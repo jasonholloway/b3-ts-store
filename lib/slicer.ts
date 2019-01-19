@@ -1,6 +1,7 @@
 import { Observable, empty, OperatorFunction, zip, GroupedObservable, pipe, of, MonoTypeOperatorFunction } from "rxjs";
 import { scan, concat, filter, shareReplay, window, map, skip, tap, concatMap, flatMap, concatAll } from "rxjs/operators";
 import { tup, reduceToArray } from "./utils";
+import { EraWithSpec } from "./specifier";
 
 
 export type Range = [number, number];
@@ -18,17 +19,13 @@ export interface Era {
     id: number
 }
 
-export interface EraWithThresh extends Era {
-    thresh: EraSpec
-}
-
 export interface EraWithSlices<V> extends Era {
     slices: Slice$<V>
 }
 
 
 export function slicer<
-    V, I extends EraWithThresh, O extends EraWithSlices<V> & I>
+    V, I extends EraWithSpec, O extends EraWithSlices<V> & I>
     (vals: Observable<V>): OperatorFunction<I, O> 
 {
     return eras => {
@@ -42,11 +39,11 @@ export function slicer<
         return zip(eras, windows)                
                 .pipe(
                     //simple era with latest slices
-                    map(([era, slices]) => ({ ...era as EraWithThresh, slices })),
+                    map(([era, slices]) => ({ ...era as EraWithSpec, slices })),
 
                     //merge in previous eras slices
                     scan(   
-                        (prev$: Observable<O>, era: EraWithSlices<V> & EraWithThresh) => {
+                        (prev$: Observable<O>, era: EraWithSlices<V> & EraWithSpec) => {
                             const slices = prev$.pipe(
                                                 flatMap(prev => prev.slices),
                                                 concat(era.slices),

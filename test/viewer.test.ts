@@ -1,15 +1,14 @@
-import { Subject, from, OperatorFunction, MonoTypeOperatorFunction } from "rxjs";
+import { Subject, from, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
-import { slicer, EraWithThresh } from "../lib/slicer";
-import { map, concatMap, groupBy, shareReplay, mapTo, tap } from "rxjs/operators";
+import { slicer } from "../lib/slicer";
+import { map, concatMap, groupBy, shareReplay } from "rxjs/operators";
 import { evaluate, KnownLogs } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/committer";
 import { Viewer, createViewer } from "../lib/viewer";
+import { specifier, Signal } from "../lib/specifier";
 
 type TestRipple = Dict<number[]>
-
-type EraCommand = void // NewEra | SuccessfulCommit
 
 jest.setTimeout(400);
 
@@ -17,18 +16,18 @@ describe('viewer', () => {
 
     const model = new TestModel();
 
-    let command$: Subject<EraCommand>
+    let signal$: Subject<Signal>
     let ripple$: Subject<Keyed$<number>>
     let doCommit$: Subject<DoCommit>
 
     let view: Viewer<TestModel>
     
     beforeEach(() => {
-        command$ = new Subject<EraCommand>();
+        signal$ = new Subject<Signal>();
         ripple$ = new Subject<Keyed$<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        const era$ = command$.pipe(
+        const era$ = signal$.pipe(
                         specifier(),
                         slicer(ripple$),
                         evaluate(model),
@@ -36,7 +35,7 @@ describe('viewer', () => {
 
         view = createViewer<TestModel>(era$);
 
-        command$.next();
+        signal$.next();
     })
 
     afterEach(() => complete())
@@ -61,8 +60,8 @@ describe('viewer', () => {
             const viewing = getView('myLog');
 
             emit({ myLog: [ 13 ] });
-            command$.next();
-            command$.next();
+            signal$.next();
+            signal$.next();
 
             complete();
 
@@ -96,7 +95,7 @@ describe('viewer', () => {
 
     function complete() {
         ripple$.complete();
-        command$.complete();
+        signal$.complete();
         doCommit$.complete();
     }
 
@@ -110,12 +109,3 @@ describe('viewer', () => {
 
 })
 
-
-function specifier() : OperatorFunction<EraCommand, EraWithThresh> {
-    return command$ => {
-        return command$.pipe(
-            mapTo({ id: 0, thresh: 0 })
-            //scan<EraCommand, number>((ac, _) => ac + 1, -1)
-        );
-    }
-} 

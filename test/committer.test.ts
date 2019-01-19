@@ -1,10 +1,11 @@
 import { Subject, from, OperatorFunction, pipe } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
-import { slicer, EraWithThresh } from "../lib/slicer";
+import { slicer } from "../lib/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
 import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, DoStore } from "../lib/committer";
+import { EraWithSpec, emptyManifest } from "../lib/specifier";
 
 type TestRipple = Dict<number[]>
 
@@ -14,13 +15,13 @@ describe('committer', () => {
 
     const model = new TestModel();
 
-    let spec$: Subject<EraWithThresh>
+    let spec$: Subject<EraWithSpec>
     let ripple$: Subject<Keyed$<number>>
     let doCommit$: Subject<DoCommit>
     let gathering: Promise<{ data: Dict<number[]>, extent: number }[]>
 
     beforeEach(() => {
-        spec$ = new Subject<EraWithThresh>();
+        spec$ = new Subject<EraWithSpec>();
         ripple$ = new Subject<Keyed$<number>>();
         doCommit$ = new Subject<DoCommit>();
 
@@ -33,7 +34,7 @@ describe('committer', () => {
                     .pipe(materialize())
                     .toPromise();
 
-        spec$.next({ id: 0, thresh: 0 });
+        spec$.next({ id: 0, thresh: 0, manifest: emptyManifest });
     })
 
 

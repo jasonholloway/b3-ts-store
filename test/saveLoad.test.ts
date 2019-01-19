@@ -1,6 +1,6 @@
 import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
-import { slicer, EraSpec, EraWithThresh } from "../lib/slicer";
+import { slicer } from "../lib/slicer";
 import { map, concatMap, groupBy, mapTo, tap } from "rxjs/operators";
 import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
@@ -8,6 +8,8 @@ import { DoCommit, committer, DoStore } from "../lib/committer";
 import { ManifestStore, BlockStore } from "../lib/bits";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
+import { Signal, specifier } from "../lib/specifier";
+import { serveBlocks } from "../lib/serveBlocks";
 
 type TestRipple = Dict<number[]>
 
@@ -23,60 +25,7 @@ function pusher() : OperatorFunction<DoStore<any>, any> {
 
     throw 432;
 }
-
-//as well storing, we want to have a go at loading from the stores too
-//this will be done by the evaluator, with some resource made available to it by
-//an as-yet-unconceived preceding stage
-//
-//as we don't have this yet, what shall we do? we can beaver away to get a loop in place
-//
-
-
-type Signal = void
-
-function specifier() : OperatorFunction<Signal, EraWithThresh> {
-    return signal$ => {
-        return signal$.pipe(
-            mapTo({ id: 0, thresh: 0 })
-            //scan<EraCommand, number>((ac, _) => ac + 1, -1)
-        );
-    }
-}
-
-
-
-//an era isn't a signal
-//
-//
-//
-//
-
-function patch<
-    A, AK extends string, I extends { [key in AK]?: A } = { [key in AK]?: A }, 
-    B = A, BK extends string = AK, O extends { [key in BK]?: B } = { [key in BK]?: B }>
-    () : OperatorFunction<I, O> {
-        throw 123;
-    }
-
-
-    
-
-interface EraWithBlocks { 
-    blocks: any
-}
-
-
-function loadBlocks
-    <I extends EraWithThresh, O extends EraWithBlocks & I>
-    () : OperatorFunction<I, O>
-{
-    return pipe(
-        map(era => ({
-            ...era as object, blocks: {}
-        } as O))
-    );
-}
-
+   
 
 
 xdescribe('saveLoad', () => {
@@ -84,7 +33,7 @@ xdescribe('saveLoad', () => {
     const model = new TestModel();
 
     let manifests: FakeManifestStore
-    let blocks: FakeBlockStore
+    let blockStore: FakeBlockStore
 
     let signal$: Subject<Signal>
     let ripple$: Subject<Keyed$<number>>
@@ -93,7 +42,7 @@ xdescribe('saveLoad', () => {
 
     beforeEach(() => {
         manifests = new FakeManifestStore();
-        blocks = new FakeBlockStore();
+        blockStore = new FakeBlockStore();
 
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Keyed$<number>>();
@@ -101,7 +50,7 @@ xdescribe('saveLoad', () => {
 
         const era$ = signal$.pipe(
                         specifier(),
-                        loadBlocks(),
+                        serveBlocks(blockStore),
                         slicer(ripple$),
                         evaluate(model));
 

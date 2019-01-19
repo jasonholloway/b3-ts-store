@@ -1,7 +1,8 @@
 import { Observable, Subject, from, OperatorFunction, pipe } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap, startWith } from "rxjs/operators";
-import { Range, slicer, EraWithThresh, EraWithSlices } from "../lib/slicer";
+import { Range, slicer, EraWithSlices } from "../lib/slicer";
+import { EraWithSpec, emptyManifest } from "../lib/specifier";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
@@ -11,15 +12,15 @@ jest.setTimeout(500);
 describe('slicer', () => {
 
     let ripples: Subject<Ripple<number>>
-    let eras: Subject<EraWithThresh>
+    let eras: Subject<EraWithSpec>
     let gathering: Promise<[Range, Dict<number[]>][]>
 
     beforeEach(() => {
-        eras = new Subject<EraWithThresh>();
+        eras = new Subject<EraWithSpec>();
         ripples = new Subject<Ripple<number>>();
 
         gathering = eras.pipe(
-                        startWith({ id: 0, thresh: 0 }),
+                        startWith({ id: 0, thresh: 0, manifest: emptyManifest }),
                         slicer(ripples),
                         materializeEras()
                     ).toPromise();
@@ -123,7 +124,7 @@ describe('slicer', () => {
     }
 
     function threshold(n: number) {
-        eras.next({ id: 0, thresh: n });
+        eras.next({ id: 0, thresh: n, manifest: emptyManifest });
     }
     
     function ripple(sl: Dict<number[]>) {

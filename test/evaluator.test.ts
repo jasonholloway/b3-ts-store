@@ -1,9 +1,10 @@
-import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices, EraWithThresh, mapSlices } from "../lib/slicer";
+import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices } from "../lib/slicer";
 import { Subject, from, empty, Observable } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
 import { startWith, map, concatMap, groupBy, tap } from "rxjs/operators";
 import { Evaluable, evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
+import { EraWithSpec, emptyManifest } from "../lib/specifier";
 
 
 type TestRipple = Keyed$<number>;
@@ -13,16 +14,16 @@ describe('evaluator', () => {
 
     const model = new TestModel();
 
-    let spec$: Subject<EraWithThresh>
+    let spec$: Subject<EraWithSpec>
     let ripple$: Subject<Keyed$<number>>
     let gathering: Observable<EraWithSlices<Evaluable<TestModel>>>
 
     beforeEach(() => {
-        spec$ = new Subject<EraWithThresh>();
+        spec$ = new Subject<EraWithSpec>();
         ripple$ = new Subject<TestRipple>();
 
         gathering = spec$.pipe(
-                        startWith({ id: 0, thresh: 0}),
+                        startWith({ id: 0, thresh: 0, manifest: emptyManifest}),
                         slicer(ripple$),
                         evaluate(model))
                     .pipe(pullAllSlices());

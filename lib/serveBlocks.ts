@@ -1,8 +1,8 @@
 import { Observer, Observable, OperatorFunction, pipe, from, of, empty } from "rxjs";
 import { LogRef } from "./evaluate";
-import { EraWithThresh } from "./slicer";
 import { BlockStore } from "./bits";
 import { map, concatMap, catchError } from "rxjs/operators";
+import { EraWithSpec } from "./specifier";
 
 export type BlockRef = string
    
@@ -20,7 +20,7 @@ export interface BlockFrame {
 }
 
 export const serveBlocks =
-    <I extends EraWithThresh & EraWithErrors, O extends EraWithBlocks & I>
+    <I extends EraWithSpec & EraWithErrors, O extends EraWithBlocks & I>
     (blockStore: BlockStore) : OperatorFunction<I, O> => {
     return pipe(
         map(era => ({

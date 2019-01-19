@@ -1,26 +1,16 @@
-import { Subject, OperatorFunction, of, forkJoin, pipe } from "rxjs";
-import { reduceToArray, tup } from "../lib/utils";
-import { EraWithThresh, pullAll } from "../lib/slicer";
-import { mapTo, delay, startWith, tap, scan } from "rxjs/operators";
-import { Signal, newEra } from "../lib/specifier";
+import { Subject, of, forkJoin } from "rxjs";
+import { reduceToArray } from "../lib/utils";
+import { pullAll } from "../lib/slicer";
+import { delay, startWith } from "rxjs/operators";
+import { Signal, newEra, newManifest, setThreshold, specifier, EraWithSpec, emptyManifest } from "../lib/specifier";
 
 jest.setTimeout(400);
-
-
-
-function specifier() : OperatorFunction<Signal, EraWithThresh> {
-    return pipe(
-        scan((prev: EraWithThresh, signal: Signal) => 
-            ({ id: prev.id + 1, thresh: 0 }),
-            { id: -1, thresh: 0 })
-    );
-}
 
 describe('specifier', () => {
 
     let perform: () => Promise<void>
     let signal$: Subject<Signal>
-    let eras: EraWithThresh[];
+    let eras: EraWithSpec[];
 
     beforeAll(() => {
         perform = async () => {}; 
@@ -42,11 +32,11 @@ describe('specifier', () => {
 
     it('basic era', () => 
         expect(eras).toEqual([
-            { id: 0, thresh: 0 }
+            { id: 0, thresh: 0, manifest: emptyManifest }
         ]))
 
 
-    describe('newEra signal', () => {
+    describe('newEra', () => {
         beforeAll(() => {
             perform = async () => {
                 signal$.next(newEra());
@@ -57,13 +47,71 @@ describe('specifier', () => {
 
         it('triggers new era', () => 
             expect(eras).toEqual([
-                { id: 0, thresh: 0 }, 
-                { id: 1, thresh: 0 }, 
-                { id: 2, thresh: 0 },
+                { id: 0, thresh: 0, manifest: emptyManifest }, 
+                { id: 1, thresh: 0, manifest: emptyManifest }, 
+                { id: 2, thresh: 0, manifest: emptyManifest },
+            ]))
+    })
+
+    describe('setThreshold', () => {
+        beforeAll(() => {
+            perform = async () => {
+                signal$.next(setThreshold(13));
+                await pause();
+            }
+        })
+
+        it('triggers new era with new threshold', () =>
+            expect(eras).toEqual([
+                { 
+                    id: 0, 
+                    thresh: 0,
+                    manifest: emptyManifest
+                },
+                { 
+                    id: 1, 
+                    thresh: 13,
+                    manifest: emptyManifest
+                }
             ]))
     })
 
 
+    describe('newManifest', () => {
+        beforeAll(() => {
+            perform = async () => {
+                signal$.next(newManifest({
+                    id: 1,
+                    logBlocks: {  
+                        myLog: ['block0', 'block1']
+                    } 
+                }));
+                await pause();
+            }
+        })
+
+        it('triggers new era with new manifest', () =>
+            expect(eras).toEqual([
+                { 
+                    id: 0, 
+                    thresh: 0,
+                    manifest: { 
+                        id: 0,
+                        logBlocks: { } 
+                    }
+                },
+                { 
+                    id: 1, 
+                    thresh: 0,
+                    manifest: {
+                        id: 1,
+                        logBlocks: { 
+                            myLog: ['block0', 'block1']
+                        } 
+                    }
+                }
+            ]))
+    })
 
 
     async function complete() {
