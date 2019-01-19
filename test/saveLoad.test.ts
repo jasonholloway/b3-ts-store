@@ -1,7 +1,7 @@
 import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
 import { slicer, EraSpec, EraWithThresh } from "../lib/slicer";
-import { map, concatMap, groupBy, mapTo } from "rxjs/operators";
+import { map, concatMap, groupBy, mapTo, tap } from "rxjs/operators";
 import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, DoStore } from "../lib/committer";
@@ -61,13 +61,19 @@ function patch<
 
     
 
-    
+interface EraWithBlocks { 
+    blocks: any
+}
 
 
-
-function loadBlocks<E>() : OperatorFunction<E, E> {
+function loadBlocks
+    <I extends EraWithThresh, O extends EraWithBlocks & I>
+    () : OperatorFunction<I, O>
+{
     return pipe(
-        map(era => era)
+        map(era => ({
+            ...era as object, blocks: {}
+        } as O))
     );
 }
 
@@ -104,7 +110,7 @@ describe('saveLoad', () => {
             pusher());
 
         era$.pipe(
-
+                tap(era => era.slices.pipe(tap(([,{evaluate}]) => evaluate('myLog'))))
             )
 
 

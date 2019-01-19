@@ -21,7 +21,7 @@ export interface Log<U extends AnyUpdate, V> {
 
 
 export type Block = {
-    [keys: string]: AnyUpdate[]
+    [keys: string]: any[]
 }
 
 export interface BlockStore {

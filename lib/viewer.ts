@@ -1,18 +1,21 @@
-import { Model, KnownLogs, KnownAggr, Era$, Evaluable } from "./evaluate";
+import { Model, KnownLogs, KnownAggr, Evaluable } from "./evaluate";
 import { Observable } from "rxjs";
 import { shareReplay, concatMap, debounceTime } from "rxjs/operators";
+import { EraWithSlices } from "./slicer";
 
 export type Viewer<M extends Model> =
         <K extends KnownLogs<M>>(ref: K) => Observable<KnownAggr<M, K>>
 
+export type ViewableEra<M extends Model> = EraWithSlices<Evaluable<M>>
 
-export function createViewer<M extends Model>(era$: Era$<Evaluable<M>>) : Viewer<M> {
+
+export function createViewer<M extends Model>(era$: Observable<ViewableEra<M>>) : Viewer<M> {
     era$ = era$.pipe(shareReplay(1));
     era$.subscribe();
 
     return (ref: KnownLogs<M>) =>
         era$.pipe(
-            concatMap(([_, slices]) =>
+            concatMap(({ slices }) =>
                 slices.pipe(
                     concatMap(([_, {evaluate}]) => evaluate(ref))
                     )),

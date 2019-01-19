@@ -1,4 +1,4 @@
-import { Observable, empty, OperatorFunction, zip, GroupedObservable, pipe, of } from "rxjs";
+import { Observable, empty, OperatorFunction, zip, GroupedObservable, pipe, of, MonoTypeOperatorFunction } from "rxjs";
 import { scan, concat, filter, shareReplay, window, map, skip, tap, concatMap, flatMap, concatAll } from "rxjs/operators";
 import { tup, reduceToArray } from "./utils";
 
@@ -135,8 +135,16 @@ export function materializeSlices<V, I extends { slices: Slice$<V> }>() : Operat
         );
 }
 
+export function pullAll<I>() : MonoTypeOperatorFunction<I> {
+    return era$ => {
+        const x = era$.pipe(shareReplay());
+        x.subscribe();
+        return x;
+    };
+}
 
-export function pullAllSlices<A, I extends EraWithSlices<A>>() : OperatorFunction<I, I> {
+
+export function pullAllSlices<A, I extends EraWithSlices<A>>() : MonoTypeOperatorFunction<I> {
     return eras => {
         const x = eras.pipe(
                     map(era => {
