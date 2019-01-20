@@ -25,14 +25,12 @@ jest.setTimeout(400);
 const reduceToKeyedArrays =
     <V>(part$: Observable<Part<V>>) =>
     part$.pipe(
-        reduce(
-            (prev$, [k, u$]: Part<V>) => 
-                prev$.pipe(
-                    concatMap(prev =>
-                        u$.pipe(
-                            reduceToArray(),
-                            map(r => ({ ...prev, [k]: r }))))
-                ),
+        reduce((prev$, [k, u$]: Part<V>) => 
+            prev$.pipe(
+                concatMap(prev =>
+                    u$.pipe(
+                        reduceToArray(),
+                        map(r => ({ ...prev, [k]: r }))))),
             of({} as Dict<V[]>)),
         concatAll()
     );
@@ -43,7 +41,6 @@ const pusher =
     pipe(
         concatMap(({ data }) => 
             data.pipe(reduceToKeyedArrays)),
-        tap(block => console.log('BLOCK', block)),
         concatMap((block) => 
             blockStore.save('block0', block)),
         pullAll(false)

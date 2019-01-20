@@ -33,15 +33,15 @@ export function slicer<
     U, I extends EraWithSpec, O extends EraWithSlices<Ripple<U>> & I>
     (ripple$: Observable<Ripple<U>>): OperatorFunction<I, O> 
 {
-    return eras => {
-        eras = eras.pipe(shareReplay(16));
+    return era$ => {
+        era$ = era$.pipe(shareReplay(16));
 
-        const windows = ripple$.pipe( 
-                            map((v, i) => slice([i, i + 1], v)),                            
-                            window(eras),         
+        const window$ = ripple$.pipe( 
+                            pullIntoSlices(),
+                            window(era$),         
                             skip(1));
 
-        return zip(eras, windows)                
+        return zip(era$, window$)
                 .pipe(
                     //simple era with latest slices
                     map(([era, slices]) => ({ ...era as EraWithSpec, slices })),
@@ -53,7 +53,7 @@ export function slicer<
                                 prev$.pipe(
                                     flatMap(prev => prev.slices),
                                     concat(era.slices),
-                                    filter(([[from, to], _]) => from >= era.thresh),                                
+                                    filter(([[from, to], _]) => from >= era.thresh),                    
                                     shareReplay()
                                 );
 
@@ -65,6 +65,22 @@ export function slicer<
                     concatAll()
                 );
     };
+}
+
+
+function pullIntoSlices<U>() : OperatorFunction<Ripple<U>, Slice<Ripple<U>>> {
+    return pipe(
+        map((part$, i) =>
+            slice([i, i + 1], pull(part$)))
+    );
+}
+
+
+function pull<U>(part$: Part$<U>): Part$<U> {
+    return part$.pipe(
+        map(([k, u$]) => tup(k, u$.pipe(pullAll()))),
+        pullAll()
+    );
 }
 
 
