@@ -1,5 +1,5 @@
 import { Observable, OperatorFunction, pipe, of, empty, concat, from } from "rxjs";
-import { EraWithSlices, scanUnwrapSlices } from "./slicer";
+import { EraWithSlices, scanUnwrapSlices, pullAll, Ripple } from "./slicer";
 import { Keyed$ } from "./utils";
 import { concatMap, defaultIfEmpty, filter, scan, concatAll, map, tap } from "rxjs/operators";
 import { Model as LogModel } from './bits'
@@ -21,7 +21,7 @@ export type KnownAggr<M extends Model, K extends keyof M['logs']>
 
 
 export interface Evaluable<M extends Model> {
-    data: Keyed$<any>
+    data: Ripple<any>
     logRefs: Observable<KnownLogs<M>>,
     evaluate<K extends KnownLogs<M>>(ref: K) : Observable<KnownAggr<M, K>>
 }
@@ -30,16 +30,16 @@ function createEvaluable<M extends Model>(raw: Evaluable<M>) : Evaluable<M> {
     return raw;
 }
 
-export const evaluate =
-    <U, M extends Model, I extends EraWithSlices<Keyed$<U>> & EraWithBlocks & EraWithSpec, O extends EraWithSlices<Evaluable<M>> & I>
+export const evaluate = 
+    <U, M extends Model, I extends EraWithSlices<Ripple<U>> & EraWithBlocks & EraWithSpec, O extends EraWithSlices<Evaluable<M>> & I>
     (model: M) : OperatorFunction<I, O> => 
         pipe(
             scanUnwrapSlices(
-                (prev$: Observable<Evaluable<M>>, curr$: Keyed$<U>, era: I) => of(
+                (prev$: Observable<Evaluable<M>>, curr$: Ripple<U>, era: I) => of(
                     createEvaluable({
                         data: curr$,
                         logRefs: curr$.pipe(
-                                    concatMap(g => isKnownLog(model, g.key) ? [g.key] : [])
+                                    concatMap(([key]) => isKnownLog(model, key) ? [key] : [])
                                     ),
                         evaluate(ref) {
                             const m = model.logs[ref];
@@ -55,8 +55,8 @@ export const evaluate =
                                 concatAll(),
 
                                 concatMap(ac => curr$.pipe(
-                                    filter(g => g.key == ref),                  //filtering without a map is lame
-                                    concatMap(u$ => u$.pipe(scan(m.add, ac))))
+                                    filter(([key]) => key == ref),                  //filtering without a map is lame *****************
+                                    concatMap(([_, u$]) => u$.pipe(scan(m.add, ac))))
                                 ));
                         }
                     })))

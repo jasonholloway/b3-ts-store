@@ -3,6 +3,7 @@ import { reduceToArray } from "../lib/utils";
 import { pullAll } from "../lib/slicer";
 import { delay, startWith } from "rxjs/operators";
 import { Signal, newEra, newManifest, setThreshold, specifier, EraWithSpec, emptyManifest } from "../lib/specifier";
+import { pause } from "./utils";
 
 jest.setTimeout(400);
 
@@ -120,7 +121,3 @@ describe('specifier', () => {
     }
 
 })
-
-function pause() {
-    return of().pipe(delay(10)).toPromise();
-}

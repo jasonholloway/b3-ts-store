@@ -1,16 +1,21 @@
-import { Observable, empty, OperatorFunction, zip, GroupedObservable, pipe, of, MonoTypeOperatorFunction } from "rxjs";
+import { Observable, empty, OperatorFunction, zip, pipe, of, MonoTypeOperatorFunction } from "rxjs";
 import { scan, concat, filter, shareReplay, window, map, skip, tap, concatMap, flatMap, concatAll } from "rxjs/operators";
 import { tup, reduceToArray } from "./utils";
 import { EraWithSpec } from "./specifier";
 
 
-export type Range = [number, number];
-
-export interface Slice<V> extends Array<Range | V> {
-    0: Range
-    1: V
+export interface Tuple2<A, B> extends Array<A | B> {
+    0: A,
+    1: B,
     length: 2
 }
+
+export interface Part<V> extends Tuple2<string, Observable<V>> {}
+export interface Part$<V> extends Observable<Part<V>> {}
+export interface Ripple<U> extends Part$<U> {}
+
+export interface Range extends Tuple2<number, number> {}
+export interface Slice<V> extends Tuple2<Range, V> {}
 
 export type Slice$<V> = Observable<Slice<V>>
 export type EraSpec = number;
@@ -25,15 +30,15 @@ export interface EraWithSlices<V> extends Era {
 
 
 export function slicer<
-    V, I extends EraWithSpec, O extends EraWithSlices<V> & I>
-    (vals: Observable<V>): OperatorFunction<I, O> 
+    U, I extends EraWithSpec, O extends EraWithSlices<Ripple<U>> & I>
+    (ripple$: Observable<Ripple<U>>): OperatorFunction<I, O> 
 {
     return eras => {
         eras = eras.pipe(shareReplay(16));
 
-        const windows = vals.pipe( 
-                            map((v, i) => slice([i, i + 1], v)),
-                            window(eras),                            
+        const windows = ripple$.pipe( 
+                            map((v, i) => slice([i, i + 1], v)),                            
+                            window(eras),         
                             skip(1));
 
         return zip(eras, windows)                
@@ -43,13 +48,14 @@ export function slicer<
 
                     //merge in previous eras slices
                     scan(   
-                        (prev$: Observable<O>, era: EraWithSlices<V> & EraWithSpec) => {
-                            const slices = prev$.pipe(
-                                                flatMap(prev => prev.slices),
-                                                concat(era.slices),
-                                                filter(([[from, to], _]) => from >= era.thresh),                                
-                                                shareReplay()
-                                            );
+                        (prev$: Observable<O>, era: EraWithSlices<Ripple<U>> & EraWithSpec) => {
+                            const slices = 
+                                prev$.pipe(
+                                    flatMap(prev => prev.slices),
+                                    concat(era.slices),
+                                    filter(([[from, to], _]) => from >= era.thresh),                                
+                                    shareReplay()
+                                );
 
                             slices.subscribe();
 
@@ -62,7 +68,7 @@ export function slicer<
 }
 
 
-export function slice<V>([from, to]: [number, number], v: V): Slice<V> {
+export function slice<V>([from, to]: Range, v: V): Slice<V> {
     return tup(tup(from, to), v);
 }
 
@@ -141,9 +147,9 @@ export function materializeSlices<V, I extends { slices: Slice$<V> }>() : Operat
         );
 }
 
-export function pullAll<I>() : MonoTypeOperatorFunction<I> {
+export function pullAll<I>(replay = true) : MonoTypeOperatorFunction<I> {
     return era$ => {
-        const x = era$.pipe(shareReplay());
+        const x = replay ? era$.pipe(shareReplay()) : era$;
         x.subscribe();
         return x;
     };

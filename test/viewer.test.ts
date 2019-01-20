@@ -1,6 +1,6 @@
 import { Subject, from, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
-import { slicer } from "../lib/slicer";
+import { slicer, Ripple } from "../lib/slicer";
 import { map, concatMap, groupBy, shareReplay, startWith } from "rxjs/operators";
 import { evaluate, KnownLogs } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
@@ -21,7 +21,7 @@ describe('viewer', () => {
     let blockStore: FakeBlockStore
 
     let signal$: Subject<Signal>
-    let ripple$: Subject<Keyed$<number>>
+    let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
     let view: Viewer<TestModel>
@@ -30,7 +30,7 @@ describe('viewer', () => {
         blockStore = new FakeBlockStore();
 
         signal$ = new Subject<Signal>();
-        ripple$ = new Subject<Keyed$<number>>();
+        ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
         const era$ = signal$.pipe(
@@ -94,7 +94,8 @@ describe('viewer', () => {
     function emit(rip: TestRipple) {
         const ripple = from(enumerate(rip)).pipe(
                         concatMap(([k, r]) => from(r).pipe(map(v => tup(k, v)))),
-                        groupBy(([k]) => k, ([_, v]) => v));
+                        groupBy(([k]) => k, ([_, v]) => v),
+                        map(g => tup(g.key, g)));
                     
         ripple$.next(ripple);
     }

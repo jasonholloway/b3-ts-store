@@ -1,16 +1,12 @@
-import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices } from "../lib/slicer";
+import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices, Ripple } from "../lib/slicer";
 import { Subject, from, empty, Observable } from "rxjs";
-import { Dict, reduceToDict, tup, reduceToArray, enumerate, Keyed$ } from "../lib/utils";
-import { startWith, map, concatMap, groupBy, tap } from "rxjs/operators";
+import { Dict, reduceToDict, tup, reduceToArray, enumerate } from "../lib/utils";
+import { startWith, map, concatMap, groupBy } from "rxjs/operators";
 import { Evaluable, evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
-import { EraWithSpec, emptyManifest, specifier, Signal, newEra, newManifest } from "../lib/specifier";
+import { specifier, Signal, newEra, newManifest } from "../lib/specifier";
 import { serveBlocks } from "../lib/serveBlocks";
-import { sinkErrors } from "../lib/sinkErrors";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-
-
-type TestRipple = Keyed$<number>;
 
 
 describe('evaluator', () => {
@@ -18,7 +14,7 @@ describe('evaluator', () => {
     const model = new TestModel();
 
     let signal$: Subject<Signal>
-    let ripple$: Subject<Keyed$<number>>
+    let ripple$: Subject<Ripple<number>>
     let blockStore: FakeBlockStore
 
     let gathering: Observable<EraWithSlices<Evaluable<TestModel>>>
@@ -27,7 +23,7 @@ describe('evaluator', () => {
         blockStore = new FakeBlockStore();
 
         signal$ = new Subject<Signal>();
-        ripple$ = new Subject<TestRipple>();
+        ripple$ = new Subject<Ripple<number>>();
 
         gathering = signal$.pipe(
                         startWith(newEra()),
@@ -145,7 +141,8 @@ describe('evaluator', () => {
         const ripple = from(enumerate(rip)).pipe(
                             concatMap(([k, r]) => from(r).pipe(
                                                     map(v => tup(k, v)))),
-                            groupBy(([k, _]) => k, ([_, v]) => v));
+                            groupBy(([k, _]) => k, ([_, v]) => v),
+                            map(g => tup(g.key, g)));
                     
         ripple$.next(ripple);
     }
@@ -156,16 +153,6 @@ describe('evaluator', () => {
     }
 
 
-    async function expectData(expected: Slice<Dict<any[]>>[][]) {
-        complete();
-
-        const r = await gathering.pipe(
-                        concatMapSlices(({data}: Evaluable<TestModel>) => empty()),
-                        materializeSlices()
-                    ).toPromise();
-
-        expect(r).toEqual(expected);
-    }
 
 
     async function expectAggrs(expected: Slice<Dict<any>>[][]) {

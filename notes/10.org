@@ -1,0 +1,7 @@
+
+so, evaluator loads from blocks, via latest manifest;
+we want to test staging, committing and loading
+
+
+
+

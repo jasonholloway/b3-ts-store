@@ -1,6 +1,6 @@
 import { Subject, from, OperatorFunction, pipe } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
-import { slicer } from "../lib/slicer";
+import { slicer, Ripple } from "../lib/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
 import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
@@ -19,7 +19,7 @@ describe('committer', () => {
     let blockStore: FakeBlockStore
 
     let spec$: Subject<EraWithSpec>
-    let ripple$: Subject<Keyed$<number>>
+    let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
     let gathering: Promise<{ data: Dict<number[]>, extent: number }[]>
 
@@ -27,7 +27,7 @@ describe('committer', () => {
         blockStore = new FakeBlockStore();
 
         spec$ = new Subject<EraWithSpec>();
-        ripple$ = new Subject<Keyed$<number>>();
+        ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
         const doStore$ = spec$.pipe(
@@ -72,7 +72,8 @@ describe('committer', () => {
     function ripple(rip: TestRipple) {
         const ripple = from(enumerate(rip)).pipe(
                         concatMap(([k, r]) => from(r).pipe(map(v => tup(k, v)))),
-                        groupBy(([k]) => k, ([_, v]) => v));
+                        groupBy(([k]) => k, ([_, v]) => v),
+                        map(g => tup(g.key, g)));
                     
         ripple$.next(ripple);
     }
@@ -99,9 +100,10 @@ describe('committer', () => {
         return pipe(
                 concatMap(({ data, extent }) => 
                     data.pipe(
-                        concatMap(g => g.pipe(
-                                        reduceToArray(),
-                                        map(r => tup(g.key, r)))),
+                        concatMap(([k, u$]) => 
+                            u$.pipe(
+                                reduceToArray(),
+                                map(r => tup(k, r)))),
                         reduceToDict(),
                         map(data => ({ data, extent })))),
                 reduceToArray()
