@@ -1,13 +1,13 @@
-import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer, GroupedObservable, of, ReplaySubject, merge } from "rxjs";
+import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer, of, ReplaySubject, merge } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, log } from "../lib/utils";
 import { slicer, pullAll, Ripple, Part, Tuple2, EraWithSlices } from "../lib/slicer";
-import { map, concatMap, groupBy, mapTo, tap, startWith, reduce, concatAll, concat, defaultIfEmpty, sample, catchError } from "rxjs/operators";
+import { map, concatMap, groupBy, mapTo, tap, startWith, reduce, concatAll, catchError, flatMap, single } from "rxjs/operators";
 import { evaluate, Evaluable } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
-import { DoCommit, committer, DoStore } from "../lib/committer";
+import { DoCommit, committer, Commit } from "../lib/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { Signal, specifier, newEra, NewManifest, newManifest, EraWithSpec } from "../lib/specifier";
+import { Signal, specifier, newEra, NewManifest, newManifest, EraWithSpec, Manifest } from "../lib/specifier";
 import { serveBlocks } from "../lib/serveBlocks";
 import { BlockStore, ManifestStore } from "../lib/bits";
 import { pause } from "./utils";
@@ -43,28 +43,37 @@ const puller =
         map(manifest => newManifest(manifest))
     );
 
-//if the pusher, on finding a later manifest in the store,
-//just sent out a signal saying to 
-//
-//
-
-
 
 const pusher = 
-    (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<DoStore<any>, any> =>
-    pipe(
-        concatMap(({ data }) => 
-            data.pipe(materializeParts())),
-        concatMap((block) => 
-            blockStore.save('block0', block)),
-        concatMap(() => 
-            manifestStore.save({ version: 1, logBlocks: { myLog: [ 'block0' ] } })
-                .pipe(catchError(() => {
-                    pull$.next(['PullManifest', {}]);
-                    return empty(); //bodge - should emit error too
-                }))),
-        pullAll(false)
-    );   
+    (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<Commit, Commit> =>
+    pipe(concatMap(commit =>
+        commit.data.pipe(
+            materializeParts(),
+            single(),
+            flatMap(async block => {             //could be multiple blocks, you know... well, it's right that each one should be committed and a ref returned
+                const ref = 'block0';
+                await blockStore.save(ref, block);
+                return tup(ref, block);
+            }),
+            flatMap(([ref, block]) => {
+                const logRefs = enumerate(block).map(([k]) => k);
+
+                const manifest: Manifest = {
+                    ...commit.era.manifest,
+                    version: commit.era.manifest.version + 1,
+                    logBlocks: { myLog: [ 'block0' ] }
+                };
+                
+                return manifestStore.save(manifest)
+                        .pipe(catchError(() => {
+                            pull$.next(['PullManifest', {}]);
+                            return empty(); //bodge - should emit error too
+                        }));
+            }),
+            mapTo({ ...commit }))) //!!!!!!!!!!!!!!!!
+        );
+
+
 
 function materializeParts<V>() : OperatorFunction<Part<V>, Dict<V[]>> {
     return pipe(
@@ -93,7 +102,7 @@ describe('saveLoad', () => {
 
     let manifest$: Observable<NewManifest>
     let era$: Observable<EraWithSlices<Evaluable<TestModel>> & EraWithSpec>
-    let commit$: Observable<any>
+    let commit$: Observable<Commit>
 
     beforeEach(() => {
         manifestStore = new FakeManifestStore();
@@ -108,18 +117,18 @@ describe('saveLoad', () => {
                         puller(manifestStore),
                         pullAll());
 
-        era$ = merge(signal$, manifest$).pipe(
-                startWith(newEra()),
-                specifier(),
-                serveBlocks(blockStore),
-                slicer(ripple$),
-                evaluate(model),
-                pullAll());
+        era$ =      merge(signal$, manifest$).pipe(
+                        startWith(newEra()),
+                        specifier(),
+                        serveBlocks(blockStore),
+                        slicer(ripple$),
+                        evaluate(model),
+                        pullAll());
 
-        commit$ = doCommit$.pipe(
-                    committer<TestModel>(era$, signal$),
-                    pusher(blockStore, manifestStore, pullManifest$),
-                    pullAll());
+        commit$ =   doCommit$.pipe(
+                        committer(model, era$, signal$),
+                        pusher(blockStore, manifestStore, pullManifest$),
+                        pullAll());
     })
 
 
@@ -143,7 +152,10 @@ describe('saveLoad', () => {
                     myLog: [ 'block0' ]
                 }
             }))
+
+        xit('triggers new era (and only commits when slice is finished...)', () => {})
     })
+
 
     describe('when there\'s an existing, newer manifest', () => {
         beforeEach(async () => {
@@ -177,7 +189,8 @@ describe('saveLoad', () => {
             expect(await getManifestVersions())
                 .toEqual([ 0, 121, 123 ]));
 
-        xit('error emitting into DoCommit context', () => {
+        it('error emitted into Commit', async () => {
+            throw 123;
             //...
         })
 

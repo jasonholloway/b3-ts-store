@@ -4,7 +4,7 @@ import { slicer, Ripple, EraWithSlices } from "../lib/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
 import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
-import { DoCommit, committer, DoStore } from "../lib/committer";
+import { DoCommit, committer, Commit } from "../lib/committer";
 import { EraWithSpec, emptyManifest } from "../lib/specifier";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { serveBlocks } from "../lib/serveBlocks";
@@ -21,7 +21,7 @@ describe('committer', () => {
     let spec$: Subject<EraWithSpec>
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
-    let gathering: Promise<{ data: Dict<number[]>, extent: number }[]>
+    let gathering: Promise<{ data: Dict<number[]>, extent: number, errors: Subject<Error>, era: EraWithSpec }[]>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
@@ -36,7 +36,7 @@ describe('committer', () => {
                         evaluate(model));
 
         gathering = doCommit$.pipe(
-                        committer<TestModel>(era$, null),
+                        committer(model, era$, null),
                         materialize())
                     .toPromise();
 
@@ -96,16 +96,16 @@ describe('committer', () => {
     }
 
 
-    function materialize<U>() : OperatorFunction<DoStore<U>, { data: Dict<U[]>, extent: number }[]> {
+    function materialize() : OperatorFunction<Commit, { data: Dict<any[]>, extent: number, errors:Subject<Error>, era: EraWithSpec }[]> {
         return pipe(
-                concatMap(({ data, extent }) => 
-                    data.pipe(
+                concatMap((commit) => 
+                    commit.data.pipe(
                         concatMap(([k, u$]) => 
                             u$.pipe(
                                 reduceToArray(),
                                 map(r => tup(k, r)))),
                         reduceToDict(),
-                        map(data => ({ data, extent })))),
+                        map(data => ({ ...commit, data })))),
                 reduceToArray()
             );
     }

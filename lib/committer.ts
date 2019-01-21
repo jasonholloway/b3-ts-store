@@ -1,28 +1,42 @@
 import { Evaluable, Model } from "./evaluate";
-import { Observable, OperatorFunction, Observer, pipe } from "rxjs";
+import { Observable, OperatorFunction, Observer, pipe, Subject, ReplaySubject } from "rxjs";
 import { share, withLatestFrom, concatMap, take, map } from "rxjs/operators";
-import { EraWithSlices, Ripple, pullAll } from "./slicer";
-import { newEra, RefreshEra } from "./specifier";
-import { tup, log } from "./utils";
+import { EraWithSlices, Ripple } from "./slicer";
+import { RefreshEra, EraWithSpec } from "./specifier";
 
 export type DoCommit = {}
 
-export type DoStore<U> = {
-    data: Ripple<U>
-    extent: number
+export interface Commit {
+    era: EraWithSpec
+    data: Ripple<any>
+    extent: number,
+    errors: Subject<Error>
 }
 
+
 export const committer =
-    <M extends Model>
-    (era$: Observable<EraWithSlices<Evaluable<M>>>, refreshEra$: Observer<RefreshEra>) : OperatorFunction<DoCommit, DoStore<any>> =>
+    <M extends Model, E extends EraWithSpec & EraWithSlices<Evaluable<M>>>
+    (_: M, era$: Observable<E>, refreshEra$: Observer<RefreshEra>) : OperatorFunction<DoCommit, Commit> =>
         pipe(
             withLatestFrom(era$),
-            concatMap(([_, {slices}]) => 
-                slices.pipe(
+            concatMap(([_, era]) => 
+                era.slices.pipe(
                     take(1),
-                    map(([[_, to], {data}]) => ({ extent: to, data})))),
+                    map(([[_, to], {data}]) => ({ 
+                        extent: to, 
+                        data, 
+                        era,
+                        errors: new ReplaySubject<Error>() //this should be eagerly collecting errors...
+                    })))),
             share());
 
         // doStore$
         //     .pipe(mapTo(newEra()))
         //     .subscribe(refreshEra$);
+        //ABOVE NEEDS REINSTATING! ***************************
+        //but it'd be good to show its absence with a test...
+
+//it'd also be nice if the committer did the materialiation...
+//the Pusher is doing to much:it's concern should be the protocol with the stores
+//though - materialization is a dirty thing;
+//if the stores themselves were nicer...
