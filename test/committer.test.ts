@@ -1,6 +1,6 @@
 import { Subject, from, OperatorFunction, pipe } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
-import { slicer, Ripple } from "../lib/slicer";
+import { slicer, Ripple, EraWithSlices } from "../lib/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
 import { evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
@@ -30,14 +30,14 @@ describe('committer', () => {
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        const doStore$ = spec$.pipe(
-                            slicer(ripple$),
-                            serveBlocks(blockStore),
-                            evaluate(model),
-                            committer(model, doCommit$, null));
+        const era$ = spec$.pipe(
+                        slicer(ripple$),
+                        serveBlocks(blockStore),
+                        evaluate(model));
 
-        gathering = doStore$
-                    .pipe(materialize())
+        gathering = doCommit$.pipe(
+                        committer<TestModel>(era$, null),
+                        materialize())
                     .toPromise();
 
         spec$.next({ id: 0, thresh: 0, manifest: emptyManifest });

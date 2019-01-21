@@ -1,5 +1,7 @@
 import { Dict, getOrSet, enumerate, tup } from "./utils";
 import { LogBlocks, LogSpec } from "./LogSpace";
+import { Manifest } from "./specifier";
+import { Observable } from "rxjs";
 
 export function declareLogModel<U extends AnyUpdate, D>(m: Model<U, D>): Model<U, D> {
     return m;
@@ -29,15 +31,10 @@ export interface BlockStore {
 }
 
 
-export type Manifest = {
-    version: number,
-    logs: Dict<LogBlocks>
-}
-
 
 export interface ManifestStore {
-    load(): Promise<Manifest>;
-    save(manifest: Manifest): Promise<void>
+    load(): Observable<Manifest>;
+    save(manifest: Manifest): Observable<void>
 }
 
 

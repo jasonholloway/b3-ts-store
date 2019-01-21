@@ -1,7 +1,6 @@
-import { AnyUpdate, Model, Log, BlockStore, ManifestStore, Manifest } from "./bits";
-import { Subject, from, Observable } from "rxjs";
-import { Dict, enumerate, getOrSet } from "./utils";
-import { flatMap, map } from "rxjs/operators";
+import { AnyUpdate, Model, Log } from "./bits";
+import { Subject } from "rxjs";
+import { Dict, getOrSet } from "./utils";
 import { InnerLog, createLogFacade } from "./Log";
 
 
@@ -23,10 +22,6 @@ export type LogSpec = {
 }
 
 
-type Frame = {
-    spec: LogSpec,
-    lastCommit: number
-}
 
 type Confirm = {}
 
@@ -34,7 +29,6 @@ type Confirm = {}
 export function createLogSpace(): LogSpace {
     let logs: { [key: string]: InnerLog } = {}
 
-    const innerLogs = new Subject<Dict<InnerLog>>();
 
     let nextCommitId = 0;
     const commits = new Subject<Confirm>();

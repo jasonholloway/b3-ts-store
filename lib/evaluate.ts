@@ -1,6 +1,5 @@
 import { Observable, OperatorFunction, pipe, of, empty, concat, from } from "rxjs";
-import { EraWithSlices, scanUnwrapSlices, pullAll, Ripple } from "./slicer";
-import { Keyed$ } from "./utils";
+import { EraWithSlices, scanUnwrapSlices, pullAll, Ripple, Slice$, Era } from "./slicer";
 import { concatMap, defaultIfEmpty, filter, scan, concatAll, map, tap } from "rxjs/operators";
 import { Model as LogModel } from './bits'
 import { EraWithBlocks } from "./serveBlocks";
@@ -29,6 +28,7 @@ export interface Evaluable<M extends Model> {
 function createEvaluable<M extends Model>(raw: Evaluable<M>) : Evaluable<M> {
     return raw;
 }
+
 
 export const evaluate = 
     <U, M extends Model, I extends EraWithSlices<Ripple<U>> & EraWithBlocks & EraWithSpec, O extends EraWithSlices<Evaluable<M>> & I>

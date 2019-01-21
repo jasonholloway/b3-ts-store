@@ -12,7 +12,7 @@ export type Signal = RefreshEra | NewManifest | SetThreshold
 
 
 export type Manifest = { 
-    id: number,
+    version: number,
     logBlocks: Dict<string[]> 
 }
 
@@ -36,7 +36,7 @@ export interface EraWithSpec extends Era {
     manifest: Manifest
 }
     
-export const emptyManifest: Manifest = { id: 0, logBlocks: {} }
+export const emptyManifest: Manifest = { version: 0, logBlocks: {} }
     
     
 export function specifier() : OperatorFunction<Signal, EraWithSpec> {

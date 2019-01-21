@@ -105,7 +105,7 @@ xdescribe('LogSpace', () => {
             })
 
             it('stores manifest, referring to stored block', () => {
-                const blocks = manifestStore.saved.logs[log.key];
+                const blocks = manifestStore.manifest.logBlocks[log.key];
                 expect(blocks).toBeDefined();
                 expect(blocks.length).toBe(1);
 
@@ -114,7 +114,7 @@ xdescribe('LogSpace', () => {
             })
 
             it('increments manifest version', () => {
-                expect(manifestStore.saved.version).toBe(1);
+                expect(manifestStore.manifest.version).toBe(1);
             })
 
         })

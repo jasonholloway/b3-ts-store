@@ -103,7 +103,7 @@ describe('evaluator', () => {
             };
 
             signal$.next(newManifest({
-                id: 1,
+                version: 1,
                 logBlocks: {
                     myLog: ['block0', 'block1']
                 }

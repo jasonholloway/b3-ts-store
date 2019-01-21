@@ -82,7 +82,7 @@ describe('specifier', () => {
         beforeAll(() => {
             perform = async () => {
                 signal$.next(newManifest({
-                    id: 1,
+                    version: 1,
                     logBlocks: {  
                         myLog: ['block0', 'block1']
                     } 
@@ -97,7 +97,7 @@ describe('specifier', () => {
                     id: 0, 
                     thresh: 0,
                     manifest: { 
-                        id: 0,
+                        version: 0,
                         logBlocks: { } 
                     }
                 },
@@ -105,7 +105,7 @@ describe('specifier', () => {
                     id: 1, 
                     thresh: 0,
                     manifest: {
-                        id: 1,
+                        version: 1,
                         logBlocks: { 
                             myLog: ['block0', 'block1']
                         } 

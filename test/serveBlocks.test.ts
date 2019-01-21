@@ -34,7 +34,7 @@ describe('serveBlocks', () => {
                     serveBlocks(blockStore),
                     pullAll());
 
-        signal$.next(['NewManifest', { id: 0, logBlocks: {} }]);
+        signal$.next(['NewManifest', { version: 0, logBlocks: {} }]);
 
         [errors, blocks] = await forkJoin(
                                     error$.pipe(

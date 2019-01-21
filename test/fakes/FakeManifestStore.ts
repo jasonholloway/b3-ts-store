@@ -1,15 +1,22 @@
-import { ManifestStore, Manifest } from "../../lib/bits";
+import { ManifestStore } from "../../lib/bits";
+import { Manifest } from "../../lib/specifier";
+import { Observable, empty, of, throwError } from "rxjs";
 
 class FakeManifestStore implements ManifestStore {
 
-    saved: Manifest = { version: 0, logs: {} }
+    manifest: Manifest = undefined;
 
-    async load(): Promise<Manifest> {
-        return this.saved;
+    load(): Observable<Manifest> {
+        return this.manifest ? of(this.manifest) : empty();
     }    
     
-    async save(manifest: Manifest): Promise<void> {
-        this.saved = manifest;
+    save(newManifest: Manifest): Observable<void> {
+        if(newManifest.version <= ((this.manifest && this.manifest.version) || 0))
+            return throwError('Newer manifest in place!');
+        else {
+            this.manifest = newManifest;
+            return empty();
+        }
     }
 
 }
