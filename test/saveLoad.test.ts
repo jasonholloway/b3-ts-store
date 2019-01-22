@@ -1,99 +1,21 @@
-import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer, of, ReplaySubject, merge, concat, MonoTypeOperatorFunction } from "rxjs";
-import { reduceToArray, Dict, Keyed$, enumerate, tup, log } from "../lib/utils";
-import { slicer, pullAll, Ripple, Part, Tuple2, EraWithSlices } from "../lib/slicer";
-import { map, concatMap, groupBy, mapTo, tap, startWith, reduce, concatAll, catchError, flatMap, single } from "rxjs/operators";
+import { Subject, from, pipe, Observable, ReplaySubject, merge, MonoTypeOperatorFunction } from "rxjs";
+import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
+import { slicer, pullAll, Ripple, EraWithSlices } from "../lib/slicer";
+import { map, concatMap, groupBy, startWith } from "rxjs/operators";
 import { evaluate, Evaluable } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { Signal, specifier, newEra, NewManifest, newManifest, EraWithSpec, Manifest } from "../lib/specifier";
+import { Signal, specifier, newEra, NewManifest, newManifest, EraWithSpec } from "../lib/specifier";
 import { serveBlocks } from "../lib/serveBlocks";
-import { BlockStore, ManifestStore } from "../lib/bits";
 import { pause } from "./utils";
+import { PullManifest, puller } from "../lib/puller";
+import { pusher } from "../lib/pusher";
 
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
-
-//the Pusher:
-//1) saves a block
-//2) tries to save a new Manifest
-//3) on success, emits new Spec
-//4) on failure, should emit an informational warning
-
-//but, to emit a warning, we need tobe in an EraWithErrors, instead of just consuming from DoStore
-//though, such errors of committing don't really belong to the era, they belong to the attempted commit...
-//
-//instead of eras piped into the committer, the commiter would primarily consume DoCommits,
-//and sample eras as a secondary input; this would then allow the DoCommit to becomea kind of CommitContext
-//passed through the stack
-//
-//the Commit would then gather state as it went through: including errors on trying to save
-//
-//
-//
-
-type PullManifest = ['PullManifest', {}]
-
-const puller =
-    (manifestStore: ManifestStore) : OperatorFunction<PullManifest, NewManifest> =>
-    pipe(
-        concatMap(([_, pull]) => manifestStore.load()),     //but what happens if empty????
-        map(manifest => newManifest(manifest))
-    );
-
-
-const pusher = 
-    (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<Commit, Commit> =>
-    pipe(
-        concatMap(commit =>
-            of(commit.data).pipe(
-                concatMap(async data => {
-                    const ref = 'block0';
-                    await blockStore.save(ref, commit.data);
-                    return ref;
-                }),
-                concatMap(blockRef => {
-                    const logRefs = enumerate(commit.data).map(([k]) => k);
-        
-                    const manifest: Manifest = {
-                        ...commit.era.manifest,
-                        version: commit.era.manifest.version + 1,
-                        logBlocks: { myLog: [ 'block0' ] }
-                    };
-                    
-                    return manifestStore.save(manifest)
-                            .pipe(tap({ 
-                                error: () => pull$.next(['PullManifest', {}])
-                            }));
-                }),
-                mapTo(commit),
-                mergeErrorsInto(commit)
-            ))
-        );
-
-
-function mergeErrorsInto<F extends { errors: Observable<Error> }>(frame: F) : MonoTypeOperatorFunction<F> {
-    return catchError(err => 
-        of({ 
-            ...frame as object,
-            errors: concat(frame.errors, of(err)) 
-        } as F));
-}
-
-function materializeParts<V>() : OperatorFunction<Part<V>, Dict<V[]>> {
-    return pipe(
-            reduce((prev$, [k, u$]: Part<V>) => 
-                prev$.pipe(
-                    concatMap(prev =>
-                        u$.pipe(
-                            reduceToArray(),
-                            map(r => ({ ...prev, [k]: r }))))),
-                of({} as Dict<V[]>)),
-            concatAll());
-}
-
 
 describe('saveLoad', () => {
 
@@ -136,16 +58,6 @@ describe('saveLoad', () => {
                         committer(model, era$, signal$),
                         pusher(blockStore, manifestStore, pullManifest$),
                         pullAllCommits());
-
-        const error$ = merge(commit$).pipe(
-                        concatMap(({errors}) => errors)
-                        );
-
-        //NB: an error will still output a commit, it seems...
-        //as otherwise how will the error get out?
-        //
-        //but then, surely the pusher will still act on it?!?!?!?
-        //
     })
 
 
