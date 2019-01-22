@@ -160,8 +160,12 @@ describe('saveLoad', () => {
                 }
             }))
 
-        xit('triggers new era, to complete commit', () => {
-            //....
+        it('triggers new era (to grab slice)', async () => {            
+            const eras = await era$
+                                .pipe(reduceToArray())
+                                .toPromise();
+
+            expect(eras).toMatchObject([ { id: 0 }, { id: 1} ]);
         })
 
 
@@ -199,7 +203,7 @@ describe('saveLoad', () => {
 
         it('newer manifest percolates into new era', async () =>
             expect(await getManifestVersions())
-                .toEqual([ 0, 121, 123 ]));
+                .toEqual([ 0, 121, 121, 123 ]));
 
         it('error emitted into Commit', async () => {
             const errs = await commit$.pipe(
