@@ -136,6 +136,16 @@ describe('saveLoad', () => {
                         committer(model, era$, signal$),
                         pusher(blockStore, manifestStore, pullManifest$),
                         pullAllCommits());
+
+        const error$ = merge(commit$).pipe(
+                        concatMap(({errors}) => errors)
+                        );
+
+        //NB: an error will still output a commit, it seems...
+        //as otherwise how will the error get out?
+        //
+        //but then, surely the pusher will still act on it?!?!?!?
+        //
     })
 
 
