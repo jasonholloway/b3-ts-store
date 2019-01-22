@@ -49,7 +49,7 @@ describe('committer', () => {
         ripple({ b: [ 1 ] });
         doCommit();
 
-        await expectStores([{
+        await expectCommits([{
             data: { a: [ 1, 2 ] },
             extent: 1
         }]);
@@ -58,13 +58,13 @@ describe('committer', () => {
     it('does nothing if no slices', async () => {
         doCommit();
 
-        await expectStores([]);
+        await expectCommits([]);
     })
 
     xit('only commits if slice known good', async () => {
         ripple({ a: [ 1, 2 ] });
         doCommit();
-        await expectStores([]);
+        await expectCommits([]);
     })
 
 
@@ -83,9 +83,9 @@ describe('committer', () => {
     }
 
 
-    async function expectStores(doStores: { data: Dict<number[]>, extent: number }[]) {
+    async function expectCommits(commits: { data: Dict<number[]>, extent: number }[]) {
         const r = await complete();
-        expect(r).toEqual(doStores);
+        expect(r).toMatchObject(commits);
     }
 
     function complete() {
