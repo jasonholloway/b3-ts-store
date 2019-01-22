@@ -46,32 +46,32 @@ const puller =
 
 const pusher = 
     (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<Commit, Commit> =>
-    pipe(concatMap(commit =>
-        commit.data.pipe(
-            materializeParts(),
-            single(),
-            flatMap(async block => {             //could be multiple blocks, you know... well, it's right that each one should be committed and a ref returned
-                const ref = 'block0';
-                await blockStore.save(ref, block);
-                return tup(ref, block);
-            }),
-            flatMap(([ref, block]) => {
-                const logRefs = enumerate(block).map(([k]) => k);
-
-                const manifest: Manifest = {
-                    ...commit.era.manifest,
-                    version: commit.era.manifest.version + 1,
-                    logBlocks: { myLog: [ 'block0' ] }
-                };
-                
-                return manifestStore.save(manifest)
-                        .pipe(tap({ error: () => 
-                            pull$.next(['PullManifest', {}])
-                        }));
-            }),
-            mapTo({ ...commit }),
-            mergeErrorsInto(commit)
-        )));
+    pipe(
+        concatMap(commit =>
+            of(commit.data).pipe(
+                concatMap(async data => {
+                    const ref = 'block0';
+                    await blockStore.save(ref, commit.data);
+                    return ref;
+                }),
+                concatMap(blockRef => {
+                    const logRefs = enumerate(commit.data).map(([k]) => k);
+        
+                    const manifest: Manifest = {
+                        ...commit.era.manifest,
+                        version: commit.era.manifest.version + 1,
+                        logBlocks: { myLog: [ 'block0' ] }
+                    };
+                    
+                    return manifestStore.save(manifest)
+                            .pipe(tap({ 
+                                error: () => pull$.next(['PullManifest', {}])
+                            }));
+                }),
+                mapTo(commit),
+                mergeErrorsInto(commit)
+            ))
+        );
 
 
 function mergeErrorsInto<F extends { errors: Observable<Error> }>(frame: F) : MonoTypeOperatorFunction<F> {
@@ -160,6 +160,11 @@ describe('saveLoad', () => {
                 }
             }))
 
+        xit('triggers new era, to complete commit', () => {
+            //....
+        })
+
+
         xit('triggers new era (and only commits when slice is finished...)', () => {})
     })
 
@@ -204,7 +209,6 @@ describe('saveLoad', () => {
 
             expect(errs).toMatchObject([ 'Newer manifest in place!' ]);
         })
-
     })
 
 

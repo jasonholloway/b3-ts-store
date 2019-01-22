@@ -1,18 +1,18 @@
 import { Evaluable, Model } from "./evaluate";
-import { Observable, OperatorFunction, Observer, pipe, Subject, ReplaySubject, empty } from "rxjs";
+import { Observable, OperatorFunction, Observer, pipe, empty } from "rxjs";
 import { share, withLatestFrom, concatMap, take, map } from "rxjs/operators";
-import { EraWithSlices, Ripple } from "./slicer";
+import { EraWithSlices, Slice } from "./slicer";
 import { RefreshEra, EraWithSpec } from "./specifier";
+import { reduceToDict, reduceToArray, tup, Dict } from "./utils";
 
 export type DoCommit = {}
 
 export interface Commit {
     era: EraWithSpec
-    data: Ripple<any>
+    data: Dict<any[]>
     extent: number,
     errors: Observable<Error>
 }
-
 
 export const committer =
     <M extends Model, E extends EraWithSpec & EraWithSlices<Evaluable<M>>>
@@ -22,12 +22,7 @@ export const committer =
             concatMap(([_, era]) => 
                 era.slices.pipe(
                     take(1),
-                    map(([[_, to], {data}]) => ({ 
-                        extent: to, 
-                        data, 
-                        era,
-                        errors: empty()
-                    })))),
+                    materialize(era))),
             share());
 
         // doStore$
@@ -36,7 +31,17 @@ export const committer =
         //ABOVE NEEDS REINSTATING! ***************************
         //but it'd be good to show its absence with a test...
 
-//it'd also be nice if the committer did the materialiation...
-//the Pusher is doing to much:it's concern should be the protocol with the stores
-//though - materialization is a dirty thing;
-//if the stores themselves were nicer...
+
+function materialize<M extends Model>(era: EraWithSpec) : OperatorFunction<Slice<Evaluable<M>>, Commit> {
+    return pipe(
+        concatMap(([_, {data}]) =>
+            data.pipe(
+                concatMap(([k, u$]) => 
+                    u$.pipe(
+                        reduceToArray(),
+                        map(r => tup(k, r)))),             
+                reduceToDict(),
+                map(data => ({ data, extent: 1, era, errors: empty() }))
+            ))
+        );
+}
