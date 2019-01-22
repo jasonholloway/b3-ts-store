@@ -168,8 +168,6 @@ describe('saveLoad', () => {
             expect(eras).toMatchObject([ { id: 0 }, { id: 1} ]);
         })
 
-
-        xit('triggers new era (and only commits when slice is finished...)', () => {})
     })
 
 
