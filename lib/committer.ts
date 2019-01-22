@@ -1,5 +1,5 @@
 import { Evaluable, Model } from "./evaluate";
-import { Observable, OperatorFunction, Observer, pipe, Subject, ReplaySubject } from "rxjs";
+import { Observable, OperatorFunction, Observer, pipe, Subject, ReplaySubject, empty } from "rxjs";
 import { share, withLatestFrom, concatMap, take, map } from "rxjs/operators";
 import { EraWithSlices, Ripple } from "./slicer";
 import { RefreshEra, EraWithSpec } from "./specifier";
@@ -10,7 +10,7 @@ export interface Commit {
     era: EraWithSpec
     data: Ripple<any>
     extent: number,
-    errors: Subject<Error>
+    errors: Observable<Error>
 }
 
 
@@ -26,7 +26,7 @@ export const committer =
                         extent: to, 
                         data, 
                         era,
-                        errors: new ReplaySubject<Error>() //this should be eagerly collecting errors...
+                        errors: empty()
                     })))),
             share());
 

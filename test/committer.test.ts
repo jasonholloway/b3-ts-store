@@ -1,4 +1,4 @@
-import { Subject, from, OperatorFunction, pipe } from "rxjs";
+import { Subject, from, OperatorFunction, pipe, Observable } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
 import { slicer, Ripple, EraWithSlices } from "../lib/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
@@ -21,7 +21,7 @@ describe('committer', () => {
     let spec$: Subject<EraWithSpec>
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
-    let gathering: Promise<{ data: Dict<number[]>, extent: number, errors: Subject<Error>, era: EraWithSpec }[]>
+    let gathering: Promise<{ data: Dict<number[]>, extent: number, errors: Observable<Error>, era: EraWithSpec }[]>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
@@ -96,7 +96,7 @@ describe('committer', () => {
     }
 
 
-    function materialize() : OperatorFunction<Commit, { data: Dict<any[]>, extent: number, errors:Subject<Error>, era: EraWithSpec }[]> {
+    function materialize() : OperatorFunction<Commit, { data: Dict<any[]>, extent: number, errors: Observable<Error>, era: EraWithSpec }[]> {
         return pipe(
                 concatMap((commit) => 
                     commit.data.pipe(

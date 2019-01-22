@@ -1,4 +1,4 @@
-import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer, of, ReplaySubject, merge } from "rxjs";
+import { Subject, from, OperatorFunction, pipe, empty, Observable, Observer, of, ReplaySubject, merge, concat, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup, log } from "../lib/utils";
 import { slicer, pullAll, Ripple, Part, Tuple2, EraWithSlices } from "../lib/slicer";
 import { map, concatMap, groupBy, mapTo, tap, startWith, reduce, concatAll, catchError, flatMap, single } from "rxjs/operators";
@@ -65,15 +65,22 @@ const pusher =
                 };
                 
                 return manifestStore.save(manifest)
-                        .pipe(catchError(() => {
-                            pull$.next(['PullManifest', {}]);
-                            return empty(); //bodge - should emit error too
+                        .pipe(tap({ error: () => 
+                            pull$.next(['PullManifest', {}])
                         }));
             }),
-            mapTo({ ...commit }))) //!!!!!!!!!!!!!!!!
-        );
+            mapTo({ ...commit }),
+            mergeErrorsInto(commit)
+        )));
 
 
+function mergeErrorsInto<F extends { errors: Observable<Error> }>(frame: F) : MonoTypeOperatorFunction<F> {
+    return catchError(err => 
+        of({ 
+            ...frame as object,
+            errors: concat(frame.errors, of(err)) 
+        } as F));
+}
 
 function materializeParts<V>() : OperatorFunction<Part<V>, Dict<V[]>> {
     return pipe(
@@ -128,7 +135,7 @@ describe('saveLoad', () => {
         commit$ =   doCommit$.pipe(
                         committer(model, era$, signal$),
                         pusher(blockStore, manifestStore, pullManifest$),
-                        pullAll());
+                        pullAllCommits());
     })
 
 
@@ -190,8 +197,12 @@ describe('saveLoad', () => {
                 .toEqual([ 0, 121, 123 ]));
 
         it('error emitted into Commit', async () => {
-            throw 123;
-            //...
+            const errs = await commit$.pipe(
+                                concatMap(c => c.errors),
+                                reduceToArray()
+                            ).toPromise();
+
+            expect(errs).toMatchObject([ 'Newer manifest in place!' ]);
         })
 
     })
@@ -205,6 +216,16 @@ describe('saveLoad', () => {
     function toArray<V>(v$: Observable<V>) {
         return v$.pipe(reduceToArray()).toPromise();
     }
+
+    function pullAllCommits() : MonoTypeOperatorFunction<Commit> {
+        return pipe(
+            map(commit => ({ 
+                ...commit ,
+                errors: commit.errors.pipe(pullAll())
+            })),
+            pullAll())
+    }
+
 
     
     function emit(rip: TestRipple) {
