@@ -1,63 +1,48 @@
-import { Subject, from, pipe, Observable, ReplaySubject, merge, MonoTypeOperatorFunction } from "rxjs";
+import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
-import { slicer, pullAll, Ripple, EraWithSlices } from "../lib/slicer";
-import { map, concatMap, groupBy, startWith } from "rxjs/operators";
-import { evaluate, Evaluable } from "../lib/evaluate";
+import { pullAll, Ripple, EraWithSlices } from "../lib/slicer";
+import { map, concatMap, groupBy } from "rxjs/operators";
+import { Evaluable } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
-import { DoCommit, committer, Commit } from "../lib/committer";
+import { DoCommit, Commit } from "../lib/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { Signal, specifier, newEra, NewManifest, newManifest, EraWithSpec } from "../lib/specifier";
-import { serveBlocks } from "../lib/serveBlocks";
+import { EraWithSpec } from "../lib/specifier";
 import { pause } from "./utils";
-import { PullManifest, puller } from "../lib/puller";
-import { pusher } from "../lib/pusher";
+import { Store, createStore } from "../lib/createStore";
 
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
 
-describe('saveLoad', () => {
+describe('store', () => {
 
     const model = new TestModel();
 
     let manifestStore: FakeManifestStore
     let blockStore: FakeBlockStore
 
-    let signal$: Subject<Signal>
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
-    let pullManifest$: Subject<PullManifest>
 
-    let manifest$: Observable<NewManifest>
     let era$: Observable<EraWithSlices<Evaluable<TestModel>> & EraWithSpec>
     let commit$: Observable<Commit>
+
+    let store: Store<TestModel>
 
     beforeEach(() => {
         manifestStore = new FakeManifestStore();
         blockStore = new FakeBlockStore();
 
-        signal$ = new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
-        pullManifest$ = new ReplaySubject<PullManifest>();
 
-        manifest$ = pullManifest$.pipe(
-                        puller(manifestStore),
-                        pullAll());
+        manifestStore.manifest = { version: 10, logBlocks: {} };
 
-        era$ =      merge(signal$, manifest$).pipe(
-                        startWith(newEra()),
-                        specifier(),
-                        serveBlocks(blockStore),
-                        slicer(ripple$),
-                        evaluate(model),
-                        pullAll());
+        store = createStore(model, blockStore, manifestStore)(ripple$, doCommit$);
 
-        commit$ =   doCommit$.pipe(
-                        committer(model, era$, signal$),
-                        pusher(blockStore, manifestStore, pullManifest$),
-                        pullAllCommits());
+        era$ = store.era$.pipe(pullAll());
+        commit$ = store.commit$.pipe(pullAllCommits());
     })
 
 
@@ -76,7 +61,7 @@ describe('saveLoad', () => {
                 
         it('saves new manifest', () => 
             expect(manifestStore.manifest).toEqual({
-                version: 1,
+                version: 11,
                 logBlocks: {
                     myLog: [ 'block0' ]
                 }
@@ -93,11 +78,24 @@ describe('saveLoad', () => {
     })
 
 
+    describe('on start', () => {
+        beforeEach(async () => {
+            await pause();
+            complete();
+        })
+
+        it('pulls in latest manifest from store', async () => {
+            expect(await getManifestVersions())
+                .toEqual([ 10 ]);
+        })
+    })
+
+
+
     describe('when there\'s an existing, newer manifest', () => {
         beforeEach(async () => {
-            manifestStore.manifest = { version: 123, logBlocks: {} };
+            manifestStore.manifest = { version: 999, logBlocks: {} };
 
-            signal$.next(newManifest({ version: 121, logBlocks: {} }));
             emit({ myLog: [ 1, 2, 3 ] });
             doCommit();
     
@@ -106,24 +104,11 @@ describe('saveLoad', () => {
         })
 
         it('manifest isn\'t updated', () =>                         //though this is responsibility of store, rather than pusher
-            expect(manifestStore.manifest.version).toBe(123));
+            expect(manifestStore.manifest.version).toBe(999));
         
-        it('pullManifest signal sent', async () => {
-            const pulls = await toArray(pullManifest$);
-            expect(pulls).toEqual([
-                ['PullManifest', {}]
-            ]);
-        })
-
-        it('newer manifest pulled in', async () =>
-            expect(await toArray(manifest$))
-                .toEqual([
-                    ['NewManifest', { version: 123, logBlocks: {} }]
-                ]));
-
         it('newer manifest percolates into new era', async () =>
             expect(await getManifestVersions())
-                .toEqual([ 0, 121, 121, 123 ]));
+                .toEqual([ 10, 10, 999 ]));
 
         it('error emitted into Commit', async () => {
             const errs = await commit$.pipe(
@@ -174,9 +159,7 @@ describe('saveLoad', () => {
 
     function complete() {
         ripple$.complete();
-        signal$.complete();
         doCommit$.complete();
-        pullManifest$.complete();
     }
 
 })

@@ -1,27 +1,38 @@
-import { Model, evaluate, LogRef } from "./evaluate";
+import { Model, evaluate, LogRef, Evaluable } from "./evaluate";
 import { BlockStore, ManifestStore } from "./bits";
 import { startWith } from "rxjs/operators";
-import { newEra, specifier, Signal } from "./specifier";
+import { newEra, specifier, Signal, EraWithSpec, NewManifest } from "./specifier";
 import { serveBlocks } from "./serveBlocks";
-import { slicer, Ripple } from "./slicer";
-import { committer, DoCommit } from "./committer";
+import { slicer, Ripple, EraWithSlices } from "./slicer";
+import { committer, DoCommit, Commit } from "./committer";
 import { Observable, Subject, merge } from "rxjs";
-import { puller, PullManifest } from "./puller";
+import { puller, PullManifest, pullManifest } from "./puller";
 import { pusher } from "./pusher";
+import { log, tup } from "./utils";
+
+
+export interface Store<M extends Model> {
+    era$: Observable<EraWithSpec & EraWithSlices<Evaluable<M>>>,
+    commit$: Observable<Commit>,
+    manifest$: Observable<NewManifest>,
+    view(ref: LogRef): any
+} 
+
+
 
 export const createStore =
     <M extends Model>
     (model: M, blockStore: BlockStore, manifestStore: ManifestStore) =>
-    (ripple$: Observable<Ripple<any>>, doCommit$: Observable<DoCommit>) => {
+    (ripple$: Observable<Ripple<any>>, doCommit$: Observable<DoCommit>) : Store<M> => {
 
     const pullManifest$ = new Subject<PullManifest>();
     const signal$ = new Subject<Signal>();
 
     const manifest$ = pullManifest$.pipe(
+                        startWith(pullManifest()),
                         puller(manifestStore));
 
     const era$ = merge(signal$, manifest$).pipe(
-                    startWith(newEra()),
                     specifier(),
                     serveBlocks(blockStore),
                     slicer(ripple$),

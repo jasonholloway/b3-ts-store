@@ -5,6 +5,8 @@ import { concatMap, map } from "rxjs/operators";
 
 export type PullManifest = ['PullManifest', {}]
 
+export const pullManifest = (): PullManifest => ['PullManifest', {}];
+
 export const puller =
     (manifestStore: ManifestStore) : OperatorFunction<PullManifest, NewManifest> =>
     pipe(

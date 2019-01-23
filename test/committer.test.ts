@@ -1,7 +1,7 @@
-import { Subject, from, OperatorFunction, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject } from "rxjs";
-import { reduceToArray, Dict, Keyed$, enumerate, tup, reduceToDict } from "../lib/utils";
+import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject } from "rxjs";
+import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
 import { slicer, Ripple, EraWithSlices, pullAll } from "../lib/slicer";
-import { map, concatMap, groupBy, tap, mergeMap, flatMap, single } from "rxjs/operators";
+import { map, concatMap, groupBy } from "rxjs/operators";
 import { evaluate, Evaluable } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/committer";
