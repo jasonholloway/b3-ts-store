@@ -4,9 +4,10 @@ import { reduceToArray } from "../lib/utils";
 import { startWith, mapTo, catchError } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { emptyManifest, Manifest } from "../lib/specifier";
-import { pullBlocks, BlockFrame } from "../lib/pullBlocks";
+import { pullBlocks } from "../lib/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/evaluateBlocks";
+import { Evaluable } from "../lib/evaluateSlices";
 
 
 describe('evaluateBlocks', () => {
@@ -15,7 +16,7 @@ describe('evaluateBlocks', () => {
 
     let blockStore: FakeBlockStore
     let manifest$: Subject<Manifest>
-    let frame$: Observable<BlockFrame>
+    let frame$: Observable<Evaluable<TestModel>>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();

@@ -1,7 +1,7 @@
-import { Evaluable, Model } from "./evaluateSlices";
+import { Evaluable } from "./evaluateSlices";
 import { Observable, OperatorFunction, Observer, pipe, empty } from "rxjs";
-import { share, withLatestFrom, concatMap, take, map, tap, mapTo, subscribeOn } from "rxjs/operators";
-import { EraWithSlices, Slice, Era } from "./slicer";
+import { share, withLatestFrom, concatMap, take, map, mapTo } from "rxjs/operators";
+import { EraWithSlices, Slice, Era, Ripple } from "./slicer";
 import { RefreshEra, newEra } from "./specifier";
 import { reduceToDict, reduceToArray, tup, Dict } from "./utils";
 
@@ -15,8 +15,7 @@ export interface Commit {
 }
 
 export const committer =
-    <M extends Model, E extends EraWithSlices<Evaluable<M>>>
-    (_: M, era$: Observable<E>, refreshEra$: Observer<RefreshEra>) : OperatorFunction<DoCommit, Commit> =>
+    (era$: Observable<EraWithSlices<[Ripple<any>, Evaluable]>  >, refreshEra$: Observer<RefreshEra>) : OperatorFunction<DoCommit, Commit> =>
         doCommit$ => {
             const c$ = doCommit$.pipe(
                         withLatestFrom(era$),
@@ -34,9 +33,9 @@ export const committer =
         };
         
 
-function materialize<M extends Model>(era: Era) : OperatorFunction<Slice<Evaluable<M>>, Commit> {
+function materialize(era: Era) : OperatorFunction<Slice<[Ripple<any>, Evaluable]>, Commit> {
     return pipe(
-        concatMap(([_, {data}]) =>
+        concatMap(([_, [data, evaluable]]) =>
             data.pipe(
                 concatMap(([k, u$]) => 
                     u$.pipe(

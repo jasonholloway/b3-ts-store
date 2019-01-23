@@ -1,6 +1,6 @@
 import { Subject, from, MonoTypeOperatorFunction, zip, merge } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
-import { slicer, Ripple } from "../lib/slicer";
+import { slicer, Ripple, mapSlices } from "../lib/slicer";
 import { map, concatMap, groupBy, shareReplay, startWith } from "rxjs/operators";
 import { evaluateSlices, KnownLogs } from "../lib/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
@@ -10,6 +10,7 @@ import { specifier, Signal, newEra, emptyManifest, newManifest, Manifest } from 
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pullBlocks } from "../lib/pullBlocks";
 import { newEpoch } from "../lib/createStore";
+import { evaluateBlocks } from "../lib/evaluateBlocks";
 
 type TestRipple = Dict<number[]>
 
@@ -38,7 +39,9 @@ describe('viewer', () => {
 
         const epoch$ = zip(
                         manifest$,
-                        manifest$.pipe(pullBlocks(blockStore))
+                        manifest$.pipe(
+                            pullBlocks(blockStore),
+                            evaluateBlocks(model))
                     ).pipe(map(e => newEpoch(...e)));
 
         const era$ = merge(epoch$, signal$).pipe(
@@ -46,11 +49,12 @@ describe('viewer', () => {
                         specifier(),
                         slicer(ripple$),
                         evaluateSlices(model),
+                        mapSlices(([_, evaluable]) => evaluable),
                         pullAll());
 
         manifest$.next(emptyManifest);
 
-        view = createViewer<TestModel>(era$);
+        view = createViewer(era$);
     })
 
     afterEach(() => complete())

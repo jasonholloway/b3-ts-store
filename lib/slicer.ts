@@ -1,8 +1,8 @@
 import { Observable, empty, OperatorFunction, zip, pipe, of, MonoTypeOperatorFunction } from "rxjs";
-import { scan, concat, filter, shareReplay, window, map, skip, tap, concatMap, flatMap, concatAll, share } from "rxjs/operators";
+import { scan, concat, filter, shareReplay, window, map, skip, concatMap, flatMap, concatAll, share } from "rxjs/operators";
 import { tup, reduceToArray } from "./utils";
 import { Manifest } from "./specifier";
-import { BlockFrame } from "./pullBlocks";
+import { Evaluable } from "./evaluateSlices";
 
 
 export interface Tuple2<A, B> extends Array<A | B> {
@@ -13,7 +13,7 @@ export interface Tuple2<A, B> extends Array<A | B> {
 
 export interface Part<V> extends Tuple2<string, Observable<V>> {}
 export interface Part$<V> extends Observable<Part<V>> {}
-export interface Ripple<U> extends Part$<U> {}
+export interface Ripple<U = any> extends Part$<U> {}
 
 export interface Range extends Tuple2<number, number> {}
 export interface Slice<V> extends Tuple2<Range, V> {}
@@ -24,7 +24,7 @@ export type EraSpec = number;
 export interface Era {
     id: number,
     manifest: Manifest,
-    blocks: BlockFrame,
+    blocks: Evaluable<any>,
     thresh: number
 }
 
@@ -33,9 +33,8 @@ export interface EraWithSlices<V> extends Era {
 }
 
 
-export function slicer<
-    U, I extends Era, O extends EraWithSlices<Ripple<U>> & I>
-    (ripple$: Observable<Ripple<U>>): OperatorFunction<I, O> 
+export function slicer<U>
+    (ripple$: Observable<Ripple<U>>): OperatorFunction<Era, EraWithSlices<Ripple<U>>> 
 {
     return era$ => {
         era$ = era$.pipe(shareReplay(16));
@@ -52,12 +51,12 @@ export function slicer<
 
                     //merge in previous eras slices
                     scan(   
-                        (prev$: Observable<O>, era: EraWithSlices<Ripple<U>>) => {
+                        (prev$: Observable<EraWithSlices<Ripple<U>>>, era: EraWithSlices<Ripple<U>>) => {
                             const slices = 
                                 prev$.pipe(
                                     flatMap(prev => prev.slices),
                                     concat(era.slices),
-                                    filter(([[from, to], _]) => from >= era.thresh),                    
+                                    filter(([[from], _]) => from >= era.thresh),                    
                                     shareReplay()
                                 );
 
@@ -93,9 +92,9 @@ export function slice<V>([from, to]: Range, v: V): Slice<V> {
 }
 
 
-export function scanSlices<
-    V, Ac, I extends EraWithSlices<V>, O extends EraWithSlices<Ac> & I>
-    (fn: (a: Ac, v: V) => Ac, zero: Ac): OperatorFunction<I, O> {
+export function scanSlices
+    <V, Ac>
+    (fn: (a: Ac, v: V) => Ac, zero: Ac): OperatorFunction<EraWithSlices<V>, EraWithSlices<Ac>> {
     return pipe(
         map(era => {
             const slices = era.slices.pipe(
@@ -104,46 +103,43 @@ export function scanSlices<
                                 tup(null, zero))
                             );
 
-            return { ...era as object, slices } as O;
+            return { ...era, slices };
         })
     );
 }
 
-export function scanUnwrapSlices<
-    V, Ac, I extends EraWithSlices<V>, O extends EraWithSlices<Ac> & I>
-    (fn: (a: Observable<Ac>, v: V, era: I) => Observable<Ac>, zero: Observable<Ac> = empty()): OperatorFunction<I, O> {
-    return pipe(
-        map(era => {
-            const zeroWrapped = zero.pipe(map(z => slice([0, 0], z)));
+export const scanUnwrapSlices =
+    <V, Ac>
+    (fn: (a: Observable<Ac>, v: V, era: EraWithSlices<V>) => Observable<Ac>, zero: Observable<Ac> = empty()): OperatorFunction<EraWithSlices<V>, EraWithSlices<Ac>> =>
+        pipe(
+            map(era => {
+                const zeroWrapped = zero.pipe(map(z => slice([0, 0], z)));
 
-            const slices = era.slices.pipe(
-                            scan(
-                                (prev$: Observable<Slice<Ac>>, [range, v]: Slice<V>) => 
-                                    fn(prev$.pipe(map(([_, prev]) => prev)), v, era)
-                                        .pipe(
-                                            map(result => tup(range, result))
-                                        ),                                                 
-                                zeroWrapped),
-                            concatAll()
-                            );
+                const slices = era.slices.pipe(
+                                scan(
+                                    (prev$: Observable<Slice<Ac>>, [range, v]: Slice<V>) => 
+                                        fn(prev$.pipe(map(([_, prev]) => prev)), v, era)
+                                            .pipe(
+                                                map(result => tup(range, result))
+                                            ),                                                 
+                                    zeroWrapped),
+                                concatAll()
+                                );
 
-            return { ...era as object, slices } as O;
-        })
-    );
+                return { ...era, slices };
+            })
+        );
+
+
+
+export function mapSlices
+    <A, B>(fn: (a: A) => B): OperatorFunction<EraWithSlices<A>, EraWithSlices<B>> {
+    return scanSlices<A, B>((_, v) => fn(v), null);
 }
 
 
-
-export function mapSlices<
-    A, B, I extends EraWithSlices<A>, O extends EraWithSlices<B> & I>
-    (fn: (a: A) => B): OperatorFunction<I, O> {
-    return scanSlices<A, B, I, O>((_, v) => fn(v), null);
-}
-
-
-export function concatMapSlices<
-    A, B, I extends EraWithSlices<A>, O extends EraWithSlices<B> & I>
-    (fn: (a: A) => Observable<B>) : OperatorFunction<I, O>
+export function concatMapSlices
+    <A, B>(fn: (a: A) => Observable<B>) : OperatorFunction<EraWithSlices<A>, EraWithSlices<B>>
 {
     return pipe(
             map(era => {
@@ -152,7 +148,7 @@ export function concatMapSlices<
                                                             map(b => tup(range, b))))
                                 )
 
-                return { ...era as object, slices } as O;
+                return { ...era, slices };
             }));   
 }
 

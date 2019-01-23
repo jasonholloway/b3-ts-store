@@ -6,6 +6,8 @@ import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib
 import { pullBlocks } from "../lib/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/createStore";
+import { evaluateBlocks } from "../lib/evaluateBlocks";
+import { TestModel } from "./fakes/testModel";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
@@ -13,6 +15,8 @@ type Ripple<U> = Dict$<Observable<U>>
 jest.setTimeout(500);
 
 describe('slicer', () => {
+
+    let model = new TestModel();
 
     let blockStore: FakeBlockStore;
 
@@ -30,7 +34,9 @@ describe('slicer', () => {
 
         const epoch$ = zip(
                         manifest$,
-                        manifest$.pipe(pullBlocks(blockStore))
+                        manifest$.pipe(
+                            pullBlocks(blockStore),
+                            evaluateBlocks(model))
                     ).pipe(map(e => newEpoch(...e)));
 
         gathering = merge(epoch$, signal$).pipe(

@@ -8,6 +8,7 @@ import { specifier, Signal, newEra, newManifest, Epoch, emptyManifest, Manifest 
 import { pullBlocks, emptyBlocks } from "../lib/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/createStore";
+import { evaluateBlocks } from "../lib/evaluateBlocks";
 
 
 describe('evaluator', () => {
@@ -18,7 +19,7 @@ describe('evaluator', () => {
     let ripple$: Subject<Ripple<number>>
     let blockStore: FakeBlockStore
 
-    let era$: Observable<EraWithSlices<Evaluable<TestModel>>>
+    let era$: Observable<EraWithSlices<[Ripple, Evaluable<TestModel>]>>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
@@ -28,7 +29,9 @@ describe('evaluator', () => {
 
         const epoch$ = zip(
                         manifest$,
-                        manifest$.pipe(pullBlocks(blockStore))
+                        manifest$.pipe(
+                            pullBlocks(blockStore),
+                            evaluateBlocks(model))
                     ).pipe(map(e => newEpoch(...e)));
 
         era$ = epoch$.pipe(
@@ -165,7 +168,7 @@ describe('evaluator', () => {
         complete();
 
         const r = await era$.pipe(
-                        concatMapSlices(({logRefs, evaluate}: Evaluable<TestModel>) => 
+                        concatMapSlices(([_, {logRefs, evaluate}]) => 
                             logRefs.pipe(
                                 concatMap(ref => evaluate(ref).pipe(
                                                     map(v => tup(ref, v)))),
@@ -180,7 +183,7 @@ describe('evaluator', () => {
         complete();
 
         const r = await era$.pipe(
-                        concatMapSlices(({logRefs}: Evaluable<TestModel>) => 
+                        concatMapSlices(([_, {logRefs}]) => 
                             logRefs.pipe(reduceToArray())),                            
                         materializeSlices()
                     ).toPromise();

@@ -13,10 +13,8 @@ export const createViewer =
 
         return (ref: KnownLogs<M>) =>
             era$.pipe(
-                log('going through eras for view!'),
                 concatMap(({ slices, blocks }) =>       //a-ha... there are no slices at the beginning...
                     slices.pipe(
-                        log('Viewing slice'),
                         concatMap(([_, {evaluate}]) => evaluate(ref)),
                         // startWith( blocks. )
                         )),

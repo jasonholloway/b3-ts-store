@@ -1,14 +1,14 @@
-import { Dict, tup, log } from "./utils";
+import { Dict, tup } from "./utils";
 import { Era, Tuple2 } from "./slicer";
-import { OperatorFunction, pipe, Observable, empty, of } from "rxjs";
-import { scan, map, concatAll, defaultIfEmpty } from "rxjs/operators";
-import { BlockFrame, emptyBlocks } from "./pullBlocks";
+import { OperatorFunction, pipe, Observable, of } from "rxjs";
+import { scan, map, concatAll } from "rxjs/operators";
+import { Evaluable } from "./evaluateSlices";
 
 export type RefreshEra = ['RefreshEra']
 export type SetThreshold = ['SetThreshold', number]
 export type NewManifest = ['NewManifest', Manifest]
 
-export interface Epoch extends Tuple2<'Epoch', [Manifest, BlockFrame]> {}
+export interface Epoch extends Tuple2<'Epoch', [Manifest, Evaluable<any>]> {}
 
 export type Signal = RefreshEra | NewManifest | SetThreshold | Epoch
 
@@ -35,13 +35,14 @@ export const setThreshold =
     
 export const emptyManifest: Manifest = { version: 0, logBlocks: {} }
 
-const emptyEra: Era = { id: 0, manifest: emptyManifest, thresh: 0, blocks: emptyBlocks  };
+
+const emptyEra = { id: 0, manifest: emptyManifest, thresh: 0, blocks: null };
 
 
 export function specifier() : OperatorFunction<Signal, Era> {
     return pipe(
-        scan<Signal, Observable<Era>>(
-            (prev$, signal) => {
+        scan(
+            (prev$: Observable<Era>, signal: Signal) => {
                 switch(signal[0]) {
                     case 'Epoch': {
                         const [manifest, blocks] = signal[1];

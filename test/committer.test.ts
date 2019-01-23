@@ -22,7 +22,7 @@ describe('committer', () => {
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
-    let era$: Observable<EraWithSlices<Evaluable<TestModel>>>
+    let era$: Observable<EraWithSlices<[Ripple, Evaluable<TestModel>]>>
     let commit$: Observable<Commit>
 
     beforeEach(() => {
@@ -31,14 +31,14 @@ describe('committer', () => {
         doCommit$ = new Subject<DoCommit>();
 
         era$ = epoch$.pipe(
-                startWith(newEpoch(emptyManifest, emptyBlocks)),
+                startWith(newEpoch(emptyManifest)),
                 specifier(),
                 slicer(ripple$),
                 evaluateSlices(model),
                 pullAll());
 
         commit$ = doCommit$.pipe(
-                    committer(model, era$, null),
+                    committer(era$, null),
                     pullAllCommits());
     })
 

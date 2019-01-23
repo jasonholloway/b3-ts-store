@@ -5,8 +5,9 @@ import { concatMap, tap, mapTo, catchError } from "rxjs/operators";
 import { enumerate } from "./utils";
 import { Manifest } from "./specifier";
 import { PullManifest } from "./pullManifests";
+import { Model } from "./evaluateSlices";
 
-export const pusher = 
+export const pusher =
     (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<Commit, Commit> =>
     pipe(
         concatMap(commit =>
