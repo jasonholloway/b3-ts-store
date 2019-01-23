@@ -1,8 +1,11 @@
-import { Observable, Subject, from, OperatorFunction, pipe } from "rxjs";
+import { Observable, Subject, from, OperatorFunction, pipe, zip, merge } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
-import { map, concatMap, startWith } from "rxjs/operators";
+import { map, concatMap } from "rxjs/operators";
 import { Range, slicer, EraWithSlices } from "../lib/slicer";
-import { EraWithSpec, emptyManifest } from "../lib/specifier";
+import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib/specifier";
+import { serveBlocks } from "../lib/serveBlocks";
+import FakeBlockStore from "./fakes/FakeBlockStore";
+import { newEpoch } from "../lib/createStore";
 
 type Dict$<V> = Observable<[string, V]>
 type Ripple<U> = Dict$<Observable<U>>
@@ -11,19 +14,32 @@ jest.setTimeout(500);
 
 describe('slicer', () => {
 
-    let ripples: Subject<Ripple<number>>
-    let eras: Subject<EraWithSpec>
+    let blockStore: FakeBlockStore;
+
+    let manifest$: Subject<Manifest>
+    let ripple$: Subject<Ripple<number>>
+    let signal$: Subject<Signal>
     let gathering: Promise<[Range, Dict<number[]>][]>
 
     beforeEach(() => {
-        eras = new Subject<EraWithSpec>();
-        ripples = new Subject<Ripple<number>>();
+        blockStore = new FakeBlockStore();
 
-        gathering = eras.pipe(
-                        startWith({ id: 0, thresh: 0, manifest: emptyManifest }),
-                        slicer(ripples),
+        manifest$ = new Subject<Manifest>();
+        signal$ = new Subject<Signal>();
+        ripple$ = new Subject<Ripple<number>>();
+
+        const epoch$ = zip(
+                        manifest$,
+                        manifest$.pipe(serveBlocks(blockStore))
+                    ).pipe(map(e => newEpoch(...e)));
+
+        gathering = merge(epoch$, signal$).pipe(
+                        specifier(),
+                        slicer(ripple$),
                         materializeEras()
                     ).toPromise();
+
+        manifest$.next(emptyManifest);
     })
 
     it('single slice appears in output', async () => {
@@ -118,17 +134,17 @@ describe('slicer', () => {
 
 
     function complete() {
-        ripples.complete();
-        eras.complete();
+        ripple$.complete();
+        signal$.complete();
         return gathering;
     }
 
     function threshold(n: number) {
-        eras.next({ id: 0, thresh: n, manifest: emptyManifest });
+        signal$.next(setThreshold(n));
     }
     
     function ripple(sl: Dict<number[]>) {
-        ripples.next(
+        ripple$.next(
              from(enumerate(sl))
                  .pipe(map(([k, r]) => tup(k, from(r))))
         );

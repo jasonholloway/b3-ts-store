@@ -7,7 +7,6 @@ import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { EraWithSpec } from "../lib/specifier";
 import { pause } from "./utils";
 import { Store, createStore } from "../lib/createStore";
 
@@ -25,7 +24,7 @@ describe('store', () => {
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
-    let era$: Observable<EraWithSlices<Evaluable<TestModel>> & EraWithSpec>
+    let era$: Observable<EraWithSlices<Evaluable<TestModel>>>
     let commit$: Observable<Commit>
 
     let store: Store<TestModel>
@@ -44,6 +43,27 @@ describe('store', () => {
 
         era$ = store.era$.pipe(pullAll());
         commit$ = store.commit$.pipe(pullAllCommits());
+    })
+
+    describe('viewing', () => {
+
+        it('serves views of staged updates', async () => {
+            emit({ myLog: [ 5, 6, 7 ] });
+            await pause();
+            complete();
+
+            const r = await toArray(store.view('myLog'));
+            expect(r).toEqual([ '5,6,7' ]);
+        })
+
+        it('serves views of existing blocks', async () => {
+            await pause();
+            complete();
+
+            const r = await toArray(store.view('myLog2'));
+            expect(r).toEqual([ '4,5,6' ]);
+        })
+
     })
 
 
@@ -120,29 +140,6 @@ describe('store', () => {
             expect(errs).toMatchObject([ 'Newer manifest in place!' ]);
         })
     })
-
-
-    describe('viewing', () => {
-
-        it('serves views of staged updates', async () => {
-            emit({ myLog: [ 5, 6, 7 ] });
-            await pause();
-            complete();
-
-            const r = await toArray(store.view('myLog'));
-            expect(r).toEqual([ '5,6,7' ]);
-        })
-
-        it('serves views of existing blocks', async () => {
-            await pause();
-            complete();
-
-            const r = await toArray(store.view('myLog2'));
-            expect(r).toEqual([ '4,5,6' ]);
-        })
-
-    })
-
 
 
     function getManifestVersions() {

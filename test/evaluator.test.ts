@@ -1,12 +1,13 @@
 import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices, Ripple } from "../lib/slicer";
-import { Subject, from, empty, Observable } from "rxjs";
+import { Subject, from, empty, Observable, zip } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate } from "../lib/utils";
 import { startWith, map, concatMap, groupBy } from "rxjs/operators";
 import { Evaluable, evaluate } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
-import { specifier, Signal, newEra, newManifest } from "../lib/specifier";
-import { serveBlocks } from "../lib/serveBlocks";
+import { specifier, Signal, newEra, newManifest, Epoch, emptyManifest, Manifest } from "../lib/specifier";
+import { serveBlocks, emptyBlocks } from "../lib/serveBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
+import { newEpoch } from "../lib/createStore";
 
 
 
@@ -14,25 +15,30 @@ describe('evaluator', () => {
 
     const model = new TestModel();
 
-    let signal$: Subject<Signal>
+    let manifest$: Subject<Manifest>;
     let ripple$: Subject<Ripple<number>>
     let blockStore: FakeBlockStore
 
-    let gathering: Observable<EraWithSlices<Evaluable<TestModel>>>
+    let era$: Observable<EraWithSlices<Evaluable<TestModel>>>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
 
-        signal$ = new Subject<Signal>();
+        manifest$ = new Subject<Manifest>();
         ripple$ = new Subject<Ripple<number>>();
 
-        gathering = signal$.pipe(
-                        startWith(newEra()),
-                        specifier(),
-                        serveBlocks(blockStore),
-                        slicer(ripple$),
-                        evaluate(model))
-                    .pipe(pullAllSlices());
+        const epoch$ = zip(
+                        manifest$,
+                        manifest$.pipe(serveBlocks(blockStore))
+                    ).pipe(map(e => newEpoch(...e)));
+
+        era$ = epoch$.pipe(
+                specifier(),
+                slicer(ripple$),
+                evaluate(model),
+                pullAllSlices());
+
+        manifest$.next(emptyManifest);
     })
 
 
@@ -103,12 +109,12 @@ describe('evaluator', () => {
                 block1: { myLog: [ 3, 4 ] }
             };
 
-            signal$.next(newManifest({
+            manifest$.next({
                 version: 1,
                 logBlocks: {
                     myLog: ['block0', 'block1']
                 }
-            }));
+            });
 
             await expectAggrs([
                 [
@@ -150,7 +156,7 @@ describe('evaluator', () => {
 
     function complete() {
         ripple$.complete();
-        signal$.complete();
+        manifest$.complete();
     }
 
 
@@ -159,7 +165,7 @@ describe('evaluator', () => {
     async function expectAggrs(expected: Slice<Dict<any>>[][]) {
         complete();
 
-        const r = await gathering.pipe(
+        const r = await era$.pipe(
                         concatMapSlices(({logRefs, evaluate}: Evaluable<TestModel>) => 
                             logRefs.pipe(
                                 concatMap(ref => evaluate(ref).pipe(
@@ -174,7 +180,7 @@ describe('evaluator', () => {
     async function expectLogRefs(expected: Slice<string[]>[][]) {
         complete();
 
-        const r = await gathering.pipe(
+        const r = await era$.pipe(
                         concatMapSlices(({logRefs}: Evaluable<TestModel>) => 
                             logRefs.pipe(reduceToArray())),                            
                         materializeSlices()

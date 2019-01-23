@@ -1,10 +1,11 @@
-import { Subject, Observable, of, forkJoin } from "rxjs";
+import { Subject, Observable, of, forkJoin, zip } from "rxjs";
 import { reduceToArray } from "../lib/utils";
-import { pullAll } from "../lib/slicer";
-import { concatMap, tap, catchError } from "rxjs/operators";
+import { pullAll, Era } from "../lib/slicer";
+import { concatMap, catchError, map } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { EraWithBlocks, serveBlocks } from "../lib/serveBlocks";
-import { Signal, specifier } from "../lib/specifier";
+import { serveBlocks } from "../lib/serveBlocks";
+import { specifier, Manifest } from "../lib/specifier";
+import { newEpoch } from "../lib/createStore";
 
 jest.setTimeout(400);
 
@@ -12,9 +13,9 @@ describe('serveBlocks', () => {
 
     let blockStore: FakeBlockStore
 
-    let signal$: Subject<Signal>
+    let manifest$: Subject<Manifest>
 
-    let era$: Observable<EraWithBlocks>
+    let era$: Observable<Era>
 
     let results: any[];
 
@@ -23,14 +24,18 @@ describe('serveBlocks', () => {
     })
 
     beforeEach(async () => {
-        signal$ = new Subject<Signal>();
+        manifest$ = new Subject<Manifest>();
 
-        era$ = signal$.pipe(
+        const epoch$ = zip(
+                        manifest$,
+                        manifest$.pipe(serveBlocks(blockStore))
+                        ).pipe(map(e => newEpoch(...e)));
+
+        era$ = epoch$.pipe(
                     specifier(),
-                    serveBlocks(blockStore),
                     pullAll());
 
-        signal$.next(['NewManifest', { version: 0, logBlocks: {} }]);
+        manifest$.next({ version: 0, logBlocks: {} });
 
         [results] = await forkJoin(
                             era$.pipe(
@@ -90,7 +95,7 @@ describe('serveBlocks', () => {
 
     async function complete() {
         await of().toPromise();
-        signal$.complete();
+        manifest$.complete();
     }
 
 })

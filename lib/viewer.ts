@@ -1,7 +1,8 @@
 import { Model, KnownLogs, KnownAggr, Evaluable } from "./evaluate";
 import { Observable } from "rxjs";
-import { shareReplay, concatMap, debounceTime } from "rxjs/operators";
+import { shareReplay, concatMap, debounceTime, startWith } from "rxjs/operators";
 import { EraWithSlices } from "./slicer";
+import { log } from "./utils";
 
 export type Viewer<M extends Model> =
         <K extends KnownLogs<M>>(ref: K) => Observable<KnownAggr<M, K>>
@@ -15,10 +16,18 @@ export function createViewer<M extends Model>(era$: Observable<EraWithSlices<Eva
 
     return (ref: KnownLogs<M>) =>
         era$.pipe(
-            concatMap(({ slices }) =>
+            concatMap(({ slices, blocks }) =>       //a-ha... there are no slices at the beginning...
                 slices.pipe(
-                    concatMap(([_, {evaluate}]) => evaluate(ref))
+                    log('Viewing slice'),
+                    concatMap(([_, {evaluate}]) => evaluate(ref)),
+                    // startWith( blocks. )
                     )),
             debounceTime(1) //something of a bodge: ultimately, epoch-number + slice-number + last era command = means of doing this deterministically
             );
 }
+
+
+
+//
+//
+//

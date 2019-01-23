@@ -1,32 +1,34 @@
 import { Observable, OperatorFunction, pipe, from, empty } from "rxjs";
 import { LogRef } from "./evaluate";
-import { BlockStore } from "./bits";
-import { map, concatMap } from "rxjs/operators";
-import { EraWithSpec } from "./specifier";
+import { BlockStore, Block } from "./bits";
+import { map, concatMap, scan, concatAll } from "rxjs/operators";
+import { Manifest } from "./specifier";
+import { Dict } from "./utils";
 
 export type BlockRef = string
-   
-
-export interface EraWithBlocks { 
-    blocks: BlockFrame
-}
 
 export interface BlockFrame {
+    blocks: Dict<Block>,
+
     load: (blockRef: BlockRef) => (logRef: LogRef) => Observable<any>
 }
 
-export const serveBlocks =
-    <I extends EraWithSpec, O extends EraWithBlocks & I>
-    (blockStore: BlockStore) : OperatorFunction<I, O> =>
-        pipe(
-            map(era => ({
-                ...era as object, 
-                blocks: {
-                    load: (blockRef: BlockRef) => (logRef: LogRef) =>
-                            from(blockStore.load(blockRef))                            
-                                .pipe(concatMap(b => b[logRef] || empty()))
+export const emptyBlocks: BlockFrame = { blocks: {}, load: () => () => empty() };
 
-                } as BlockFrame
-            } as O))
+
+export const serveBlocks =
+    (blockStore: BlockStore) : OperatorFunction<Manifest, BlockFrame> =>
+        pipe(
+            scan<Manifest, Observable<BlockFrame>>(
+                (prev$, {logBlocks}) => 
+                    prev$.pipe(
+                        map(prev => ({
+                            blocks: {},
+                            load: (blockRef: BlockRef) => (logRef: LogRef) => 
+                                    from(blockStore.load(blockRef))
+                                        .pipe(concatMap(b => b[logRef] || empty()))
+                        }))),
+                empty()
+            ),
+            concatAll()
         );
-        

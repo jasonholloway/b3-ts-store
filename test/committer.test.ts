@@ -1,14 +1,14 @@
 import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject } from "rxjs";
 import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
 import { slicer, Ripple, EraWithSlices, pullAll } from "../lib/slicer";
-import { map, concatMap, groupBy } from "rxjs/operators";
+import { map, concatMap, groupBy, startWith } from "rxjs/operators";
 import { evaluate, Evaluable } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/committer";
-import { EraWithSpec, emptyManifest } from "../lib/specifier";
-import FakeBlockStore from "./fakes/FakeBlockStore";
-import { serveBlocks } from "../lib/serveBlocks";
+import { emptyManifest, specifier, Epoch } from "../lib/specifier";
 import { pause } from "./utils";
+import { newEpoch } from "../lib/createStore";
+import { emptyBlocks } from "../lib/serveBlocks";
 
 type TestRipple = Dict<number[]>
 
@@ -17,33 +17,29 @@ jest.setTimeout(400);
 describe('committer', () => {
 
     const model = new TestModel();
-    let blockStore: FakeBlockStore
 
-    let spec$: Subject<EraWithSpec>
+    let epoch$: Subject<Epoch>
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
-    let era$: Observable<EraWithSpec & EraWithSlices<Evaluable<TestModel>>>
+    let era$: Observable<EraWithSlices<Evaluable<TestModel>>>
     let commit$: Observable<Commit>
 
     beforeEach(() => {
-        blockStore = new FakeBlockStore();
-
-        spec$ = new Subject<EraWithSpec>();
+        epoch$ = new Subject<Epoch>();
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        era$ = spec$.pipe(
+        era$ = epoch$.pipe(
+                startWith(newEpoch(emptyManifest, emptyBlocks)),
+                specifier(),
                 slicer(ripple$),
-                serveBlocks(blockStore),
                 evaluate(model),
                 pullAll());
 
         commit$ = doCommit$.pipe(
                     committer(model, era$, null),
                     pullAllCommits());
-                    
-        spec$.next({ id: 0, thresh: 0, manifest: emptyManifest });
     })
 
     afterEach(complete)
@@ -110,7 +106,7 @@ describe('committer', () => {
 
     function complete() {
         ripple$.complete();
-        spec$.complete();
+        epoch$.complete();
         doCommit$.complete();
     }
 

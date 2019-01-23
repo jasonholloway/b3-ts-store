@@ -2,6 +2,150 @@
 so, evaluator loads from blocks, via latest manifest;
 we want to test staging, committing and loading
 
+------------------------------------------------------------
+
+
+so, calling evaluate on a slice alone
+is a bit of a handicap here
+
+in fact, the above wouldn't work with multiple slices anyway?
+it wouldn't... evaluate should always be called on the last seen slice
+we'd want switchMap
+
+but the original problem remains: how to evaluate if there are no slices whatsoever?
+maybe - there should always be a slice open,
+taking in ripples
+
+but there's strictly one ripple per slice
+a ripple is an atomic unit of updates: you can take it or leave it, but not split it, and not mung it together without preserving its atomism
+
+and here, effectively, we are requiring there to be a ripple posted for us to be able to view anything
+which is daft
+
+the whle idea of using the Evaluable here breaks down if we don't have an object to evalaluate
+
+-----
+
+so - possibilities:
+- the Evaluator could stick an Evaluable over the Blocks property of the era
+- then, if slices were empty, the viewer would begin with the block evaluable
+
+here's something though: what about the problem of duplication?
+if the viewer were to *always*, on /every era/ aggregate from blocks and then separately from each encountered slice...
+
+the Slices themselves are thankfully memoized; the problem is with summoning up from the bowels of the BlockStore intrusively from the top
+and in the Evaluator itself this problem occurs, in that the slice evaluation has a special case for reaching into the blocks
+
+though the block server also does memoization(?) - no, it can't, as it doesn't evaluate
+
+evaluation has to be done, and stored
+
+with slices, there's the possibility of living on across eras (not yet done, however, at the level of evaluation!)
+with blocks, we could do the same: memoise evaluations per era
+
+gah - the thought of re-reading entire histories with each new era is gruesome, but it'd work
+
+so: as a first step, just plonk the evaluated block thing...
+
+---
+
+hmm wait a sec. evaluations are done /per view/ so they can't be simply cached in place, unless we were to have a lookup (not that unreasonable...)
+ie a lookup of already-accumulating views. aslong as there were 1 subscriber to the view, it would be available to multicast
+
+if a view lapsed, and was re-viewed, then aggregation would proceed from the start (otherwise we'd have to do time-based garbage collection)
+
+these lookups would be - per-slice???
+then a similar lookup would be in place in the block 'slice'
+
+--------
+
+the Evaluator should create one Evaluable per slice, and one Evaluable for blocks
+
+each evaluable would then have an opporunity to shareReplay its views, via a map
+this map would then be a memory leak: some kind of cache thing would have to be used instead of a simple map, which is a shame
+
+but this would be an optimisation, and would rely on common evaluable objects being a thing
+
+--------------------------------------------------------------------------------
+
+seems i forgot about the notion of the BlockFrame: an immutable representation of the block cache,
+one per era
+
+but the Blocks are timeless... they exist outside of era time, and so the BlockFrame makes no sense
+well... actually it does, as a BlockFrame would be a suitable cache
+
+blocks that were no longer referred to from a successor frame could just not be copied over
+
+but this seems again a bind... really we want a simple cache of blocks... 
+otherwise, as each era began, we'd have to cross-reference all existing Blocks with those that were needed
+
+all Blocks referred to would exist as possibilities, lazy fetchables
+a cell in the honeycomb, waiting to be filled
+
+then when the new era began, with the new manifest, these blocks, with their data, would be copied over
+
+----
+
+what would happen when a block is stored?
+up till now i've imagined a shortcut that plonks the formed block into the store
+
+under the above model, this 'plonking' wouldn't be possible without the commencement of a brand new era
+
+so a commit, when successful, would include a newly-formed and successfully-committed block; this block would tumble out of the commit pipeline,
+ready to be decocted and piped into a new BlockFrame
+
+----
+
+there's no need for BlockFrames to go at the same pace as Eras:
+as long the latest manifest (which would also be shortcircuited on commit)
+determined the BlockFrame, and /then/ the era of slices began
+
+new manifests must create new BlockFrames (which would be rolled together from the previous BlockFrame)
+which must be in place for a new Era
+
+though an Era could just happen afresh, with the same BlockFrame and Manifest if needed
+
+----
+
+so:
+a BlockFrame will be a set of lazily-realizable block streams, unique to each emitted manifest
+
+and, just as the underlying data is scanned through time at its own discrete pace
+so will evaluations proceed similarly
+
+there will be a cache of per-log evaluations
+or, in keeping with the determinism of the data storage,
+why not have a lazily-realiable set of per-log streams?
+
+this idea of each block and each log being /real/ before its time would create problems if there were very many of them
+
+but whatevs; a simple beginning would be to forget about the caching of evaluables: it can be finessed later when more about everything is known
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

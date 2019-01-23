@@ -1,9 +1,7 @@
 import { Observable, OperatorFunction, pipe, of, empty, concat, from } from "rxjs";
 import { EraWithSlices, scanUnwrapSlices, pullAll, Ripple, Slice$, Era } from "./slicer";
 import { concatMap, defaultIfEmpty, filter, scan, concatAll, map, tap } from "rxjs/operators";
-import { Model as LogModel } from './bits'
-import { EraWithBlocks } from "./serveBlocks";
-import { EraWithSpec } from "./specifier";
+import { Model as LogModel, BlockStore } from './bits'
 
 export type LogRef = string;
 
@@ -31,8 +29,8 @@ function createEvaluable<M extends Model>(raw: Evaluable<M>) : Evaluable<M> {
 
 
 export const evaluate = 
-    <U, M extends Model, I extends EraWithSlices<Ripple<U>> & EraWithBlocks & EraWithSpec, O extends EraWithSlices<Evaluable<M>> & I>
-    (model: M) : OperatorFunction<I, O> => 
+    <U, M extends Model, I extends EraWithSlices<Ripple<U>>>
+    (model: M) : OperatorFunction<I, EraWithSlices<Evaluable<M>> & I> => 
         pipe(
             scanUnwrapSlices(
                 (prev$: Observable<Evaluable<M>>, curr$: Ripple<U>, era: I) => of(
@@ -41,6 +39,7 @@ export const evaluate =
                         logRefs: curr$.pipe(
                                     concatMap(([key]) => isKnownLog(model, key) ? [key] : [])
                                     ),
+
                         evaluate(ref) {
                             const m = model.logs[ref];
 
@@ -59,11 +58,12 @@ export const evaluate =
                                     concatMap(([_, u$]) => u$.pipe(scan(m.add, ac))))
                                 ));
                         }
-                    })))
-            );
+                    }))),
+            map(era => Object.assign({}, era))
+        );
 
 
-function loadFromBlocks(era: EraWithSpec & EraWithBlocks, logRef: string) : Observable<any> {
+function loadFromBlocks(era: Era, logRef: string) : Observable<any> {
     const blockRef$ = from(era.manifest.logBlocks[logRef] || []);
     return blockRef$.pipe(
             concatMap(blockRef => era.blocks.load(blockRef)(logRef)));

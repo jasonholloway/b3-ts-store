@@ -1,4 +1,4 @@
-import { Subject, from, MonoTypeOperatorFunction } from "rxjs";
+import { Subject, from, MonoTypeOperatorFunction, zip, merge } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
 import { slicer, Ripple } from "../lib/slicer";
 import { map, concatMap, groupBy, shareReplay, startWith } from "rxjs/operators";
@@ -6,9 +6,10 @@ import { evaluate, KnownLogs } from "../lib/evaluate";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/committer";
 import { Viewer, createViewer } from "../lib/viewer";
-import { specifier, Signal, newEra, emptyManifest, newManifest } from "../lib/specifier";
+import { specifier, Signal, newEra, emptyManifest, newManifest, Manifest } from "../lib/specifier";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { serveBlocks } from "../lib/serveBlocks";
+import { newEpoch } from "../lib/createStore";
 
 type TestRipple = Dict<number[]>
 
@@ -20,6 +21,7 @@ describe('viewer', () => {
 
     let blockStore: FakeBlockStore
 
+    let manifest$: Subject<Manifest>
     let signal$: Subject<Signal>
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
@@ -33,13 +35,19 @@ describe('viewer', () => {
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        const era$ = signal$.pipe(
+        const epoch$ = zip(
+                        manifest$,
+                        manifest$.pipe(serveBlocks(blockStore))
+                    ).pipe(map(e => newEpoch(...e)));
+
+        const era$ = merge(epoch$, signal$).pipe(
                         startWith(newEra()),
                         specifier(),
-                        serveBlocks(blockStore),
                         slicer(ripple$),
                         evaluate(model),
                         pullAll());
+
+        manifest$.next(emptyManifest);
 
         view = createViewer<TestModel>(era$);
     })

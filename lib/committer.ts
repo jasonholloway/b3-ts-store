@@ -1,21 +1,21 @@
 import { Evaluable, Model } from "./evaluate";
 import { Observable, OperatorFunction, Observer, pipe, empty } from "rxjs";
 import { share, withLatestFrom, concatMap, take, map, tap, mapTo, subscribeOn } from "rxjs/operators";
-import { EraWithSlices, Slice } from "./slicer";
-import { RefreshEra, EraWithSpec, newEra } from "./specifier";
+import { EraWithSlices, Slice, Era } from "./slicer";
+import { RefreshEra, newEra } from "./specifier";
 import { reduceToDict, reduceToArray, tup, Dict } from "./utils";
 
 export type DoCommit = {}
 
 export interface Commit {
-    era: EraWithSpec
+    era: Era
     data: Dict<any[]>
     extent: number,
     errors: Observable<Error>
 }
 
 export const committer =
-    <M extends Model, E extends EraWithSpec & EraWithSlices<Evaluable<M>>>
+    <M extends Model, E extends EraWithSlices<Evaluable<M>>>
     (_: M, era$: Observable<E>, refreshEra$: Observer<RefreshEra>) : OperatorFunction<DoCommit, Commit> =>
         doCommit$ => {
             const c$ = doCommit$.pipe(
@@ -34,7 +34,7 @@ export const committer =
         };
         
 
-function materialize<M extends Model>(era: EraWithSpec) : OperatorFunction<Slice<Evaluable<M>>, Commit> {
+function materialize<M extends Model>(era: Era) : OperatorFunction<Slice<Evaluable<M>>, Commit> {
     return pipe(
         concatMap(([_, {data}]) =>
             data.pipe(

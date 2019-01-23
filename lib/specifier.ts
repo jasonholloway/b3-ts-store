@@ -1,13 +1,16 @@
 import { Dict, tup } from "./utils";
-import { Era } from "./slicer";
-import { OperatorFunction, pipe } from "rxjs";
-import { scan, map } from "rxjs/operators";
+import { Era, Tuple2 } from "./slicer";
+import { OperatorFunction, pipe, Observable, empty } from "rxjs";
+import { scan, map, concatAll } from "rxjs/operators";
+import { BlockFrame } from "./serveBlocks";
 
 export type RefreshEra = ['RefreshEra']
 export type SetThreshold = ['SetThreshold', number]
 export type NewManifest = ['NewManifest', Manifest]
 
-export type Signal = RefreshEra | NewManifest | SetThreshold
+export interface Epoch extends Tuple2<'Epoch', [Manifest, BlockFrame]> {}
+
+export type Signal = RefreshEra | NewManifest | SetThreshold | Epoch
 
 
 
@@ -29,32 +32,36 @@ export const setThreshold =
 
 
 
-
-
-export interface EraWithSpec extends Era {
-    thresh: number,
-    manifest: Manifest
-}
     
 export const emptyManifest: Manifest = { version: 0, logBlocks: {} }
-    
-    
-export function specifier() : OperatorFunction<Signal, EraWithSpec> {
+
+
+export function specifier() : OperatorFunction<Signal, Era> {
     return pipe(
-        scan(
-            (prev: EraWithSpec, signal: Signal) => {
+        scan<Signal, Observable<Era>>(
+            (prev$, signal) => {
                 switch(signal[0]) {
-                    case 'NewManifest':
-                        return { ...prev, manifest: signal[1] };
-
-                    case 'SetThreshold':
-                        return { ...prev, thresh: signal[1] };
-
+                    case 'Epoch': {
+                        const [manifest, blocks] = signal[1];
+                        return prev$.pipe(
+                                map(prev => ({ ...prev, manifest, blocks })));
+                        }
+                    case 'NewManifest': {
+                        const manifest = signal[1];
+                        return prev$.pipe(
+                                map(prev => ({ ...prev, manifest })));
+                        }
+                    case 'SetThreshold': {
+                        const thresh = signal[1];
+                        return prev$.pipe(
+                                map(prev => ({ ...prev, thresh })));
+                        }
                     default:
-                        return prev;
+                        return prev$;
                 }
             },
-            { id: 0, thresh: 0, manifest: emptyManifest }),
+            empty()),
+        concatAll(),
         map((era, id) => ({ ...era, id }))
     );
 }

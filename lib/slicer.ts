@@ -1,7 +1,8 @@
 import { Observable, empty, OperatorFunction, zip, pipe, of, MonoTypeOperatorFunction } from "rxjs";
 import { scan, concat, filter, shareReplay, window, map, skip, tap, concatMap, flatMap, concatAll, share } from "rxjs/operators";
 import { tup, reduceToArray } from "./utils";
-import { EraWithSpec } from "./specifier";
+import { Manifest } from "./specifier";
+import { BlockFrame } from "./serveBlocks";
 
 
 export interface Tuple2<A, B> extends Array<A | B> {
@@ -21,7 +22,10 @@ export type Slice$<V> = Observable<Slice<V>>
 export type EraSpec = number;
 
 export interface Era {
-    id: number
+    id: number,
+    manifest: Manifest,
+    blocks: BlockFrame,
+    thresh: number
 }
 
 export interface EraWithSlices<V> extends Era {
@@ -30,7 +34,7 @@ export interface EraWithSlices<V> extends Era {
 
 
 export function slicer<
-    U, I extends EraWithSpec, O extends EraWithSlices<Ripple<U>> & I>
+    U, I extends Era, O extends EraWithSlices<Ripple<U>> & I>
     (ripple$: Observable<Ripple<U>>): OperatorFunction<I, O> 
 {
     return era$ => {
@@ -44,11 +48,11 @@ export function slicer<
         return zip(era$, window$)
                 .pipe(
                     //simple era with latest slices
-                    map(([era, slices]) => ({ ...era as EraWithSpec, slices })),
+                    map(([era, slices]) => ({ ...era as Era, slices })),
 
                     //merge in previous eras slices
                     scan(   
-                        (prev$: Observable<O>, era: EraWithSlices<Ripple<U>> & EraWithSpec) => {
+                        (prev$: Observable<O>, era: EraWithSlices<Ripple<U>>) => {
                             const slices = 
                                 prev$.pipe(
                                     flatMap(prev => prev.slices),
