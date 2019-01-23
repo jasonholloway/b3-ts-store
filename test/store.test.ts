@@ -37,7 +37,8 @@ describe('store', () => {
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        manifestStore.manifest = { version: 10, logBlocks: {} };
+        manifestStore.manifest = { version: 10, logBlocks: { myLog2: [ 'block1' ] } };
+        blockStore.blocks = { block1: { myLog2: [ 4, 5, 6 ] } }
 
         store = createStore(model, blockStore, manifestStore)(ripple$, doCommit$);
 
@@ -119,6 +120,29 @@ describe('store', () => {
             expect(errs).toMatchObject([ 'Newer manifest in place!' ]);
         })
     })
+
+
+    describe('viewing', () => {
+
+        it('serves views of staged updates', async () => {
+            emit({ myLog: [ 5, 6, 7 ] });
+            await pause();
+            complete();
+
+            const r = await toArray(store.view('myLog'));
+            expect(r).toEqual([ '5,6,7' ]);
+        })
+
+        it('serves views of existing blocks', async () => {
+            await pause();
+            complete();
+
+            const r = await toArray(store.view('myLog2'));
+            expect(r).toEqual([ '4,5,6' ]);
+        })
+
+    })
+
 
 
     function getManifestVersions() {
