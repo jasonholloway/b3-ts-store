@@ -1,23 +1,18 @@
-import { Subject, Observable, of, forkJoin, zip } from "rxjs";
+import { Subject, of, forkJoin } from "rxjs";
 import { reduceToArray } from "../lib/utils";
-import { pullAll, Era } from "../lib/slicer";
-import { concatMap, catchError, map } from "rxjs/operators";
+import { pullAll } from "../lib/slicer";
+import { concatMap, catchError, startWith } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { serveBlocks } from "../lib/serveBlocks";
-import { specifier, Manifest } from "../lib/specifier";
-import { newEpoch } from "../lib/createStore";
+import { pullBlocks } from "../lib/pullBlocks";
+import { Manifest, emptyManifest } from "../lib/specifier";
 
 jest.setTimeout(400);
 
-describe('serveBlocks', () => {
+describe('pullBlocks', () => {
 
     let blockStore: FakeBlockStore
-
     let manifest$: Subject<Manifest>
-
-    let era$: Observable<Era>
-
-    let results: any[];
+    let results: any[]
 
     beforeAll(() => {
         blockStore = new FakeBlockStore();
@@ -26,21 +21,15 @@ describe('serveBlocks', () => {
     beforeEach(async () => {
         manifest$ = new Subject<Manifest>();
 
-        const epoch$ = zip(
-                        manifest$,
-                        manifest$.pipe(serveBlocks(blockStore))
-                        ).pipe(map(e => newEpoch(...e)));
-
-        era$ = epoch$.pipe(
-                    specifier(),
-                    pullAll());
-
-        manifest$.next({ version: 0, logBlocks: {} });
-
+        const frame$ = manifest$.pipe(
+                        startWith(emptyManifest),
+                        pullBlocks(blockStore),
+                        pullAll());
+                        
         [results] = await forkJoin(
-                            era$.pipe(
-                                concatMap(era =>
-                                    era.blocks.load('block0')('myLog')
+                            frame$.pipe(
+                                concatMap(frame =>
+                                    frame.load('block0')('myLog')
                                         .pipe(catchError(err => of(err)))),
                                 reduceToArray()),
                             complete())

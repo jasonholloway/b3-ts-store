@@ -1,15 +1,16 @@
-import { Model, evaluate, LogRef, Evaluable, KnownLogs, KnownAggr } from "./evaluate";
+import { Model, evaluateSlices, LogRef, Evaluable, KnownLogs, KnownAggr } from "./evaluateSlices";
 import { BlockStore, ManifestStore } from "./bits";
-import { startWith, share, mapTo, map } from "rxjs/operators";
+import { startWith, share, mapTo, map, shareReplay } from "rxjs/operators";
 import { newEra, specifier, Signal, Manifest, Epoch } from "./specifier";
-import { serveBlocks, BlockFrame } from "./serveBlocks";
+import { pullBlocks as pullBlocks, BlockFrame } from "./pullBlocks";
 import { slicer, Ripple, EraWithSlices } from "./slicer";
 import { committer, DoCommit, Commit } from "./committer";
-import { Observable, Subject, merge, empty, zip } from "rxjs";
-import { puller, PullManifest, pullManifest } from "./puller";
+import { Observable, Subject, merge, empty, zip, OperatorFunction, pipe } from "rxjs";
+import { pullManifests, PullManifest, pullManifest } from "./pullManifests";
 import { pusher } from "./pusher";
 import { createViewer } from "./viewer";
-import { tup } from "./utils";
+import { tup, log } from "./utils";
+import { evaluateBlocks } from "./evaluateBlocks";
 
 
 export interface Store<M extends Model> {
@@ -32,19 +33,21 @@ export const createStore =
     const signal$ = new Subject<Signal>();
 
     const manifest$ = pullManifest$.pipe(
-                            startWith(pullManifest()),
-                            puller(manifestStore));
+                        startWith(pullManifest()),
+                        pullManifests(manifestStore),
+                        shareReplay(1));
 
     const epoch$ = zip(
                     manifest$,
                     manifest$.pipe(
-                        serveBlocks(blockStore))
+                        pullBlocks(blockStore),
+                        evaluateBlocks(model))
                     ).pipe(map(e => newEpoch(...e)));
     
     const era$ = merge(epoch$, signal$).pipe(
                     specifier(),
                     slicer(ripple$),
-                    evaluate(model));
+                    evaluateSlices(model));
 
     const commit$ = doCommit$.pipe(
                     committer(model, era$, signal$),

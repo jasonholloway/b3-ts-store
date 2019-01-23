@@ -1,8 +1,8 @@
-import { Dict, tup } from "./utils";
+import { Dict, tup, log } from "./utils";
 import { Era, Tuple2 } from "./slicer";
-import { OperatorFunction, pipe, Observable, empty } from "rxjs";
-import { scan, map, concatAll } from "rxjs/operators";
-import { BlockFrame } from "./serveBlocks";
+import { OperatorFunction, pipe, Observable, empty, of } from "rxjs";
+import { scan, map, concatAll, defaultIfEmpty } from "rxjs/operators";
+import { BlockFrame, emptyBlocks } from "./pullBlocks";
 
 export type RefreshEra = ['RefreshEra']
 export type SetThreshold = ['SetThreshold', number]
@@ -35,6 +35,8 @@ export const setThreshold =
     
 export const emptyManifest: Manifest = { version: 0, logBlocks: {} }
 
+const emptyEra: Era = { id: 0, manifest: emptyManifest, thresh: 0, blocks: emptyBlocks  };
+
 
 export function specifier() : OperatorFunction<Signal, Era> {
     return pipe(
@@ -60,7 +62,7 @@ export function specifier() : OperatorFunction<Signal, Era> {
                         return prev$;
                 }
             },
-            empty()),
+            of(emptyEra)),
         concatAll(),
         map((era, id) => ({ ...era, id }))
     );

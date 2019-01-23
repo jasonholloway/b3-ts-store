@@ -4,7 +4,7 @@ import { Commit } from "./committer";
 import { concatMap, tap, mapTo, catchError } from "rxjs/operators";
 import { enumerate } from "./utils";
 import { Manifest } from "./specifier";
-import { PullManifest } from "./puller";
+import { PullManifest } from "./pullManifests";
 
 export const pusher = 
     (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<Commit, Commit> =>

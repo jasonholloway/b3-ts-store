@@ -2,13 +2,12 @@ import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWi
 import { Subject, from, empty, Observable, zip } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate } from "../lib/utils";
 import { startWith, map, concatMap, groupBy } from "rxjs/operators";
-import { Evaluable, evaluate } from "../lib/evaluate";
+import { Evaluable, evaluateSlices } from "../lib/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { specifier, Signal, newEra, newManifest, Epoch, emptyManifest, Manifest } from "../lib/specifier";
-import { serveBlocks, emptyBlocks } from "../lib/serveBlocks";
+import { pullBlocks, emptyBlocks } from "../lib/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/createStore";
-
 
 
 describe('evaluator', () => {
@@ -29,13 +28,13 @@ describe('evaluator', () => {
 
         const epoch$ = zip(
                         manifest$,
-                        manifest$.pipe(serveBlocks(blockStore))
+                        manifest$.pipe(pullBlocks(blockStore))
                     ).pipe(map(e => newEpoch(...e)));
 
         era$ = epoch$.pipe(
                 specifier(),
                 slicer(ripple$),
-                evaluate(model),
+                evaluateSlices(model),
                 pullAllSlices());
 
         manifest$.next(emptyManifest);

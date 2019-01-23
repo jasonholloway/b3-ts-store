@@ -2,7 +2,7 @@ import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs"
 import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
 import { pullAll, Ripple, EraWithSlices } from "../lib/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
-import { Evaluable } from "../lib/evaluate";
+import { Evaluable } from "../lib/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";

@@ -3,7 +3,7 @@ import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "
 import { map, concatMap } from "rxjs/operators";
 import { Range, slicer, EraWithSlices } from "../lib/slicer";
 import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib/specifier";
-import { serveBlocks } from "../lib/serveBlocks";
+import { pullBlocks } from "../lib/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/createStore";
 
@@ -30,7 +30,7 @@ describe('slicer', () => {
 
         const epoch$ = zip(
                         manifest$,
-                        manifest$.pipe(serveBlocks(blockStore))
+                        manifest$.pipe(pullBlocks(blockStore))
                     ).pipe(map(e => newEpoch(...e)));
 
         gathering = merge(epoch$, signal$).pipe(

@@ -2,13 +2,13 @@ import { Subject, from, MonoTypeOperatorFunction, zip, merge } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
 import { slicer, Ripple } from "../lib/slicer";
 import { map, concatMap, groupBy, shareReplay, startWith } from "rxjs/operators";
-import { evaluate, KnownLogs } from "../lib/evaluate";
+import { evaluateSlices, KnownLogs } from "../lib/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/committer";
 import { Viewer, createViewer } from "../lib/viewer";
 import { specifier, Signal, newEra, emptyManifest, newManifest, Manifest } from "../lib/specifier";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { serveBlocks } from "../lib/serveBlocks";
+import { pullBlocks } from "../lib/pullBlocks";
 import { newEpoch } from "../lib/createStore";
 
 type TestRipple = Dict<number[]>
@@ -31,20 +31,21 @@ describe('viewer', () => {
     beforeEach(() => {
         blockStore = new FakeBlockStore();
 
+        manifest$ = new Subject<Manifest>();
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
         const epoch$ = zip(
                         manifest$,
-                        manifest$.pipe(serveBlocks(blockStore))
+                        manifest$.pipe(pullBlocks(blockStore))
                     ).pipe(map(e => newEpoch(...e)));
 
         const era$ = merge(epoch$, signal$).pipe(
                         startWith(newEra()),
                         specifier(),
                         slicer(ripple$),
-                        evaluate(model),
+                        evaluateSlices(model),
                         pullAll());
 
         manifest$.next(emptyManifest);

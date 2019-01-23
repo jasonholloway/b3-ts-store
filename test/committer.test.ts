@@ -1,14 +1,14 @@
 import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject } from "rxjs";
-import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
+import { reduceToArray, Dict, enumerate, tup, log } from "../lib/utils";
 import { slicer, Ripple, EraWithSlices, pullAll } from "../lib/slicer";
 import { map, concatMap, groupBy, startWith } from "rxjs/operators";
-import { evaluate, Evaluable } from "../lib/evaluate";
+import { evaluateSlices, Evaluable } from "../lib/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/committer";
 import { emptyManifest, specifier, Epoch } from "../lib/specifier";
 import { pause } from "./utils";
 import { newEpoch } from "../lib/createStore";
-import { emptyBlocks } from "../lib/serveBlocks";
+import { emptyBlocks } from "../lib/pullBlocks";
 
 type TestRipple = Dict<number[]>
 
@@ -34,7 +34,7 @@ describe('committer', () => {
                 startWith(newEpoch(emptyManifest, emptyBlocks)),
                 specifier(),
                 slicer(ripple$),
-                evaluate(model),
+                evaluateSlices(model),
                 pullAll());
 
         commit$ = doCommit$.pipe(

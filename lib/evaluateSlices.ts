@@ -28,7 +28,10 @@ function createEvaluable<M extends Model>(raw: Evaluable<M>) : Evaluable<M> {
 }
 
 
-export const evaluate = 
+
+
+
+export const evaluateSlices = 
     <U, M extends Model, I extends EraWithSlices<Ripple<U>>>
     (model: M) : OperatorFunction<I, EraWithSlices<Evaluable<M>> & I> => 
         pipe(

@@ -1,30 +1,34 @@
 import { Observable, OperatorFunction, pipe, from, empty } from "rxjs";
-import { LogRef } from "./evaluate";
+import { LogRef } from "./evaluateSlices";
 import { BlockStore, Block } from "./bits";
-import { map, concatMap, scan, concatAll } from "rxjs/operators";
+import { map, concatMap, scan, concatAll, defaultIfEmpty } from "rxjs/operators";
 import { Manifest } from "./specifier";
-import { Dict } from "./utils";
+import { Dict, log } from "./utils";
 
 export type BlockRef = string
 
 export interface BlockFrame {
-    blocks: Dict<Block>,
-
     load: (blockRef: BlockRef) => (logRef: LogRef) => Observable<any>
 }
 
-export const emptyBlocks: BlockFrame = { blocks: {}, load: () => () => empty() };
+interface InnerBlockFrame extends BlockFrame {
+    data: Dict<Block>
+}
 
 
-export const serveBlocks =
+export const emptyBlocks: BlockFrame = { load: () => () => empty() };
+
+
+export const pullBlocks =
     (blockStore: BlockStore) : OperatorFunction<Manifest, BlockFrame> =>
         pipe(
-            scan<Manifest, Observable<BlockFrame>>(
+            scan<Manifest, Observable<InnerBlockFrame>>(
                 (prev$, {logBlocks}) => 
                     prev$.pipe(
+                        defaultIfEmpty({}),
                         map(prev => ({
-                            blocks: {},
-                            load: (blockRef: BlockRef) => (logRef: LogRef) => 
+                            data: {},
+                            load: (blockRef: BlockRef) => (logRef: LogRef) =>
                                     from(blockStore.load(blockRef))
                                         .pipe(concatMap(b => b[logRef] || empty()))
                         }))),

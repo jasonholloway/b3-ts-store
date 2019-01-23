@@ -32,7 +32,7 @@ describe('specifier', () => {
     })
 
     it('basic era', () => 
-        expect(eras).toEqual([
+        expect(eras).toMatchObject([
             { id: 0, thresh: 0, manifest: emptyManifest }
         ]))
 
@@ -47,7 +47,7 @@ describe('specifier', () => {
         })
 
         it('triggers new era', () => 
-            expect(eras).toEqual([
+            expect(eras).toMatchObject([
                 { id: 0, thresh: 0, manifest: emptyManifest }, 
                 { id: 1, thresh: 0, manifest: emptyManifest }, 
                 { id: 2, thresh: 0, manifest: emptyManifest },
@@ -63,7 +63,7 @@ describe('specifier', () => {
         })
 
         it('triggers new era with new threshold', () =>
-            expect(eras).toEqual([
+            expect(eras).toMatchObject([
                 { 
                     id: 0, 
                     thresh: 0,
@@ -92,7 +92,7 @@ describe('specifier', () => {
         })
 
         it('triggers new era with new manifest', () =>
-            expect(eras).toEqual([
+            expect(eras).toMatchObject([
                 { 
                     id: 0, 
                     thresh: 0,

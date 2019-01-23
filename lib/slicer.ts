@@ -2,7 +2,7 @@ import { Observable, empty, OperatorFunction, zip, pipe, of, MonoTypeOperatorFun
 import { scan, concat, filter, shareReplay, window, map, skip, tap, concatMap, flatMap, concatAll, share } from "rxjs/operators";
 import { tup, reduceToArray } from "./utils";
 import { Manifest } from "./specifier";
-import { BlockFrame } from "./serveBlocks";
+import { BlockFrame } from "./pullBlocks";
 
 
 export interface Tuple2<A, B> extends Array<A | B> {

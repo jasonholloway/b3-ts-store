@@ -7,7 +7,7 @@ export type PullManifest = ['PullManifest', {}]
 
 export const pullManifest = (): PullManifest => ['PullManifest', {}];
 
-export const puller =
+export const pullManifests =
     (manifestStore: ManifestStore) : OperatorFunction<PullManifest, Manifest> =>
     pipe(
         concatMap(([_, pull]) => manifestStore.load()),     //but what happens if empty????
