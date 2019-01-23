@@ -61,6 +61,18 @@ describe('evaluateBlocks', () => {
         expect(error).toMatchObject(Error('Block not found!'));
     })
 
+    it('returns empty when log not in block', async () => {
+        complete();
+
+        const [frame] = await frame$.pipe(reduceToArray()).toPromise();
+
+        const updates = await frame.load('block123')('myLog')
+                                .pipe(reduceToArray())
+                                .toPromise();
+
+        expect(updates).toEqual([]);
+    })
+
 
 
     function complete() {
