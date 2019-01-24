@@ -9,7 +9,7 @@ import { Viewer, createViewer } from "../lib/core/viewer";
 import { specifier, Signal, newEra, emptyManifest, newManifest, Manifest } from "../lib/core/specifier";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pullBlocks } from "../lib/core/pullBlocks";
-import { newEpoch } from "../lib/core/createCore";
+import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 
 type TestRipple = Dict<number[]>

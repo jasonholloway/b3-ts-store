@@ -7,7 +7,7 @@ import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
 import { emptyManifest, specifier, Epoch } from "../lib/core/specifier";
 import { pause } from "./utils";
-import { newEpoch } from "../lib/core/createCore";
+import { newEpoch } from "../lib/core";
 import { emptyBlocks } from "../lib/core/pullBlocks";
 
 type TestRipple = Dict<number[]>

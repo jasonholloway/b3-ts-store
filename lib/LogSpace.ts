@@ -1,231 +1,45 @@
-import { AnyUpdate, Model, Log } from "./bits";
+import { Log, ManifestStore, BlockStore } from "./bits";
 import { Subject } from "rxjs";
-import { Dict, getOrSet } from "./utils";
+import { getOrSet } from "./utils";
 import { InnerLog, createLogFacade } from "./Log";
+import { Model, KnownLogs } from "./core/evaluateSlices";
+import { createCore } from "./core";
+import { Ripple } from "./core/slicer";
+import { DoCommit } from "./core/committer";
 
 
-export interface LogSpace {
-    getLog<U extends AnyUpdate, D>(key: string, model: Model<U, D>): Log<U, any>;
-    commit(): Promise<void>;
+export interface LogSpace<M extends Model> {
+    getLog(key: KnownLogs<M>): Log<U, any>;
+    commit(): void;
     reset(): void;
 }
 
 
-type BlockRef = string
-export type LogBlocks = BlockRef[]
-
-
-
-export type LogSpec = {
-    head: number,
-    blocks: BlockRef[]
-}
-
-
-
-type Confirm = {}
-
-
-export function createLogSpace(): LogSpace {
+export function createLogSpace<M extends Model>(model: M, manifests: ManifestStore, blocks: BlockStore): LogSpace<M> {
     let logs: { [key: string]: InnerLog } = {}
 
+    const ripple$ = new Subject<Ripple>();
+    const doCommit$ = new Subject<DoCommit>();
 
-    let nextCommitId = 0;
-    const commits = new Subject<Confirm>();
-
-
-    // commits.pipe(
-    //     withLatestFrom(manifests, innerLogs),
-    //     map(([cid, manifest, innerLogs]) => {
-    //         const confirm = new Subject<LogSpec>();
-
-    //         from(enumerate(innerLogs)).pipe(
-    //             reduce<[string, InnerLog], Block>(
-    //                 (block, [key, log]) => 
-    //                 ({
-
-    //                 }), {})
-    //         )
-                
-
-    //         const newBlock = beginCommits(innerLogs, confirm);
-
-    //         const ref = `B${Math.ceil(Math.random() * 1000)}`;
-
-    //         return tup(cid, manifest, tup(ref, newBlock), confirm);
-    //     }),
-    //     map(([cid, manifest, [blockRef, newBlock], confirm]) => {
-            
-    //         const newSpecs = enumerate(manifest.logs)
-    //                             .reduce(
-    //                                 (ac, [key, blocks]) => 
-    //                                     ({  ...ac, [key]: blocks }), 
-    //                                 {} as Dict<LogBlocks>);
-
-    //         const newManifest = {
-    //             version: manifest.version + 1,
-    //             logs: newSpecs
-    //         };
-
-    //         return tup(cid, newManifest, tup(blockRef, newBlock), confirm);
-    //     })
-    // );
-
-    // function beginCommits(logs: Dict<InnerLog>, confirm: Observable<LogSpec>): Block {
-    //     return enumerate(logs)
-    //             .reduce(
-    //                 (block, [key, log]) => 
-    //                     ({ ...block, [key]: log.beginCommit(confirm) }), 
-    //                 {} as Block);
-    // }
-
-
-        // flatMap(async ([cid, manifest, innerLogs]) => {
-
-        //     const confirm = new Subject<LogSpec>();
-
-        //     const newBlock = enumerate(innerLogs)
-        //                         .reduce(
-        //                             (block, [key, log]) => 
-        //                                 ({ ...block, [key]: log.beginCommit(confirm) }), 
-        //                             {} as Block);
-        
-        //     const blockRef = `B${Math.ceil(Math.random() * 1000)}`;
-
-        //     await this.blockStore.save(blockRef, newBlock); //should do gazump-check before this...
-
-        //     const specs = enumerate(manifest.logs)
-        //                     .reduce<Dict<LogBlocks>>(
-        //                         (ac, [key, blocks]) => ({ 
-        //                             ...ac, 
-        //                             [key]: blocks
-        //                         }), {});
-
-        //     const newManifest = {
-        //         version: this.version + 1,
-        //         logs: specs
-        //     }
-
-        //     await this.manifestStore.save(newManifest);
-
-        //     confirm.next(null); //publish new spec as confirmation
-                    
-
-            
-
-        //     return [];
-        // })
-    
-
-        
-    // async function doCommit(): Promise<void> {        
-    //     const confirm = new Subject<LogSpec>();
-
-    //     try {
-    //         const block = enumerate(logs)
-    //                         .reduce(
-    //                             (block, [key, log]) => 
-    //                                 ({ ...block, [key]: log.beginCommit(confirm) }), 
-    //                             {} as Block);
-            
-    //         const blockRef = `B${Math.ceil(Math.random() * 1000)}`;
-        
-    //         await this.blockStore.save(blockRef, block); //should do gazump-check before this...
-
-    //         const logBlocks = enumerate(logs)
-    //                             .reduce<Dict<LogBlocks>>(
-    //                                 (ac, [key, log]) => ({ 
-    //                                     ...ac, 
-    //                                     [key]: log.blocks()
-    //                                 }), {});
-
-    //         const manifest = {
-    //             version: this.version + 1,
-    //             logs: logBlocks
-    //         }
-
-    //         await this.manifestStore.save(manifest);
-
-    //         confirm.next(null); //publish new spec as confirmation
-
-    //         //and more generally publish???
-    //     }
-    //     catch(err) {
-    //         confirm.error(err);
-    //         throw err;
-    //     }
-    //     finally {
-    //         confirm.complete();
-    //     }
-    // }
+    const core = createCore(model, blocks, manifests)(ripple$, doCommit$);
 
 
     return {
-        getLog<U extends AnyUpdate, D>(key: string, model: Model<U, D>): Log<U, any> {
+        getLog(key: KnownLogs<M>): Log<U, any> {
             const entry = getOrSet(logs, key, () => { 
                 return createLogFacade(model, null, null);
             });
             return entry;
         },
 
+        commit(): void {
+            doCommit$.next(123);
+        },
+
         reset(): void {
             // enumerate(this.logs)
                 // .forEach(([_, l]) => l.reset());
-        },
-
-
-        
-        //logSpecs are always coming in
-        //committing requires us to get the latest manifest (it will have been initially seeded of course...)
-        //I mean, you don't want to get the latest, cos that's some fruity misappropriation of rx
-        //instead of polling for the latest ad hoc, the latest frame should be our current context
-
-        //and the frame will know everything about its current configuration
-        //
-        //but the client Logs will be the same; the BlockCache will remain the same also
-        //but the bit in the middle will change with time
-        //a Frame has mappings of blocks to logs
-        //
-        //so, we start from a frame, but committing actually gathers together everything from various places
-        //well, it takes things from the logs, and stores things into the BlockStore: all of which are non-streamy
-        //
-        //the user will have a handle on the LogSpace, inside of which will be streams; LogSpace will be a harness for streams
-        //so the user will call commit
-        //but internally, the commit must adapt itself to a certain Frame
-        //the latest Frame should be used to do everything, everything should be bound to the single instance
-        //in effect the user is sending a 'commit' impulse into the system: this could be implemented itself as a stream
-        //
-        //so we will have a stream of commit impulses, then
-        //and as these commits are effected, new LogSpecs will be sent out, and all LogHandles will announce the availability of new data
-        //but we can't serve up all that data eagerly: it has to be specifically requested.
-        //but if we don't know what the new updates are, how can we know whether they fit the current updates or not?
-        //
-        //as soon as we know there's more data to fetch, then - if the handle exists, we should pull that new data down
-        //but that pulling down is to be done by the Log rather than the Space
-        //the Space just distributes new Specs
-        //
-        //but when we commit, the Space and the Logs meet
-        //
-
-
-
-        async commit(): Promise<void> {
-            const commitId = nextCommitId++;
-            commits.next(commitId);
-
-            //wait for errors or completions
-            //with corresponding commitId
-
-            //serialize!
-            //...
-            //AND WHAT ABOUT ROLLBACK IN EVENT OF A FAILURE?????????????!!!!!
-
-            //but...
-            //cancelCommits should be called on all logs here
-            //not just the affected ones
-
-            //plus: what'd happen if we cancelled a limbo that wasn't our own? 
-            //it wouldn't be a problem, as long as the attempt at committing is also thrown out
         }
+
     };
 }

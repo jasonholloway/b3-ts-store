@@ -8,7 +8,7 @@ import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pause } from "./utils";
-import { Core, createCore } from "../lib/core/createCore";
+import { Core, createCore } from "../lib/core";
 
 type TestRipple = Dict<number[]>
 

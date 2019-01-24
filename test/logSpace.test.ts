@@ -2,24 +2,28 @@ import { Log } from "../lib/bits";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import { enumerate } from "../lib/utils";
-import { testLogModel, AddUp, addUp } from "./fakes/testModel";
+import { testLogModel, AddUp, addUp, TestModel } from "./fakes/testModel";
 import { LogSpace, createLogSpace } from "../lib/LogSpace";
 
 
-xdescribe('LogSpace', () => {
+describe('logSpace', () => {
 
-    let logSpace: LogSpace;
+    const model = new TestModel();
+
+    let space: LogSpace<TestModel>;
+
     let log: Log<AddUp, string>;
-    let blockStore: FakeBlockStore;
-    let manifestStore: FakeManifestStore;
-    let model = testLogModel;
+    let blocks: FakeBlockStore;
+    let manifests: FakeManifestStore;
     let getLog: (name?: string) => Log<AddUp, string>;
 
     beforeEach(() => {
-        blockStore = new FakeBlockStore();
-        manifestStore = new FakeManifestStore();
-        logSpace = createLogSpace(); //(blockStore, manifestStore, null);
-        getLog = (name: string) => logSpace.getLog(name || 'test', testLogModel);
+        blocks = new FakeBlockStore();
+        manifests = new FakeManifestStore();
+
+        space = createLogSpace(model, manifests, blocks);
+
+        getLog = (name: string) => space.getLog(name || 'test', testLogModel);
         log = getLog();
     })
 
@@ -50,7 +54,7 @@ xdescribe('LogSpace', () => {
             it('resets to zero', async () => {
                 log.stage(addUp(0, '9'));
                 log.stage(addUp(1, '8'));
-                logSpace.reset();
+                space.reset();
     
                 const view = await log.view();
                 expect(view).toBe('');
@@ -59,7 +63,7 @@ xdescribe('LogSpace', () => {
 
         describe('during and after commit', () => {
             beforeEach(() => {
-                blockStore.manualResponse = true;
+                blocks.manualResponse = true;
             })
 
             it('aggregated data stays same', async () => {
@@ -67,10 +71,10 @@ xdescribe('LogSpace', () => {
                 log.stage(addUp(1, '5'));
                 expect(await log.view()).toBe('5:5');
 
-                const committing = logSpace.commit();
+                const committing = space.commit();
                 expect(await log.view()).toBe('5:5');
 
-                blockStore.respond();
+                blocks.respond();
                 await committing;
                 expect(await log.view()).toBe('5:5');
             })
@@ -80,10 +84,10 @@ xdescribe('LogSpace', () => {
 
             it('data remains as it should be', async () => {
                 log.stage(addUp(0, '1'));
-                await logSpace.commit();
+                await space.commit();
 
                 log.stage(addUp(1, '2'));
-                await logSpace.commit();
+                await space.commit();
 
                 expect(await log.view()).toBe('1:2');
             })
@@ -96,25 +100,25 @@ xdescribe('LogSpace', () => {
             beforeEach(async () => {
                 log.stage(addUp(0, '4'));
                 log.stage(addUp(1, '5'));
-                await logSpace.commit();
+                await space.commit();
             })
 
             it('stores block', () => {
-                const [_, block] = enumerate(blockStore.blocks).pop();
+                const [_, block] = enumerate(blocks.blocks).pop();
                 expect(block[log.key]).toEqual([ '4', '5' ]);
             })
 
             it('stores manifest, referring to stored block', () => {
-                const blocks = manifestStore.manifest.logBlocks[log.key];
+                const blocks = manifests.manifest.logBlocks[log.key];
                 expect(blocks).toBeDefined();
                 expect(blocks.length).toBe(1);
 
                 const blockRef = blocks[0];
-                expect(blockStore.blocks[blockRef]).toHaveProperty(log.key, [ '4', '5' ]);
+                expect(blocks.blocks[blockRef]).toHaveProperty(log.key, [ '4', '5' ]);
             })
 
             it('increments manifest version', () => {
-                expect(manifestStore.manifest.version).toBe(1);
+                expect(manifests.manifest.version).toBe(1);
             })
 
         })
@@ -143,14 +147,14 @@ xdescribe('LogSpace', () => {
         describe('on commit failure', () => {
 
             beforeEach(() => {
-                blockStore.errorsOnPersist = true;
+                blocks.errorsOnPersist = true;
             })
 
             it('staged updates left in place', async () => {
                 log.stage(addUp(0, '999'));
                 log.stage(addUp(1, '1'));
 
-                try { await logSpace.commit(); }
+                try { await space.commit(); }
                 catch {}
 
                 const view = await log.view();

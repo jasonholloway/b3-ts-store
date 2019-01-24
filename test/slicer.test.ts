@@ -5,7 +5,7 @@ import { Range, slicer, EraWithSlices } from "../lib/core/slicer";
 import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib/core/specifier";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { newEpoch } from "../lib/core/createCore";
+import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { TestModel } from "./fakes/testModel";
 

@@ -7,7 +7,7 @@ import { TestModel } from "./fakes/testModel";
 import { specifier, Signal, newEra, newManifest, Epoch, emptyManifest, Manifest } from "../lib/core/specifier";
 import { pullBlocks, emptyBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { newEpoch } from "../lib/core/createCore";
+import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 
 
