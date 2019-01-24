@@ -1,13 +1,13 @@
-import { pullAll } from "../lib/slicer";
+import { pullAll } from "../lib/core/slicer";
 import { Subject, Observable, empty, of } from "rxjs";
 import { reduceToArray } from "../lib/utils";
 import { startWith, mapTo, catchError, last, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { Manifest } from "../lib/specifier";
-import { pullBlocks } from "../lib/pullBlocks";
+import { Manifest } from "../lib/core/specifier";
+import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { evaluateBlocks } from "../lib/evaluateBlocks";
-import { Evaluable } from "../lib/evaluateSlices";
+import { evaluateBlocks } from "../lib/core/evaluateBlocks";
+import { Evaluable } from "../lib/core/evaluateSlices";
 
 
 describe('evaluateBlocks', () => {

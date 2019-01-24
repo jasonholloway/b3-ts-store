@@ -1,9 +1,9 @@
 import { Observable, OperatorFunction, pipe, from, empty } from "rxjs";
 import { LogRef } from "./evaluateSlices";
-import { BlockStore, Block } from "./bits";
+import { BlockStore, Block } from "../bits";
 import { map, concatMap, scan, concatAll, defaultIfEmpty } from "rxjs/operators";
 import { Manifest, emptyManifest } from "./specifier";
-import { Dict, log } from "./utils";
+import { Dict, log } from "../utils";
 
 export type BlockRef = string
 

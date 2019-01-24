@@ -1,10 +1,10 @@
 import { Subject, of, forkJoin } from "rxjs";
 import { reduceToArray } from "../lib/utils";
-import { pullAll } from "../lib/slicer";
+import { pullAll } from "../lib/core/slicer";
 import { concatMap, catchError, startWith } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { pullBlocks } from "../lib/pullBlocks";
-import { Manifest, emptyManifest } from "../lib/specifier";
+import { pullBlocks } from "../lib/core/pullBlocks";
+import { Manifest, emptyManifest } from "../lib/core/specifier";
 
 jest.setTimeout(400);
 

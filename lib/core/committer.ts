@@ -3,7 +3,7 @@ import { Observable, OperatorFunction, Observer, pipe, empty } from "rxjs";
 import { share, withLatestFrom, concatMap, take, map, mapTo } from "rxjs/operators";
 import { EraWithSlices, Slice, Era, Ripple } from "./slicer";
 import { RefreshEra, newEra } from "./specifier";
-import { reduceToDict, reduceToArray, tup, Dict } from "./utils";
+import { reduceToDict, reduceToArray, tup, Dict } from "../utils";
 
 export type DoCommit = {}
 

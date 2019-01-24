@@ -1,12 +1,12 @@
 import { Observable, Subject, from, OperatorFunction, pipe, zip, merge } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap } from "rxjs/operators";
-import { Range, slicer, EraWithSlices } from "../lib/slicer";
-import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib/specifier";
-import { pullBlocks } from "../lib/pullBlocks";
+import { Range, slicer, EraWithSlices } from "../lib/core/slicer";
+import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib/core/specifier";
+import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { newEpoch } from "../lib/createStore";
-import { evaluateBlocks } from "../lib/evaluateBlocks";
+import { newEpoch } from "../lib/core/createCore";
+import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { TestModel } from "./fakes/testModel";
 
 type Dict$<V> = Observable<[string, V]>

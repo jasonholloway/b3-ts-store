@@ -1,8 +1,8 @@
 import { Observable, OperatorFunction, pipe, of, empty, concat, from } from "rxjs";
 import { EraWithSlices, scanUnwrapSlices, pullAll, Ripple, Slice$, Era } from "./slicer";
 import { concatMap, defaultIfEmpty, filter, scan, concatAll, map, tap } from "rxjs/operators";
-import { Model as LogModel, BlockStore } from './bits'
-import { tup } from "./utils";
+import { Model as LogModel, BlockStore } from '../bits'
+import { tup } from "../utils";
 
 export type LogRef = string;
 

@@ -1,5 +1,5 @@
 import { ManifestStore } from "../../lib/bits";
-import { Manifest } from "../../lib/specifier";
+import { Manifest } from "../../lib/core/specifier";
 import { Observable, empty, of, throwError } from "rxjs";
 
 class FakeManifestStore implements ManifestStore {

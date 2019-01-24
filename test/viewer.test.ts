@@ -1,16 +1,16 @@
 import { Subject, from, MonoTypeOperatorFunction, zip, merge } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
-import { slicer, Ripple, mapSlices } from "../lib/slicer";
+import { slicer, Ripple, mapSlices } from "../lib/core/slicer";
 import { map, concatMap, groupBy, shareReplay, startWith } from "rxjs/operators";
-import { evaluateSlices, KnownLogs } from "../lib/evaluateSlices";
+import { evaluateSlices, KnownLogs } from "../lib/core/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
-import { DoCommit } from "../lib/committer";
-import { Viewer, createViewer } from "../lib/viewer";
-import { specifier, Signal, newEra, emptyManifest, newManifest, Manifest } from "../lib/specifier";
+import { DoCommit } from "../lib/core/committer";
+import { Viewer, createViewer } from "../lib/core/viewer";
+import { specifier, Signal, newEra, emptyManifest, newManifest, Manifest } from "../lib/core/specifier";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { pullBlocks } from "../lib/pullBlocks";
-import { newEpoch } from "../lib/createStore";
-import { evaluateBlocks } from "../lib/evaluateBlocks";
+import { pullBlocks } from "../lib/core/pullBlocks";
+import { newEpoch } from "../lib/core/createCore";
+import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 
 type TestRipple = Dict<number[]>
 

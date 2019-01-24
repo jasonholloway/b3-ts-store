@@ -1,4 +1,4 @@
-import { Dict, tup } from "./utils";
+import { Dict, tup } from "../utils";
 import { Era, Tuple2 } from "./slicer";
 import { OperatorFunction, pipe, Observable, of } from "rxjs";
 import { scan, map, concatAll } from "rxjs/operators";

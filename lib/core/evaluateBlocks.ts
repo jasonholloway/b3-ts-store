@@ -2,7 +2,7 @@ import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluateSlices";
 import { OperatorFunction, pipe, empty, from, of, Observable } from "rxjs";
 import { BlockFrame } from "./pullBlocks";
 import { map, concatMap, scan } from "rxjs/operators";
-import { log } from "./utils";
+import { log } from "../utils";
 
 
 

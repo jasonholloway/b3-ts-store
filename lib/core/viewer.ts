@@ -3,7 +3,6 @@ import { Observable, of, concat } from "rxjs";
 import { shareReplay, concatMap, debounceTime, map } from "rxjs/operators";
 import { EraWithSlices } from "./slicer";
 
-
 export const createViewer =
     <M extends Model>
     (era$: Observable<EraWithSlices<Evaluable<M>>>) : Viewer<M> => {
@@ -24,15 +23,5 @@ export const createViewer =
     }
 
 
-export type ViewableEra<M extends Model> = EraWithSlices<Evaluable<M>>
-
-
 export type Viewer<M extends Model> = 
     <K extends KnownLogs<M>>(ref: K) => Observable<KnownAggr<M, K>>
-
-
-
-
-//
-//
-//

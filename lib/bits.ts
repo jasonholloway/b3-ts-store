@@ -1,6 +1,6 @@
 import { Dict, getOrSet, enumerate, tup } from "./utils";
 import { LogBlocks, LogSpec } from "./LogSpace";
-import { Manifest } from "./specifier";
+import { Manifest } from "./core/specifier";
 import { Observable } from "rxjs";
 
 export function declareLogModel<U extends AnyUpdate, D>(m: Model<U, D>): Model<U, D> {

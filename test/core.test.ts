@@ -1,20 +1,20 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
-import { pullAll, Ripple, EraWithSlices } from "../lib/slicer";
+import { pullAll, Ripple, EraWithSlices } from "../lib/core/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
-import { Evaluable } from "../lib/evaluateSlices";
+import { Evaluable } from "../lib/core/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
-import { DoCommit, Commit } from "../lib/committer";
+import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pause } from "./utils";
-import { Store, createStore } from "../lib/createStore";
+import { Core, createCore } from "../lib/core/createCore";
 
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
 
-describe('store', () => {
+describe('core', () => {
 
     const model = new TestModel();
 
@@ -27,7 +27,7 @@ describe('store', () => {
     let era$: Observable<EraWithSlices<Evaluable<TestModel>>>
     let commit$: Observable<Commit>
 
-    let store: Store<TestModel>
+    let store: Core<TestModel>
 
     beforeEach(() => {
         manifestStore = new FakeManifestStore();
@@ -39,7 +39,7 @@ describe('store', () => {
         manifestStore.manifest = { version: 10, logBlocks: { myLog2: [ 'block1' ] } };
         blockStore.blocks = { block1: { myLog2: [ 4, 5, 6 ] } }
 
-        store = createStore(model, blockStore, manifestStore)(ripple$, doCommit$);
+        store = createCore(model, blockStore, manifestStore)(ripple$, doCommit$);
 
         era$ = store.era$.pipe(pullAll());
         commit$ = store.commit$.pipe(pullAllCommits());

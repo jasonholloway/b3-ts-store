@@ -1,8 +1,8 @@
-import { BlockStore, ManifestStore } from "./bits";
+import { BlockStore, ManifestStore } from "../bits";
 import { Observer, OperatorFunction, pipe, of, Observable, MonoTypeOperatorFunction, concat } from "rxjs";
 import { Commit } from "./committer";
 import { concatMap, tap, mapTo, catchError } from "rxjs/operators";
-import { enumerate } from "./utils";
+import { enumerate } from "../utils";
 import { Manifest } from "./specifier";
 import { PullManifest } from "./pullManifests";
 import { Model } from "./evaluateSlices";

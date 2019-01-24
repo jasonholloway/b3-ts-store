@@ -1,8 +1,8 @@
 import { Subject, of, forkJoin } from "rxjs";
 import { reduceToArray } from "../lib/utils";
-import { pullAll, Era } from "../lib/slicer";
+import { pullAll, Era } from "../lib/core/slicer";
 import { delay, startWith } from "rxjs/operators";
-import { Signal, newEra, newManifest, setThreshold, specifier, emptyManifest } from "../lib/specifier";
+import { Signal, newEra, newManifest, setThreshold, specifier, emptyManifest } from "../lib/core/specifier";
 import { pause } from "./utils";
 
 jest.setTimeout(400);
