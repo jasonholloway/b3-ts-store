@@ -18,18 +18,19 @@ export const testLogModel = declareLogModel({
 
 
 
+
+const logModel = {
+    zero: '',
+    add: (ac: string, v: number) => 
+        ac == '' ? v.toString() : (ac + ',' + v)
+};
+
 export class TestModel {
     logs = {
-        myLog: {
-            zero: '',
-            add: (ac: string, v: number) => 
-                ac == '' ? v.toString() : (ac + ',' + v)
-        },
-        myLog2: {
-            zero: '',
-            add: (ac: string, v: number) => 
-                ac == '' ? v.toString() : (ac + ',' + v)
-        }
+        myLog: logModel,
+        myLog2: logModel,
+        myLog3: logModel,
+        myLog4: logModel
     }
 }
 

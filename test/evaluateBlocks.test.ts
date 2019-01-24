@@ -1,9 +1,9 @@
 import { pullAll } from "../lib/slicer";
 import { Subject, Observable, empty, of } from "rxjs";
 import { reduceToArray } from "../lib/utils";
-import { startWith, mapTo, catchError } from "rxjs/operators";
+import { startWith, mapTo, catchError, last, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { emptyManifest, Manifest } from "../lib/specifier";
+import { Manifest } from "../lib/specifier";
 import { pullBlocks } from "../lib/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/evaluateBlocks";
@@ -17,67 +17,115 @@ describe('evaluateBlocks', () => {
     let blockStore: FakeBlockStore
     let manifest$: Subject<Manifest>
     let frame$: Observable<Evaluable<TestModel>>
+    let manifest: Manifest;
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
         manifest$ = new Subject<Manifest>();
 
         blockStore.blocks = {
-            block123: {
+            block1: {
+                myLog: [ 1, 2 ]
+            },
+            block2: {
+                myLog: [ 3, 4 ]
+            },
+            block3: {
+                myLog: [ 5 ],
                 myLog2: [ 1, 2, 3 ]
             }
         };
 
+        manifest = { 
+            version: 1, 
+            logBlocks: { 
+                myLog: [ 'block1', 'block2', 'block3' ],
+                myLog2: [ 'block3' ],
+                myLog3: [ 'block1' ],
+                myLog4: [ 'wibble' ]
+            } 
+        };
+
         frame$ = manifest$.pipe(
-                    startWith(emptyManifest),
+                    startWith(manifest),
                     pullBlocks(blockStore),
                     evaluateBlocks(model),
                     pullAll());
     })
 
-    it('serves single block', async () => {
-        complete();
+    describe('simple', () => {
+        beforeEach(complete);
 
-        const [frame] = await frame$.pipe(reduceToArray()).toPromise();
+        it('evaluates single block', async () => {
+            const frame = await final(frame$);
+            const view = await final(frame.evaluate('myLog2'));
 
-        const updates = await frame.load('block123')('myLog2')
-                                .pipe(reduceToArray())
-                                .toPromise();
+            expect(view).toEqual('1,2,3');
+        })
 
-        expect(updates).toEqual([1, 2, 3]);
+        it('evaluates multiple block', async () => {
+            const frame = await final(frame$);
+            const view = await final(frame.evaluate('myLog'));
+
+            expect(view).toEqual('1,2,3,4,5');
+        })
+
+        it('returns empty if log unknown in blocks', async () => {
+            const frame = await final(frame$);
+            const views = await gather(frame.evaluate('myLog3'));
+
+            expect(views).toEqual([]);
+        })
+
+        it('throws error if block not known', async () => {
+            const frame = await final(frame$);
+            
+            await expect(gather(frame.evaluate('myLog4')))
+                    .rejects.toThrowError('Block not found!');
+        })
     })
 
-    it('returns error to caller when block not in store', async () => {
-        complete();
 
-        const [frame] = await frame$.pipe(reduceToArray()).toPromise();
+    describe('after update', () => {
+        beforeEach(() => {
+            blockStore.blocks.block4 = { myLog: [ 10 ], myLog2: [ 4, 5, 6] }
+            manifest$.next({ 
+                version: 2, 
+                logBlocks: {
+                    myLog: [ 'block4' ],
+                    myLog2: [ 'block3', 'block4' ]
+                }
+            });
 
-        const [error] = await frame.load('block12')('myLog2')
-                                    .pipe(
-                                        mapTo(empty()),
-                                        catchError(err => of(err)),
-                                        reduceToArray())
-                                    .toPromise();
+            complete();
+        })
 
-        expect(error).toMatchObject(Error('Block not found!'));
+        it('evaluates new blocks', async () => {
+            const frame = await final(frame$);
+            const view = await final(frame.evaluate('myLog2'));
+
+            expect(view).toEqual('1,2,3,4,5,6');
+        })
+
+        it('forgets previous blocks', async () => {
+            const frame = await final(frame$);
+            const view = await final(frame.evaluate('myLog'));
+
+            expect(view).toEqual('10');
+        })
     })
-
-    it('returns empty when log not in block', async () => {
-        complete();
-
-        const [frame] = await frame$.pipe(reduceToArray()).toPromise();
-
-        const updates = await frame.load('block123')('myLog')
-                                .pipe(reduceToArray())
-                                .toPromise();
-
-        expect(updates).toEqual([]);
-    })
-
 
 
     function complete() {
         manifest$.complete();
+    }
+
+    function gather<V>(v$: Observable<V>) {
+        return v$.pipe(toArray()).toPromise();
+    }
+
+    function final<V>(v$: Observable<V>) {
+        return v$.pipe(last()).toPromise();
     }
 
 })

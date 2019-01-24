@@ -47,7 +47,7 @@ export function slicer<U>
         return zip(era$, window$)
                 .pipe(
                     //simple era with latest slices
-                    map(([era, slices]) => ({ ...era as Era, slices })),
+                    map(([era, slices]) => ({ ...era, slices })),
 
                     //merge in previous eras slices
                     scan(   
@@ -62,7 +62,7 @@ export function slicer<U>
 
                             slices.subscribe();
 
-                            return of({ ...era as object, slices } as O);
+                            return of({ ...era, slices });
                         },
                         empty()),
                     concatAll()
