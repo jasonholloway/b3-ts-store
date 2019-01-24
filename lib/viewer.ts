@@ -1,8 +1,7 @@
 import { Model, KnownLogs, KnownAggr, Evaluable } from "./evaluateSlices";
-import { Observable } from "rxjs";
-import { shareReplay, concatMap, debounceTime, startWith } from "rxjs/operators";
+import { Observable, of, concat } from "rxjs";
+import { shareReplay, concatMap, debounceTime, map } from "rxjs/operators";
 import { EraWithSlices } from "./slicer";
-import { log } from "./utils";
 
 
 export const createViewer =
@@ -13,24 +12,16 @@ export const createViewer =
 
         return (ref: KnownLogs<M>) =>
             era$.pipe(
-                concatMap(({ slices, blocks }) =>       //a-ha... there are no slices at the beginning...
-                    slices.pipe(
-                        concatMap(([_, {evaluate}]) => evaluate(ref)),
-                        // startWith( blocks. )
-                        )),
+                concatMap(({ blocks, slices }) =>
+                    concat(
+                        of(blocks as Evaluable<M>),
+                        slices.pipe(map(([_, ev]) => ev)))
+                    .pipe(
+                        concatMap(({evaluate}) => evaluate(ref))
+                    )),
                 debounceTime(1) //something of a bodge: ultimately, epoch-number + slice-number + last era command = means of doing this deterministically
                 );
     }
-
-
-//so, the evaluator should be wiring all the evaluables up
-//and should be /creating/ an evaluable specially for the blocks
-//which the viewer will then default to using if there are no slices about
-//
-//really, the viewer should firstly create a stream of evaluables, and debounce on this eagerly
-//debouncing late still lets of unnecessary work happen: should be nipped in the bud
-//
-//here: get the latest evaluable (via debouncing),then call 'evaluate()' on it
 
 
 export type ViewableEra<M extends Model> = EraWithSlices<Evaluable<M>>

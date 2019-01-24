@@ -89,6 +89,27 @@ describe('viewer', () => {
         })
     })
 
+    describe('from blocks', () => {
+
+        beforeEach(() => {
+            blockStore.blocks.block1 = {
+                myLog3: [ 1, 2, 3]
+            };
+
+            manifest$.next({
+                version: 2,
+                logBlocks: {
+                    myLog3: [ 'block1' ]
+                }
+            });
+        })
+
+        it('views blocks too', async () => {
+            await expectViews('myLog3', [ '1,2,3' ]);
+        })
+
+    })
+
 
     function getView(ref: KnownLogs<TestModel>) {
         return view(ref)
