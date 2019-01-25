@@ -121,6 +121,236 @@ this idea of each block and each log being /real/ before its time would create p
 
 but whatevs; a simple beginning would be to forget about the caching of evaluables: it can be finessed later when more about everything is known
 
+--------------------------------------------------------------------------------
+
+*Digestion Reprise*
+
+the digestor will bring project multiple slices into one
+
+the Committer is safe from its effects as it will be working from an old, stable slice of the previous era
+
+(thought in passing: does the Committer wait for the entire slice to finish currently? I think it does, but this means that a digested slice must complete - must keep a look out for this)
+
+---
+
+but as part of the digestion, old obsolete (but still staged) updates may be elided: this will affect the particular log, and the logs of its derivatives will be treated separately
+
+we would be committing this pre-digested lump; and in its committing, later staged slices (unhurt in the movement and redigestion) would sit just as happily on top of the committed digestion as they did before.
+
+------------------------------------------------------------
+
+so, given slices to map, what now?
+well, we'renot mapping em for a start:
+we want to scan their innards into a single slice
+
+but... slices are expected to have their ranges pinned on em up front
+this makes it unfeasible to stream in growing combinations of them
+as the combined range would be constantly growing
+
+new slices could be streamed through as they were made, with brand new ranges attached
+the consumer of the slices would then bear responsibility for managing them, matching them up and overwriting previous emissions
+
+or, each single slice's range would be served via a stream: this would allow new values to be piped through
+as the slice grew. 
+
+so, in committing, the slice would only be 'final' when both the range and ripple streams were complete
+the range is really only of use in committing
+
+instead of separate streams with separate times, maybe each slice would be a single stream...
+and in it would be both ripples and ranges; even better, there'd be a stream of ripples per range;
+but then (voila!) we're back at the original scheme of slices in a stream... what would we gain but complication?
+
+as each atomic slice is emitted, our single digested slice must grow
+on each new digestion, history must be restated
+and views re-aggregated
+
+each era, as it comes through, has its slice stream tampered with, so that it emits either:
+one single, never ending slice (well, it ends when the era ends)
+or many, overlapping slices
+
+the point of the range is, when we commit, we need to know how much of staging we can lop off
+and then a new manifest will come through (as part of same movement?)
+that will tell us to reload, reevaluate, redigest
+
+a digestion is a restatement of facts: this is what an era is,of course
+compressions take away updates that occured obsoletely in the near past
+and they won't impact aggregations: the evaluated result will always be the very same
+that's the point of a compression: the compressed amounts to the same as the uncompressed
+
+should digestion then occur between eras? there's nothing to gain in digesting just for exactly the same views to be restated
+there is though a point in compressing before commit
+and if old slices are being folded forwards into a new era
+(the new era contains a precis of the past)
+
+---
+
+because stages only know te state passing through them incrementally
+each intermediate value has to be passed through
+
+and so digestion, which is most effectively done on a body of data rather than just a small part, and which
+if it is to do anything, has to restate what has already passed, is unsuitable for incremental application
+
+a past era restated in the present, and a captured range of slices for a commit - these are two opportunities for digestion
+
+but digesting in-band only makes sense (is only possible) if the downstream consumers of slices can reapply slice ranges
+
+----
+
+we want to make emitting small updates as cheap as possible to bring as much as we can under a single model
+
+to do this, we have to compress, even in the base storage of ripples
+
+but, to be able to commit individual slices, then the original splits of things must be retained
+
+and, in order to undo, to bin ripple after ripple, the same information needs to be preserved - so do we really want to eagerly compress?
+
+single keypresses, even - if these were in the model - we wouldn't want such small updates to be undone bit by bit
+
+------
+
+simple: if we want undo in local editing, then we have to store each little input ripple and keep it about
+
+but we don't want to be reaggregating all these little bits on each new era...
+its like evaluable slices should therefore be folded over, instead of just ripple slices being restated
+
+each slice as it is first made should be there and then evaluated
+but doing this wires it up to the era base - to blocks
+
+lazily re-evaluating lets us lop ripples off the beginning of staging
+on the next era, evaluations begin again - and the old ripples aren't known about at all
+
+this allows shifting sands: as new blocks appear from elsewhere, our per-era evaluation will
+straightaway find them
+
+so this is a waste of effort, especially as the small updates pile up, and are re-evaulated each time
+
+how can we stop this reaggregation happening? there has to be some kind of cache
+
+an evaluation, once made on a log, knows what it has been built from
+there is potential hash here, made from the committed log offset + the local offset
+though, if a portion of the previous local offset has now become the head, we also don't need
+to redo work here
+
+each and every slice should calculate, each logPart's hash, which, when it came to re-evaluation
+could be used to avoid redoing work
+
+-----
+
+but, back to the digestion: if views are going to have some kind of cacheing mechanism, then
+our two considerations are:
+- commits should be compressed as much as possible (this can be done as late as we like)
+- more pressing, Committer must commit all current slices, not just the first...
+  just doing the first was a way to simplify the current implementation
+  and centralizing whatever digestion should be done
+  i still like the idea of doing it once, upstream
+  but, as said before, this breaks undos unless the original ripples were retained anyway
+  and if we did do it upstream, the digestion would be always incomplete and growing
+  the mere melding together of ripples would achieve nothing as the inner structure of them would have to be retained to satisfy the committer,
+  which requires stable and final ranges with which to tweak the thresh
+
+  as such, compression evenon commits is not necessary to proceed, though commits /do need to cover more than the first encountered slice/
+  
+-----
+
+in passing:
+if forms are to be filled out, it'd be cool to be able to request a provisional child LogSpace that could be posted to before affecting the parent
+we'd have then a hierarchy of LogSpaces
+
+as one committed, only the parent would be affected
+and changes in the parent would be propagated seemlessly to the child,
+as if they were new blocks
+
+the child Space, in committing, would create a Ripple in the parent, rather than a Block;
+though, in loading, it would indeed load real blocks by proxy
+
+-----------------------
+
+so (again):
+let's make Committer commit as many slices as it can
+
+---------------------
+
+*Take 2*
+
+whereas the Slicer is accumulating buffers of first-level ripples
+after this point the only thing cared for is the /final/ slice in the era
+
+slices in the first case are one-by-one sequential things;
+whereas in the latter they are restatements that needto be resubscribed to
+
+in the case of commits, we can commit the last-stated slice, but only if it covers the full range from the threhold onwards
+
+the Committer, caring about coverage of data like this could do its own reduction to ensure this invariant, allowing for upstream stages
+to emit in parts (as currenlty they do) but also allowing for consolidation and restatement from above
+
+so as a first pass, the needs of the Committer would be met, but no digestion would have to written it quite yet
+
+--
+
+currently, in evaluation, all individual slices are wired up to one another, meaning the viewer only has to keep tabs on the last seen,
+as we can rely on the full breadth of the slice space being implicitly covered.
+
+but there's overlapin functionality here with the digestion step, that would also bring bits together, like
+
+perhaps evaluation could just be done /after/ digestion
+so there'd be the digetsion step first of all, with the back-to-front aggregation clipping off unneeded remnants of the past
+
+only then would actual view-driven evaluation occur:
+
+the cost of this would be though the memoisation currently done by storing evaluations on slices
+
+but memoisation could still be done bit-by-bit; even digested slices are built from previous digestions
+in this scanning, work could be sparingly performed
+
+--
+
+but: in the case of undos, we'd want to go back but one slice, 
+in the old scheme, there'd be a saved view freshly waiting for us
+in the new, everything would be freshly created as slices were lopped off
+
+either way, a new era would have to be started on each undone step
+
+---
+
+for arbitrary info to memoized per slice, and made available after each era iteration,
+then the info would have to be saved onto the slice (as now) but before the Slicer's refolding...
+
+like the slice prep step would be a pipeline in itself
+
+each individual slice would have info stored against it;
+
+/including/ the latest frame of a big, digested slice
+
+so there'd be the raw per-slice data, but also a single view of everything accumulated so far in staging
+
+but in moving the threshold forwards, such slices would of course be undercut
+so each aggregate, digested slice would have to wear on itself its range
+and only if this range were still adequate would later eras reuse it
+otherwise, it would be regathered
+
+but, again, this per-era slice-enrichment is like a massive reduction loop,
+whereby the eventual, ultimately evaluated and digested era is completely available to its successor
+
+its like the next era's slices should have the opportunity to zip together with the previous era's
+
+this is the only way for memoisation to survive across eras, unless it were in the individual read heads of the viewer (a separate and complimentary possibility)
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

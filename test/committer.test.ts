@@ -1,4 +1,4 @@
-import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject } from "rxjs";
+import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, OperatorFunction } from "rxjs";
 import { reduceToArray, Dict, enumerate, tup, log } from "../lib/utils";
 import { slicer, Ripple, EraWithSlices, pullAll } from "../lib/core/slicer";
 import { map, concatMap, groupBy, startWith } from "rxjs/operators";
@@ -13,6 +13,24 @@ import { emptyBlocks } from "../lib/core/pullBlocks";
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
+
+
+const digestor = 
+    () : MonoTypeOperatorFunction<EraWithSlices<Ripple>> => 
+    pipe(        
+        map(era => {
+            const r = era.slices.pipe(
+                map(([_, ripple]) => ripple)
+            );
+
+            return { ...era, /*slices*/ };
+        }));
+
+
+
+
+
+
 
 describe('committer', () => {
 
@@ -34,6 +52,7 @@ describe('committer', () => {
                 startWith(newEpoch(emptyManifest)),
                 specifier(),
                 slicer(ripple$),
+                digestor(),
                 evaluateSlices(model),
                 pullAll());
 
@@ -45,14 +64,17 @@ describe('committer', () => {
     afterEach(complete)
 
 
-    it('stores first slice', async () => {
+    it('stores all slices of era', async () => {
         emit({ a: [ 1, 2 ] });
         emit({ b: [ 1 ] });
         doCommit();
 
         await expectCommits([{
-            data: { a: [ 1, 2 ] },
-            extent: 1
+            data: { 
+                a: [ 1, 2 ] ,
+                b: [ 1 ]
+            },
+            // extent: 2
         }]);
     })
 
@@ -94,10 +116,11 @@ describe('committer', () => {
     }
 
 
-    async function expectCommits(commits: { data: Dict<number[]>, extent: number }[]) {
+    async function expectCommits(commits: { data: Dict<number[]>, extent?: number }[]) {
         complete();
 
         const r = await commit$
+                        .pipe(map(({data, extent}) => ({ data, extent })))
                         .pipe(reduceToArray())
                         .toPromise();
 

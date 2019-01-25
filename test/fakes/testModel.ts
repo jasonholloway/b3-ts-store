@@ -1,22 +1,4 @@
-import { declareLogModel } from "../../lib/bits";
 import { declareUpdate } from "../../lib/utils";
-
-export const testLogModel = declareLogModel({
-    zero: [],
-    add(data: number[], [v, t, num]: AddUp) {
-        switch(t) {
-            case 'ADD':
-                return data.concat([parseInt(num)]);
-            default:
-                throw Error('Strange update!');
-        }
-    },
-    // view(data) {
-    //     return data.join(':');
-    // }
-})
-
-
 
 
 const logModel = {
@@ -25,12 +7,22 @@ const logModel = {
         ac == '' ? v.toString() : (ac + ',' + v)
 };
 
+const logModel2 = {
+    zero: '',
+    add: (ac: string, [_, body]: AddUp) =>
+        ac == '' ? body : (ac + ':' + body)
+}
+
+
 export class TestModel {
     logs = {
         myLog: logModel,
         myLog2: logModel,
         myLog3: logModel,
-        myLog4: logModel
+        myLog4: logModel,
+
+        test: logModel2,
+        hello: logModel2
     }
 }
 

@@ -1,11 +1,10 @@
 import { BlockStore, ManifestStore } from "../bits";
 import { Observer, OperatorFunction, pipe, of, Observable, MonoTypeOperatorFunction, concat } from "rxjs";
 import { Commit } from "./committer";
-import { concatMap, tap, mapTo, catchError } from "rxjs/operators";
-import { enumerate } from "../utils";
+import { concatMap, tap, mapTo, catchError, defaultIfEmpty } from "rxjs/operators";
+import { enumerate, log } from "../utils";
 import { Manifest } from "./specifier";
 import { PullManifest } from "./pullManifests";
-import { Model } from "./evaluateSlices";
 
 export const pusher =
     (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<Commit, Commit> =>
@@ -26,10 +25,10 @@ export const pusher =
                         logBlocks: { myLog: [ 'block0' ] }
                     };
 
-                    return manifestStore.save(manifest)
-                            .pipe(tap({ 
-                                error: () => pull$.next(['PullManifest', {}])
-                            }));
+                    return manifestStore.save(manifest) //but the store also needs to return an etag for us to merge into the next manifest
+                            .pipe(
+                                defaultIfEmpty(null),   //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                                tap({ error: () => pull$.next(['PullManifest', {}]) }));
                 }),
                 mapTo(commit),
                 mergeErrorsInto(commit)

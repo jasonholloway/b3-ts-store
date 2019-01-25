@@ -33,45 +33,58 @@ export interface EraWithSlices<V> extends Era {
 }
 
 
-export function slicer<U>
-    (ripple$: Observable<Ripple<U>>): OperatorFunction<Era, EraWithSlices<Ripple<U>>> 
-{
-    return era$ => {
-        era$ = era$.pipe(shareReplay(16));
+export const slicer =
+    (ripple$: Observable<Ripple>): OperatorFunction<Era, EraWithSlices<Ripple>> =>
+        era$ => {
+            era$ = era$.pipe(shareReplay(16));
 
-        const window$ = ripple$.pipe( 
-                            pullIntoSlices(),
-                            window(era$),         
-                            skip(1));
+            const window$ = ripple$.pipe( 
+                                pullIntoSlices(),
 
-        return zip(era$, window$)
-                .pipe(
-                    //simple era with latest slices
-                    map(([era, slices]) => ({ ...era, slices })),
+                                //here is where slices could be digested and primed for evaluation
+                                //ie before folding in with preious eras below
+                                //
+                                //but then the folding together (or rather, zipping together)
+                                //requires awareness of the current thresh etc
+                                //
+                                //as digestion progresses one slice at a time
+                                //with the clumped aggregate marginally complete for each slice
+                                //
+                                //
+                                //
 
-                    //merge in previous eras slices
-                    scan(   
-                        (prev$: Observable<EraWithSlices<Ripple<U>>>, era: EraWithSlices<Ripple<U>>) => {
-                            const slices = 
-                                prev$.pipe(
-                                    flatMap(prev => prev.slices),
-                                    concat(era.slices),
-                                    filter(([[from], _]) => from >= era.thresh),                    
-                                    shareReplay()
-                                );
+                                
 
-                            slices.subscribe();
+                                window(era$),         
+                                skip(1));
 
-                            return of({ ...era, slices });
-                        },
-                        empty()),
-                    concatAll()
-                );
-    };
-}
+            return zip(era$, window$)
+                    .pipe(
+                        //simple era with latest slices
+                        map(([era, slices]) => ({ ...era, slices })),
+
+                        //merge in previous eras slices
+                        scan(   
+                            (prev$: Observable<EraWithSlices<Ripple>>, era: EraWithSlices<Ripple>) => {
+                                const slices = 
+                                    prev$.pipe(
+                                        flatMap(prev => prev.slices),
+                                        concat(era.slices),
+                                        filter(([[from], _]) => from >= era.thresh),                    
+                                        shareReplay()
+                                    );
+
+                                slices.subscribe();
+
+                                return of({ ...era, slices });
+                            },
+                            empty()),
+                        concatAll()
+                    );
+        };
 
 
-function pullIntoSlices<U>() : OperatorFunction<Ripple<U>, Slice<Ripple<U>>> {
+function pullIntoSlices() : OperatorFunction<Ripple, Slice<Ripple>> {
     return pipe(
         map((part$, i) =>
             slice([i, i + 1], pull(part$)))

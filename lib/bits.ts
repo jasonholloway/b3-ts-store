@@ -20,7 +20,6 @@ export interface Log<U extends AnyUpdate, V> {
 }
 
 
-
 export type Block = {
     [keys: string]: any[]
 }
@@ -29,8 +28,6 @@ export interface BlockStore {
     load(key: string): Promise<Block>;
     save(key: string, block: Block): Promise<void>;
 }
-
-
 
 export interface ManifestStore {
     load(): Observable<Manifest>;

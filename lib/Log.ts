@@ -58,36 +58,6 @@ export function createLogMachine<U extends AnyUpdate, D>(
         spec: { head: 0, blocks: [] }
     };
 
-    //aggregations can be derived from the latest state of the log
-    //as in, updates can just be joined onto staging
-    //but what of bad updates? as in, an update that makes no sense to the model?
-    //there has to be some chance of validation here
-    //updates should be aggregated and filtered upstream of the overall log state
-    //and the aggregated state should therefore be reduced upstream
-
-    //but updates here can't be alone
-    //there also have to be updates loaded from the store
-    //which would be loaded and reduced via the model
-    //these committeds have to be reduced to a single set/aggregation
-    //and on each new view of the committed updates,
-    //our set of staged updates is recombined with it to give a view of staging
-
-    //the thing is, these committed updates have to be triggered in the first place:
-    //the first update or attempt at a view has to call an upstream source of blocks
-    //that will return a stream of updates that need to be merged into
-
-    //for every block we need,
-    //we should load updates for it
-    //and flatMap the resulting stream into one
-    //(but preserving the orderof the blocks!)
-    
-    //but we know our blocks before we want to load them
-    //on an update, we want to subscribe to the *cold* stream of updates from the store
-    //and we want to somehow merge into this new upstream
-    //there must be some premade operator that does exactly this
-    //but for this we need to look...
-    //
-
 
     const onUpdate: LogReduction<U, D>
         = update => state => ({
@@ -97,20 +67,7 @@ export function createLogMachine<U extends AnyUpdate, D>(
                 staged: [...state.staged, update]
             });
 
-    //when new spec comes in,
-    //we should store it in the state
-    //anyone listening for new aggrs
-    //should now pull through the latest state'n'spec
-    //which should load all blocks, aggregate these
-    //and pass them down
-
-    //not sure what the point of the LogState is, here;
-    //LogSpec + staging = all updates; simple as that
-    //the complication comes when we want to save effort,
-    //and just apply new updates on top of existing aggregations
-    //well - CommittedUpdates would be aggregated one by one as they come through
-    //and the CommittedAggr would be tapped by the StagedAggr, which would apply 
-    //staged updates freshly on top of it
+            
     const onSpec: LogReduction<LogSpec, D>
         = spec => state => {
             //we don't need to aggregate here, just to change indices in the state

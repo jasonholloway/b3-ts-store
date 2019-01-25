@@ -6,14 +6,14 @@ import { Slice } from './core/slicer';
 
 
 export type UpdateCreator<Type extends string, Body = void> 
-            = ((version: number, body?: Body) => [number, Type, Body])
+            = ((body?: Body) => [Type, Body])
                 & { readonly type: Type }
    
 export function declareUpdate<Type extends string>(type: Type) {
     return {
         withData<Body>(): UpdateCreator<Type, Body> {
             return Object.assign(
-                ((version: number, body: Body) => tup(version, type, body)),
+                ((body: Body) => tup(type, body)),
                 { type });
         }
     }

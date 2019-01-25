@@ -8,6 +8,7 @@ import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { Evaluable } from "../lib/core/evaluateSlices";
+import { final, gather } from "./helpers";
 
 
 describe('evaluateBlocks', () => {
@@ -118,14 +119,6 @@ describe('evaluateBlocks', () => {
 
     function complete() {
         manifest$.complete();
-    }
-
-    function gather<V>(v$: Observable<V>) {
-        return v$.pipe(toArray()).toPromise();
-    }
-
-    function final<V>(v$: Observable<V>) {
-        return v$.pipe(last()).toPromise();
     }
 
 })
