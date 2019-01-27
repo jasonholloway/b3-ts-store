@@ -784,12 +784,12 @@ this is all ok, but at the time of the new Era's specification, we need to know 
 
 the Slicer numbers slices; it should also update /lastSlice/ on the current slice that it prepares
 
+-------
 
+Slicer sets /era.from/, which compliments /era.threshold/
 
-
-
-as the previous Evaluable gets folded in to the new Era,
-
+now, this should only affect evaluation
+so an era should have an evaluate function, as well as logRefs
 
 
 

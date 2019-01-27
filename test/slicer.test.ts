@@ -142,6 +142,7 @@ describe('slicer', () => {
     })
 
 
+
     async function expectEras(expected: any[]) {
         complete();
         const eras = await era$.pipe(toArray()).toPromise();

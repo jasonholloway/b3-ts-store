@@ -1,17 +1,17 @@
 import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, EraWithSlices, Ripple } from "../lib/core/slicer";
-import { Subject, from, empty, Observable, zip } from "rxjs";
+import { Subject, from, Observable, zip } from "rxjs";
 import { Dict, reduceToDict, tup, reduceToArray, enumerate } from "../lib/utils";
-import { startWith, map, concatMap, groupBy } from "rxjs/operators";
+import { map, concatMap, groupBy } from "rxjs/operators";
 import { Evaluable, evaluateSlices } from "../lib/core/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
-import { specifier, Signal, newEra, newManifest, Epoch, emptyManifest, Manifest } from "../lib/core/specifier";
-import { pullBlocks, emptyBlocks } from "../lib/core/pullBlocks";
+import { specifier, emptyManifest, Manifest } from "../lib/core/specifier";
+import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 
 
-describe('evaluator', () => {
+describe('evaluateSlices', () => {
 
     const model = new TestModel();
 
