@@ -339,6 +339,522 @@ this is the only way for memoisation to survive across eras, unless it were in t
 
 
 
+here is where slices could be digested and primed for evaluation
+ie before folding in with preious eras below
+
+but then the folding together (or rather, zipping together)
+requires awareness of the current thresh etc
+
+as digestion progresses one slice at a time
+with the clumped aggregate marginally complete for each slice
+
+as old slices would be combined with new ones
+via simple concatenation
+the only things that would change would be the second-order accumulations, not the data of the slices themselves:
+ie. each slice's Evaluable and Digested
+
+the Digested is the unified, compressed slice that most simply represents the semantic accumulation
+of all time up to and including the owning slice
+that is, it is determined by everything that has led up to this slice
+
+and so, as we re-lay the ripples in the new era, this will change, potentially
+but it's also possible that it won't
+and that the previous era's version of the same could be used again
+
+there's no need for zipping here, just recalculation
+we never have two slices to be merged
+only the old era's slices to be re-laid
+and in doing so, we can redo the aggregation or leave in place
+
+Digested pertains to the entire sapace of logs; but Evaluables? these
+set up lazy functions. How will memoization go?
+
+it wouldn't be that bad to just expect views to be selective in what they emit,
+rather than for each slice to cache each and every view possible 
+so the challenge would become: how to stop unnecessary new views being emitted?
+
+well, the problem here is that eras, as they come afresh, must be freshly subscribed to
+by the Viewer; the old era is left for dead. But in this new subscription, all of history must
+be balefully replayed
+
+I'd say it'd be nice if the Viewer ddn't have to bother with newly-arriving eras: it could
+just have a single stream of slices to receive from
+then it'd just be a case of ignoring slices we'd seen before
+but then there's the problem of resetting, of changing the threshold
+
+to do so, the Viewer must begin from before; it's perfectly proper for it to subscribe afresh to a new era
+and receive everything that is new from the new era
+
+well - in subscribing to the new era, what it will receive in the first place is a sequence of slices
+if these slices hadn't been seen before, then it should continue receiving them
+
+the problem is in distinguishing what is truly a new epoch that requires us to start afresh in our viewing,
+and make-believe eras that are only being emitting for the convenience of other components
+
+the committer, if it's committing aggregated slices up till now needn't reset the era, I don't think
+it will just take as many slices as it's heard about; wait for them all (once captured) to complete
+and then the commit will go forwards
+
+on success of the commit, a new manifest will be emitted, and somehow this will move the threshold to lop off
+exactly what had been committed (if it's still about)
+
+but moving the threshold doesn't require a new era either - tailed views should notice no difference; only that
+a portion of the payload has moved (transparently) from the staging area into block storage
+
+a case where a new era would be required would be where foreign block movements had been received: these should
+cause us to look at ourselves afresh, but with the new knowledge of the world granted by the new manifest
+but even here, we only need to freshly trigger those views affected...
+
+we occasionally find ourselves back in this same spot, where ideas of hashing logs intrude
+if each log had some kind of marker, so we could pick out exactly which logs were effected by era-defining updates
+then we could be much more particular, with great savings across the board
+
+though then we'd have to be careful in emitting intermediate values: if, on newly affected logs, we replayed their
+histories, and their's alone - then we're going to be showing some inconsistencies
+
+it seems, when it comes to playing back visions from block storage, we should actually suppres all intermediate values
+as we know at time of viewing what the latest log value is, where it's head is at: there should be a filter in the viewerevaluable
+only letting through the latest of each log - then we could replay at our leisure
+
+but before this: the latest digestion should be on each and every slice as it comes through
+
+------
+
+a lot hangs here on how our eras will be.
+
+an era will occur when:
+- we reset
+- a new manifest comes in from outside
+
+currently eras also roll over on commits
+- this may actually be needed to free memory: otherwise old slices will never be forgotten
+  only on new eras do we selectively slough off the old: if it's past, it's passed
+- and this is basically where we store stuff: if we don't store it here, where would we store it?
+  maybe (eek) we don't have to defensively store stuff at all: as long as there are consumers
+  no, we do: undoing surely needs all previous slices tobe remembered, so that we can arbitrarily lop them off here and there
+
+so, rolling the era lets us slough the old shit off from storage
+this is actually pretty nice  
+
+if each slice referred toits previous slice, then we could step backwards by simply promoting the previous;
+but this seems complicated: we'd lose the whole stream articulation, which structures the system so nicely (or does it?!)
+
+with the buffered stream approach, we could do undo's by selectively folding in the previous era's slices: just fold in all of them except the previous one;
+a new era will have begun, with nice new specs
+
+this is a pleasant layout with a clear declaration of intent propogating through; but then we want to layer on optimisations
+
+so, say we had just stepped backwards, and wanted to selectively replay the past. Now, somehow, we'd know on a per-log basis where the head of each log was;
+and we'd know which logs had to be messed with to render the proper updated views.
+
+but, on the new era, all the old slices (minus the top one) would be folded into the new era. The attached Digest of each slice would still be good, as each one
+is only backward-looking and doesn't give two hoots for changes in the future that might be lopped off or added to or whatever
+
+in folding these in, we'd need some way of knowing that they could remain in situ, and wouldn't have to be recalculated. We need to have some marker (the famous hash!)
+indicating whether the past had changed...
+
+what would the Digest actually be anyway? it'd be an evaporated ripple, covering from the beginning of staging up to and including the slice's own native ripple
+
+the range of this digest would relate to slices that always were what they are; a portion of a range has happened and will never alter; it is immutable
+
+so we needn't worry about the actual represented contents having changed (as long as the ripple is complete! - this seems like it may be important)
+just that time has sidestepped the digest's version of history and moved on
+
+if the manifest version has changed, then we have built on sand
+
+but even a benign locally-sourced commit will change the manifest tag, and we don't want to throw everything away like this on each commit, do we?
+it's like we need to have some indication whether the overall manifest is local and contains our current timeline
+
+when we were thinking of logs this cropped up to: a way of knowing a log has changed?
+
+for a log, this would surely include the committed log head, plus the current, local offset
+this offset would be unaffected by, and would persist in its semantic usefulness, across each and every era
+but if a reset were to occur, then all log offsets would change to the new threshold, which would always be one beyond the current, and so a new view would be made
+
+i like this scheme: a per-log indication of freshness, like this: 13#34 (indicating, committed log head of 13, and up to local slice number 34)
+
+what would happen though on a commit? then it'd go up to 14#35
+except that, the first portion of the marker won't be a monotonically-rising index of such niceness: it'll be some kind of etag determined by the store
+it'll be a GUID, probably. 
+
+when we do our own persisting, would it be possible to short-circuit things, so that the etag that we now locally know, is somehow marked as being local?
+
+I've gone askew here: /it's not the etag of the manifest/! it's the log head persisted; even on recompressions, this index will remain stable
+
+how can we then identify the committed artifact as being the very same as we have cached in place?
+from the manifest, we see 14#0, locally we have in place 13#4
+though they are in fact the same
+
+we need an aliasing scheme, which is faffy i know
+on successful commit, an alias will be set up so that everyone in the next era knows that product:123@13.4 is the same as product:123@14
+
+this is not elegant; it stinks, in fact.
+the only thing i can think is like a per-log etag: a GUID on every slice that would get saved against logsin the manifest, so if we had a particular view of a log in place,
+we could keep it in place (this would be handy when serving nice projections for web viewing too - though, the idea is to load the actual logs, isn't it?)
+
+a guid also carries no information; if we wanted to know we could build on the old in-place info how could we know? at least if we knew (somehow) that what we were seeing
+amounted to public log head product:123@12, and we wanted product:123@55 then we could build on it (if we really wanted like)
+
+but all of this is getting tangled up in what ifs: we should concentrate on more simple solutions
+
+-----
+
+well, the idea of filtering till we see the latest we know about feels like a good one to me, as long as the slice is final, we know what we need to filter for
+(but what if the slice isn't final? hmm - i feel like they always should be if we're doing single ripples; the ripple is an atomic unit, like)
+
+---
+
+the question was, how to reuse Digests and Evaluables within Eras...
+
+the digest will be on the slice; it must have some marker to tell us the extent of its validity
+the digest only pertains to certain logs, of course, it'd be nice if only updated logs that it itself cared about invalidated it...
+
+but to know this some kind of hashing function would have to be performed on the logrefs it exposed, which isn't as quick and easy as you'd hope, not at all
+
+the digest advertises its local slice range; it should also advertise some marker of the epoch it was originally built on
+but this is just to avoid recompressing each and every era change...
+
+eras /must/ be swapped when even the threshold changes, as the era is the emission of a new spec
+
+consumers would receive the new era, and resubscribe to its slices, but, as the slices would now not be ranges but simply indexed (as only Digests would span)- actually forget about that bit
+subscribers would instead force the slices they received to go monotonically; ie they would never go backwards; restated slices would therefore be ignored
+
+and undos, stepping backwards? in this case, they would have to somehow re-emit the previous. this could be mandated by the same variable in the spec that told the slicer
+to lop off a portion of the previous era - basically, its possible without too much hassle - just a bit of paramterisation via the spec
+
+---
+
+in this case, do slices need to be 'zipped up'?
+
+the problem cases are commits and rebases; in these scenarios, Digests must be redone
+
+and views too: it's alright just filtering out old slices, but if the ground has changed, these restated slices might know something you don't
+
+so, if the ground has changed, we should go through them again? Narp - we only care, in every case, about the latest slice. The latest slice should have the best Digest, and the most pertinent
+Evaluable. Everything before the latest is just an old value malingering, needed maybe for undos and nothing more
+
+but - how do we know which is the latest? the spec needs some kind of notification
+as in, when looking at /Products/, NO! it's not per log, is it?! *it's per-Slice!*
+
+every era should now what its latest finalized Slice is - after this point we're into the world of up-to-the-minute latest slices
+and these can be naturally followed
+
+but when the era turns, that's exactly when we want to know which slices we can run over v. quickly to get to the coalface
+the old slices are still there as if they were current; but advertising this little bit of info allows consumers to scuttle past old news
+
+---
+
+in the case of an undo, then this same variable would lurch backwards: in this case we would filter till that point and show that slice suddenly
+
+in other cases, we would instead go forwards to the brand new first slice of the new era
+
+/so - the same mechanism, hurrah - simplicity!/
+
+-
+
+but what about, say, rebasing?
+
+then, the shifting of the ground means we should definitely emit the latest new slice in the new era (as is /always the case!/)
+
+it's just that, in this case, all evaluations and digestions would need to be redone
+
+------------------------
+
+digestions being one-per slice seems suddenly quite heavy: this is a lot of memoization, as it will sit alongside views too.
+in fact, as digestions cover all of staging, space usage is exponential as staging fills up
+and not just space usage, but the size of job in each additionaly run through of the model's compressors...
+it's not scalable except for when staging is guaranteed to be quite small - which it definitely isn't...
+
+so i've suddenly conveinced myself very easily that digestions shouldn't be stored on slices
+
+the only way to allow this would be if we minimised re-evaluations on era changes
+that was the big driver of the whole store-things-on-slices idea
+
+on each new era, consumers of eras/slices should be skipping everything they're not interested in - that's the key
+
+views of individual logs are themselves individually subscribed to evaluables of slices
+should each view then individually skip all the old slicesit already knows?
+well - probably not
+
+--------------------------------------------------
+
+so - each era will be specced with its known range of complete slices
+
+but, over the course of a single era, many slices will be emitted (but this is fine, as the reading of them will proceed linearly)
+
+so what we have is a starting range, or a folded range, or a known range
+
+---
+
+anything following progress across eras can just skip restated slices by looking at this range
+
+but - why can't the consumer just track this? the consumer knows what slices it's seen, like
+
+well... urgh...
+
+unfortunately no consumers currently course through the slices one by one anyway; both committer and viewer just get the final slice of interest and evaluate that
+
+the collocation of evaluated and slice needn't stay as it is...
+
+the viewer will always be reading the latest slices; but that's only because the evaluables have been linked up by the previous stage
+the wiring up of evaluables is of course itself part of the consumption
+
+but, because we're expecting to have to arbitrarily read from any point, we want to be able to just point at our sliceof interest, and gather its full preceding history
+and to do this, each time an era begins again, each slice needs wiring up to its previous slice again
+
+to simplify, we can just forget about cacheing - then the problem of viewing will just become a thing in the viewer:
+
+the viewer will aggregate each slice as it comes in, but filtering till it gets to the first slice of /this/ era
+
+----
+
+if we're gazumped, then the ground shifts, as we're familiar, and our current view, if it's now obsolete, has tobe regathered from the off
+
+i don't exactly see then why we have tohave Evaluables about. An Evaluable is a prepackaged and located script for viewing: it takes away the job of the Viewer,
+which should just now iterate through Evaluables instead of doing any viewing itself; the reason forthem in the first place was that the Committer would separately
+consume them
+
+but as each Evaluable is viewed, it would take in the previous slice's reduction, like
+and so, as the view proceeds, only the latest emissions are made (though - restatements will still be made messily)
+
+as memoisations must be per-log, the crosswise cacheing strategy don't seem so natural, actually
+
+--------
+
+go on then: the viewer takes in eras and slices, and efficiently emits new views per log
+
+but what then of the poor Committer? instead of just aggregating on commit, we really want a rolling update of errors in the staging zone:
+the Committer should be viewing all logRefs of all the slices, and piping out any arising errors
+
+but we don't want Viewer and Committer to be pursuing completely separate aggregations in duplicate;
+views of slices should therefore be shared
+
+but the Committer only cares about the /committed/ slices of the previous era
+
+------
+
+instead of evaluations per slice, it should really be per era
+
+committing then clings on to the previous eras total evaluation, while the view progresses onwards
+
+but the new era /will/ present a completely new evaluation still, and the problem of duplication arises again
+
+the per-era evaluable should create per-log evaluations that read in each new slice as it occurs, pluck out the log parts thatrelate to it, and move the view forward
+
+there should also be some kind of cache of ready-created evalutions to avoid duplication (though this will be irrelevant, functionally)
+
+---
+
+but then, the continuing evaluations of the viewer will cross eras; the new evaluation will be picked up, and will it merely restate the emissions of the previous era?
+
+if so, the viewer could merely filter these out (though, as evalution will be done behind the Evaluable interface, there's no direct means of applying this filtering)
+
+otherwise, the new evaluable on the new era could, perhaps, just emit views pertaining to the new slices of the era
+instead of starting from the beginning, it would quietly consume the previous era's evaluable (a readymade /ac/) and emit only /new/ views;
+it'd rely on its consumers switching readily to it from its predecessor
+and if there were new consumers, the idea would be that they'd only want to see the latest anyway
+
+but this will all be per-log
+each previous eras per-log evaluation would therefore have to be stored in that era: multi-level cacheing
+
+-----
+
+the era will be evaluated (or rather, one particular log will be): blocks will be dredged, as will all slices one by one, and, eventually,
+a stream of the era's latest views will spurt out. A similar viewing of the next era will, for the consumer at least, be entirely complementary: no views will be restated
+
+but internally, the aggregation of the views of the new era will, one presumes, have to begin from scratch - unless the previous era is used to aggregate /its/ slices
+but this means each era will keep a reference to the previous era, so that the memoised aggregation proper to each can be stored on each
+
+but sometimes, instead of being reliant on the previous eras slices, sometimes, say post reset, we don't care about the previous era, as things have moved on,
+and we doindeed want to start afresh, unavoidably. Though this would be determined by explicit values in the spec: we'd only refer back to the previous era if
+the current era's range (though not its /fresh/ range) 
+
+-
+
+so, a new era, containing some old slices, will be evaluated
+
+somehow it will know to delegate to the previous era (maybe because its range isn't all fresh - ie it covers slices /not owned by itself/)
+in which case, it should evaluate the previous era before evaluating itself.
+
+this, combined with a per-era memoizing of per-log evaluations should work nicely
+
+-----
+
+what about rebasing?
+
+in which case a new era will begin, but all previous evaluations are now useless (or - shouldn't this be decided per-log, eh?)
+
+----------------------------------
+
+with each Era, existing slices, along with existing era-wide Evaluable are folded in. Inside the Evaluable, per-log accumulations are also
+passed through, ready to be taken up by the receiving Era with its foot in the future
+
+the new Era fields its own Evaluable, exposing logRefs and the /evaluate()/ function. The era's logRefs will be all those of its /current/ slices plus those
+it gets via delegation to its predecessor.
+
+the /range/ of the Era determines whether it delegates to block storage or to it predecessor era.
+
+logRefs aren't however given by block storage; only evaluations are.
+
+---
+
+if an Epoch changes however, the current Era can't delegate in to its predecessor
+in this case, the best the new era can do is to evaluate again from block storage
+
+and it must reevaluate /all of the slices passed on to it/, instead of only slices after the new-era threshold
+
+--
+
+Eras will have several indices, indicating ranges:
+
+from:   index of /next/ slice; all slices before this threshold will be cast aside
+last:   index of last-evaluated slice; previous era will provide evaluation /up till this point/
+
+
+but what happens if the from threshold moves forwards?
+if so, the previous era is entirely invalidated(?)
+
+actually, it isn't - as even if the threshold steps on, it doesn't mean that the old staged info newly lopped away should no longer be represented
+if it's been committed, we still want to show it
+
+
+if /from/ creeps forwards, then we can no longer use the previous era for it
+although, again, we should be able to, if it's a commit
+
+in fact, a reset will move /from/ forwards and past the past anyway
+resetting doesn't lop off the front; it skips everything forwards to begin afresh
+
+in the case of a commit, then old bits will be taken away: /from/ will go forward, to presumably match /last/ 
+
+but with a commit, the Epoch will move as well: the manifest will have a new tag; and committed log heads will shift
+and if the epoch moves, then we have to evaluate afresh (maybe...)
+
+we can imagine slice indices going forwards, being transposed so as to appear entirely new, but really being the same old ripples
+this would enable /from/ and /last/ to still make simple sense, iterating monotonically through a dimension
+
+otherwise /from/ and /last/ would remain the same, but really all had changed.
+unless these indices also paid attention to epoch version
+but then blitzing all on an arbitrary epoch change is a waste as well
+
+instead of invalidating based on epoch version, which is blunt, we should invalidate based on
+committed log head
+
+each evaluation of a log will, when first starting its evaluation of an era, check the manifest to see where the upstream log has got up to
+if the previous era's evaluation is based on the same logHead, then it can be happily used
+but if not, then we have do our own evaluation afresh
+
+this means that evaluations would have to emit not just views, but notices of dependence
+the previous era's evaluable (if still in range according to the log spec) will be subscribed to,
+and its first emission will be consulted
+
+------
+
+on /reset/ (again for shits and giggles) the sliceThreshold will be moved forwards
+
+the evaluator will firstly look at /lastEvaluated/
+if this is >= the new threshold, then it should delegate to this to get a basis for its own aggregation
+and, once it had this from the previous era, then all current slices /past the lastEvaluated/ would be played onto it
+the overall stream of views would be filtered so that only views > /lastEvaluated/ will be output
+it's expected that consumers will have already received the last evaluated view from the previous era
+
+/threshold/
+/lastEvaluated/
+
+-----
+
+on /epoch shift/, the evaluator will see from /lastEvaluated/ that the previous era's evaluation has something to say,
+and it will let it whisper in its own ear via subscription; but if the view so rendered doesn't match the current /logHead/ (or - more wastefully, the current epoch version)
+
+then a backup plan comes into operation,
+whereby the previous era's evaluation must be ignored
+and instead all the current era's slices get replayed on top of a re-evaluation of block storage
+
+----
+
+as the new Era begins in the specifier, then the extent of the previous era needs to be encoded in the current era's spec
+
+we need to know exactly how many slices the previous era had
+this is known only to the Slicer (and consumers of it) - as the Slicer numbers the slices it creates, one by one
+
+a new Era comes along, is triggered by whatever; there's no guarantee I don't think that its Slices have all completed on its own demise
+the last Slice dealt with may be waiting for some very slow addition
+this is all ok, but at the time of the new Era's specification, we need to know where the previous era got up to
+
+---
+
+the Slicer numbers slices; it should also update /lastSlice/ on the current slice that it prepares
+
+
+
+
+
+as the previous Evaluable gets folded in to the new Era,
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

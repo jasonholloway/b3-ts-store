@@ -41,19 +41,10 @@ export const slicer =
             const window$ = ripple$.pipe( 
                                 pullIntoSlices(),
 
-                                //here is where slices could be digested and primed for evaluation
-                                //ie before folding in with preious eras below
-                                //
-                                //but then the folding together (or rather, zipping together)
-                                //requires awareness of the current thresh etc
-                                //
-                                //as digestion progresses one slice at a time
-                                //with the clumped aggregate marginally complete for each slice
-                                //
-                                //
-                                //
-
-                                
+                                //slices are numbered here
+                                //and the next era's spec must be determined by them
+                                //so either we get this information upstream somehow, 
+                                //or we fold it in here <-- the right approach
 
                                 window(era$),         
                                 skip(1));
