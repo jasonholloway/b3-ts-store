@@ -1,7 +1,7 @@
 import { Observable, empty, OperatorFunction, zip, pipe, of, MonoTypeOperatorFunction } from "rxjs";
-import { scan, concat, filter, shareReplay, window, map, skip, concatMap, flatMap, concatAll, share } from "rxjs/operators";
+import { scan, concat, filter, shareReplay, window, map, skip, concatMap, flatMap, concatAll, share, last, defaultIfEmpty, withLatestFrom, max } from "rxjs/operators";
 import { tup, reduceToArray } from "../utils";
-import { Manifest } from "./specifier";
+import { Manifest, emptyManifest } from "./specifier";
 import { Evaluable } from "./evaluateSlices";
 
 
@@ -29,9 +29,18 @@ export interface Era {
 }
 
 export interface EraWithSlices<V> extends Era {
-    slices: Slice$<V>
+    slices: Slice$<V>,
+    from: number
 }
 
+const emptyEra: EraWithSlices<Ripple> = {
+    id: 0,
+    slices: empty(),
+    from: 0,
+    thresh: 0,
+    manifest: emptyManifest,
+    blocks: null,
+}
 
 export const slicer =
     (ripple$: Observable<Ripple>): OperatorFunction<Era, EraWithSlices<Ripple>> =>
@@ -39,41 +48,56 @@ export const slicer =
             era$ = era$.pipe(shareReplay(16));
 
             const window$ = ripple$.pipe( 
-                                pullIntoSlices(),
-
-                                //slices are numbered here
-                                //and the next era's spec must be determined by them
-                                //so either we get this information upstream somehow, 
-                                //or we fold it in here <-- the right approach
-
-                                window(era$),         
+                                pullParts(),
+                                window(era$),     
                                 skip(1));
 
             return zip(era$, window$)
                     .pipe(
-                        //simple era with latest slices
-                        map(([era, slices]) => ({ ...era, slices })),
-
-                        //merge in previous eras slices
                         scan(   
-                            (prev$: Observable<EraWithSlices<Ripple>>, era: EraWithSlices<Ripple>) => {
-                                const slices = 
+                            (prev$: Observable<EraWithSlices<Ripple>>, [era, ripple$]: [Era, Observable<Ripple>]) => {
+
+                                const from$ = prev$.pipe(
+                                                concatMap(prev => 
+                                                    prev.slices.pipe(
+                                                        map(([[_, to]]) => to),
+                                                        defaultIfEmpty(prev.from),
+                                                        max())),
+                                                defaultIfEmpty(0),
+                                                shareReplay(1));
+
+                                const currSlice$ = 
+                                    ripple$.pipe(
+                                        withLatestFrom(from$),
+                                        map(([part$, start], i) => slice([start + i, start + i + 1], part$)));
+
+                                const allSlice$ = 
                                     prev$.pipe(
-                                        flatMap(prev => prev.slices),
-                                        concat(era.slices),
+                                        concatMap(prev => prev.slices),
+                                        concat(currSlice$),
                                         filter(([[from], _]) => from >= era.thresh),                    
-                                        shareReplay()
-                                    );
+                                        shareReplay());
 
-                                slices.subscribe();
+                                allSlice$.subscribe();
 
-                                return of({ ...era, slices });
+                                return from$.pipe(
+                                    map(from => ({
+                                        ...era,
+                                        slices: allSlice$,
+                                        from 
+                                    })));
                             },
                             empty()),
                         concatAll()
                     );
         };
 
+
+function pullParts() : MonoTypeOperatorFunction<Ripple> {
+    return pipe(
+        map(pull)
+    );
+}
 
 function pullIntoSlices() : OperatorFunction<Ripple, Slice<Ripple>> {
     return pipe(

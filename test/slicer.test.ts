@@ -1,7 +1,7 @@
 import { Observable, Subject, from, OperatorFunction, pipe, zip, merge } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
-import { map, concatMap } from "rxjs/operators";
-import { Range, slicer, EraWithSlices } from "../lib/core/slicer";
+import { map, concatMap, toArray } from "rxjs/operators";
+import { Range, slicer, EraWithSlices, pullAllSlices } from "../lib/core/slicer";
 import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib/core/specifier";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
@@ -23,7 +23,8 @@ describe('slicer', () => {
     let manifest$: Subject<Manifest>
     let ripple$: Subject<Ripple<number>>
     let signal$: Subject<Signal>
-    let gathering: Promise<[Range, Dict<number[]>][]>
+
+    let era$: Observable<EraWithSlices<Ripple<number>>>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
@@ -39,11 +40,10 @@ describe('slicer', () => {
                             evaluateBlocks(model))
                     ).pipe(map(e => newEpoch(...e)));
 
-        gathering = merge(epoch$, signal$).pipe(
-                        specifier(),
-                        slicer(ripple$),
-                        materializeEras()
-                    ).toPromise();
+        era$ = merge(epoch$, signal$).pipe(
+                    specifier(),
+                    slicer(ripple$),
+                    pullAllSlices());
 
         manifest$.next(emptyManifest);
     })
@@ -51,7 +51,7 @@ describe('slicer', () => {
     it('single slice appears in output', async () => {
         ripple({ log1: [ 1, 2, 3 ] });
         
-        await expectEras([
+        await expectSlices([
             [
                 [[0, 1], { log1: [ 1, 2, 3 ] }]
             ]
@@ -62,7 +62,7 @@ describe('slicer', () => {
         ripple({ log1: [ 1, 2, 3 ] });
         ripple({ log2: [ 4, 5, 6 ] });
 
-        await expectEras([
+        await expectSlices([
             [
                 [[0, 1], { log1: [ 1, 2, 3 ] }],
                 [[1, 2], { log2: [ 4, 5, 6 ] }]
@@ -74,7 +74,7 @@ describe('slicer', () => {
         ripple({ log1: [ 1, 2, 3 ] });
         threshold(1);
 
-        await expectEras([
+        await expectSlices([
             [
                 [[0, 1], { log1: [ 1, 2, 3 ] }]
             ],
@@ -88,7 +88,7 @@ describe('slicer', () => {
         threshold(1);
         ripple({ log1: [ 4 ] });
         
-        await expectEras([
+        await expectSlices([
             [
                 [[0, 1], { log1: [ 1, 2, 3 ] }]
             ],
@@ -104,7 +104,7 @@ describe('slicer', () => {
         ripple({ log1: [ 3 ] })
         threshold(2);
         
-        await expectEras([
+        await expectSlices([
             [
                 [[0, 1], { log1: [ 1 ] }],
                 [[1, 2], { log1: [ 2 ] }],
@@ -121,7 +121,7 @@ describe('slicer', () => {
         ripple({ log1: [ 1, 2, 3 ] });
         ripple({ log2: [ 4, 5, 6 ] });
 
-        await expectEras([
+        await expectSlices([
             [
                 [[0, 1], { log1: [ 1, 2, 3 ] }],
                 [[1, 2], { log2: [ 4, 5, 6 ] }]
@@ -130,19 +130,36 @@ describe('slicer', () => {
     })
 
 
+    it('era.from populated on new eras', async () => {
+        ripple({ log1: [ 1, 2, 3 ] });
+        ripple({ log2: [ 4, 5, 6 ] });
+        threshold(0);
+        
+        await expectEras([
+            { from: 0 },
+            { from: 2 }
+        ])
+    })
+
+
+    async function expectEras(expected: any[]) {
+        complete();
+        const eras = await era$.pipe(toArray()).toPromise();
+        expect(eras).toMatchObject(expected);
+    }
 
 
 
-    async function expectEras(expected: [Range, Dict<number[]>][][]) {
-        const r = await complete();
-        expect(r).toEqual(expected);
+    async function expectSlices(expected: [Range, Dict<number[]>][][]) {
+        complete();
+        const eras = await era$.pipe(materializeEras()).toPromise();
+        expect(eras).toMatchObject(expected);
     }
 
 
     function complete() {
         ripple$.complete();
         signal$.complete();
-        return gathering;
     }
 
     function threshold(n: number) {
