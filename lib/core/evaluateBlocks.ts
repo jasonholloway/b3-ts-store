@@ -12,7 +12,7 @@ export const evaluateBlocks =
         map(({manifest, load}) => {
 
             return {
-                logRefs: empty(),
+                logRef$: empty(),
 
                 evaluate<K extends KnownLogs<M>>(logRef: K): Observable<KnownAggr<M, K>> {
                     const m = model.logs[logRef];
@@ -25,4 +25,4 @@ export const evaluateBlocks =
             }
         })
     );
-
+        

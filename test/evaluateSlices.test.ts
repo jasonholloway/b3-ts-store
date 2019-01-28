@@ -11,7 +11,7 @@ import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 
 
-describe('evaluateSlices', () => {
+xdescribe('evaluateSlices', () => {
 
     const model = new TestModel();
 
@@ -168,7 +168,7 @@ describe('evaluateSlices', () => {
         complete();
 
         const r = await era$.pipe(
-                        concatMapSlices(([_, {logRefs, evaluate}]) => 
+                        concatMapSlices(([_, {logRef$: logRefs, evaluate}]) => 
                             logRefs.pipe(
                                 concatMap(ref => evaluate(ref).pipe(
                                                     map(v => tup(ref, v)))),
@@ -183,7 +183,7 @@ describe('evaluateSlices', () => {
         complete();
 
         const r = await era$.pipe(
-                        concatMapSlices(([_, {logRefs}]) => 
+                        concatMapSlices(([_, {logRef$: logRefs}]) => 
                             logRefs.pipe(reduceToArray())),                            
                         materializeSlices()
                     ).toPromise();

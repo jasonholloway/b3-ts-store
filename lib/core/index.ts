@@ -20,7 +20,7 @@ export interface Core<M extends Model> {
 } 
 
 const emptyEvaluable: Evaluable = {
-    logRefs: empty(),
+    logRef$: empty(),
     evaluate: () => empty()
 }
 

@@ -19,7 +19,7 @@ export type KnownAggr<M extends Model, K extends keyof M['logs']>
 
 
 export interface Evaluable<M extends Model = any> {
-    logRefs: Observable<KnownLogs<M>>,
+    logRef$: Observable<KnownLogs<M>>,
     evaluate<K extends KnownLogs<M>>(ref: K) : Observable<KnownAggr<M, K>>
 }
 
@@ -38,7 +38,7 @@ export const evaluateSlices =
                     tup(curr$,
                         createEvaluable<M>({
 
-                            logRefs: curr$.pipe(
+                            logRef$: curr$.pipe(
                                         concatMap(([key]) => isKnownLog(model, key) ? [key] : [])),
 
                             evaluate(ref) {

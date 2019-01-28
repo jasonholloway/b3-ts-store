@@ -1,9 +1,9 @@
-import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, Ripple } from "../lib/core/slicer";
-import { Subject, from, Observable, zip } from "rxjs";
-import { Dict, reduceToDict, tup, reduceToArray, enumerate } from "../lib/utils";
+import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, Ripple, pullAll } from "../lib/core/slicer";
+import { Subject, from, Observable, zip, merge } from "rxjs";
+import { Dict, reduceToDict, tup, reduceToArray, enumerate, log } from "../lib/utils";
 import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { specifier, emptyManifest, Manifest } from "../lib/core/specifier";
+import { specifier, emptyManifest, Manifest, setThreshold, Signal, newEra } from "../lib/core/specifier";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/core";
@@ -15,7 +15,8 @@ describe('evaluator', () => {
 
     const model = new TestModel();
 
-    let manifest$: Subject<Manifest>;
+    let manifest$: Subject<Manifest>
+    let signal$: Subject<Signal>
     let ripple$: Subject<Ripple<number>>
     let blockStore: FakeBlockStore
 
@@ -25,6 +26,7 @@ describe('evaluator', () => {
         blockStore = new FakeBlockStore();
 
         manifest$ = new Subject<Manifest>();
+        signal$= new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
 
         const epoch$ = zip(
@@ -34,22 +36,13 @@ describe('evaluator', () => {
                             evaluateBlocks(model))
                     ).pipe(map(e => newEpoch(...e)));
 
-        era$ = epoch$.pipe(
-                specifier(),
-                slicer(ripple$),
-                evaluator(model),
-                pullAllSlices());
+        era$ = merge(signal$, epoch$).pipe(
+                    specifier(),
+                    slicer(ripple$),
+                    evaluator(model),
+                    pullAllSlices());
 
         manifest$.next(emptyManifest);
-    })
-
-
-    it('passes through raw logs in tuple', async () => {
-        ripple({ myLog: [1, 2], myLog2: [ 9 ] });
-    
-        await expectLogRefs([
-            ['myLog', 'myLog2']
-        ]);
     })
 
 
@@ -69,6 +62,29 @@ describe('evaluator', () => {
                 ['myLog2']
             ]);
         })
+
+        it('includes logRefs of eras within threshold', async () => {
+            ripple({ myLog: [1] });
+            signal$.next(newEra());
+            ripple({ myLog2: [1] });
+
+            await expectLogRefs([
+                ['myLog'],
+                ['myLog', 'myLog2']
+            ]);
+        })
+
+        it('excludes logRefs of eras before threshold', async () => {
+            ripple({ myLog: [1] });
+            signal$.next(setThreshold(1));
+            ripple({ myLog2: [1] });
+
+            await expectLogRefs([
+                ['myLog'],
+                ['myLog2']
+            ]);
+        })
+
     })
 
 
@@ -91,6 +107,16 @@ describe('evaluator', () => {
             ]);
         })
 
+        it('ignores before threshold', async () => {
+            ripple({ myLog: [1, 2] });
+            ripple({ myLog: [3, 4] });
+            signal$.next(setThreshold(1));
+    
+            await expectAggrs([
+                { myLog: '1,2,3,4' },
+                { myLog: '3,4' }
+            ]);
+        })
 
         it('loads blocks first, given manifest', async () => {
             ripple({ myLog: [ 5, 6 ] });
@@ -112,6 +138,13 @@ describe('evaluator', () => {
                 { myLog: '1,2,3,4,5,6' }
             ]);
         })
+
+        //what should it do given a threshold moved on...?
+        //feels like it should continue serving as before
+        //
+        //a changed epoch is a different matter, of course
+        //
+        //
     })
 
 
@@ -152,10 +185,12 @@ describe('evaluator', () => {
 
         const all = await era$.pipe(
                             concatMap(era =>
-                                era.logRefs.pipe(
-                                    concatMap(ref => era.evaluate(ref).pipe(
-                                                        map(v => tup(ref, v)))),
-                                    reduceToDict()))
+                                era.logRef$.pipe(
+                                    concatMap(ref => 
+                                        era.evaluate(ref).pipe(
+                                            map(v => tup(ref, v)))),
+                                    reduceToDict())),
+                            toArray()
                         ).toPromise();
 
         expect(all).toEqual(expected);
@@ -165,9 +200,10 @@ describe('evaluator', () => {
         complete();
 
         const r = await era$.pipe(
-                            concatMap(era => era.logRefs
-                                                .pipe(toArray()))
-                            ).toPromise();
+                            concatMap(era =>
+                                era.logRef$.pipe(toArray())),
+                            toArray()
+                        ).toPromise();
 
         expect(r).toEqual(expected);
     }
