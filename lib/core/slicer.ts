@@ -16,7 +16,7 @@ export interface Part$<V> extends Observable<Part<V>> {}
 export interface Ripple<U = any> extends Part$<U> {}
 
 export interface Range extends Tuple2<number, number> {}
-export interface Slice<V> extends Tuple2<Range, V> {}
+export interface Slice<V = Ripple> extends Tuple2<Range, V> {}
 
 export type Slice$<V> = Observable<Slice<V>>
 export type EraSpec = number;

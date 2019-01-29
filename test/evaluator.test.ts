@@ -1,6 +1,6 @@
-import { slicer, Slice, concatMapSlices, materializeSlices, pullAllSlices, Ripple, pullAll } from "../lib/core/slicer";
+import { slicer, pullAllSlices, Ripple } from "../lib/core/slicer";
 import { Subject, from, Observable, zip, merge } from "rxjs";
-import { Dict, reduceToDict, tup, reduceToArray, enumerate, log } from "../lib/utils";
+import { Dict, reduceToDict, tup, enumerate } from "../lib/utils";
 import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { specifier, emptyManifest, Manifest, setThreshold, Signal, newEra } from "../lib/core/specifier";
@@ -138,13 +138,6 @@ describe('evaluator', () => {
                 { myLog: '1,2,3,4,5,6' }
             ]);
         })
-
-        //what should it do given a threshold moved on...?
-        //feels like it should continue serving as before
-        //
-        //a changed epoch is a different matter, of course
-        //
-        //
     })
 
 

@@ -1,8 +1,8 @@
 import { pipe, OperatorFunction, empty, Observable, of, concat } from "rxjs";
-import { EraWithSlices, Ripple, pullAll } from "./slicer";
-import { scan, concatAll, concatMap, map, filter, defaultIfEmpty, tap, shareReplay } from "rxjs/operators";
+import { EraWithSlices, Ripple, pullAll, Slice } from "./slicer";
+import { scan, concatAll, concatMap, map, filter, defaultIfEmpty, tap, shareReplay, startWith, single, last } from "rxjs/operators";
 import { Evaluable, Model, KnownLogs } from "./evaluateSlices";
-import { log } from "../utils";
+import { log, tup } from "../utils";
 
 
 export interface EvaluableEra<M extends Model> 
@@ -20,7 +20,15 @@ export const evaluator =
                                         concatMap(([ref]) => isKnownLog(model, ref) ? [ref] : [])) ; //and unique?
 
                     const sliceId$ = era.slices.pipe(
-                                        map(([[id]]) => id));   //for plucking out latest sliceId (default to threshold)
+                                                map(([[id]]) => id),
+
+                                                );   //for plucking out latest sliceId (default to from)
+
+                    //so... evaluate will be called when attaching to a new era
+                    //at this point we should only emit actual views from /from/ or onwards
+                    //or, if we have no views, we should emit the base view from block storage
+                    //
+                    //
 
                     return of(createEvaluableEra<M>({
                         ...era,
@@ -28,28 +36,32 @@ export const evaluator =
 
                         evaluate(ref) {
                             const m = model.logs[ref];
-
-                            const update$ = era.slices.pipe(
-                                                concatMap(([, part$]) => 
-                                                    part$.pipe(
-                                                        filter(([key, v]) => key == ref),
-                                                        concatMap(([, v$]) => v$))));
                             
-                            const blockEval$ = era.blocks
-                                                .evaluate(ref)
-                                                .pipe(shareReplay(1));
-                                            
-                            return concat(
-                                    blockEval$, 
-                                    update$.pipe(
-                                        scan<any, Observable<any>>(
-                                            (ac$, v) => 
-                                                ac$.pipe(map(ac => m.add(ac, v))),
-                                            blockEval$
-                                                .pipe(defaultIfEmpty(m.zero))),
-                                        concatAll())
-                                    );
-                        }
+                            const base$ = era.blocks
+                                            .evaluate(ref).pipe(
+                                                single(),
+                                                map(v => tup(era.thresh, v)),
+                                                shareReplay(1));
+
+                            return base$.pipe(
+                                    concatMap(base =>                                               
+                                        era.slices.pipe(
+                                            scan<Slice, Observable<[number, any]>>(
+                                                (prev$, [[i], part$]) => 
+                                                    prev$.pipe(
+                                                        concatMap(([, prev]) => part$.pipe(
+                                                            filter(([key]) => key == ref),
+                                                            concatMap(([, v$]) => v$),
+                                                            scan(m.add, prev),
+                                                            last())),
+                                                        map(v => tup(i, v))
+                                                    ),
+                                                of(base)),
+                                            concatAll(),
+                                            filter(([i]) => i >= era.from),
+                                            defaultIfEmpty(base))),             //this isn't what we should be defaulting to!
+                                    map(([, v]) => v));                         //really we want to partition here
+                        }                                                       
                     }));
                 },
                 empty()),

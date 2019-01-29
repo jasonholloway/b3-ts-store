@@ -1,7 +1,7 @@
 import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluateSlices";
 import { OperatorFunction, pipe, empty, from, Observable } from "rxjs";
 import { BlockFrame } from "./pullBlocks";
-import { map, concatMap, scan, takeLast } from "rxjs/operators";
+import { map, concatMap, scan, takeLast, startWith } from "rxjs/operators";
 
 export const evaluateBlocks = 
     <M extends Model>(model: M) : OperatorFunction<BlockFrame, Evaluable<M>> =>
@@ -17,6 +17,7 @@ export const evaluateBlocks =
                             .pipe(
                                 concatMap(blockRef => load(blockRef)(logRef)),
                                 scan(m.add, m.zero),
+                                startWith(m.zero),
                                 takeLast(1));
                 }
             }

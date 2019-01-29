@@ -71,11 +71,11 @@ describe('evaluateBlocks', () => {
             expect(views).toEqual(['1,2,3,4,5']);
         })
 
-        it('returns empty if log unknown in blocks', async () => {
+        it('returns zero if log unknown in blocks', async () => {
             const frame = await final(frame$);
             const views = await gather(frame.evaluate('myLog3'));
 
-            expect(views).toEqual([]);
+            expect(views).toEqual(['']);
         })
 
         it('throws error if block not known', async () => {
