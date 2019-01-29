@@ -1,7 +1,7 @@
 import { Subject, from, MonoTypeOperatorFunction, zip, merge } from "rxjs";
 import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
-import { slicer, Ripple, mapSlices } from "../lib/core/slicer";
-import { map, concatMap, groupBy, shareReplay, startWith } from "rxjs/operators";
+import { slicer, Ripple, mapSlices, pullAll } from "../lib/core/slicer";
+import { map, concatMap, groupBy, shareReplay, startWith, toArray } from "rxjs/operators";
 import { evaluateSlices, KnownLogs } from "../lib/core/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/core/committer";
@@ -11,6 +11,8 @@ import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
+import { evaluator } from "../lib/core/evaluator";
+import { gather } from "./helpers";
 
 type TestRipple = Dict<number[]>
 
@@ -48,8 +50,7 @@ describe('viewer', () => {
                         startWith(newEra()),
                         specifier(),
                         slicer(ripple$),
-                        evaluateSlices(model),
-                        mapSlices(([_, evaluable]) => evaluable),
+                        evaluator(model),
                         pullAll());
 
         manifest$.next(emptyManifest);
@@ -112,16 +113,13 @@ describe('viewer', () => {
 
 
     function getView(ref: KnownLogs<TestModel>) {
-        return view(ref)
-                .pipe(reduceToArray())
-                .toPromise();
+        return gather(view(ref));
     }
 
 
-    async function expectViews(ref: KnownLogs<TestModel>, expected: any[]) {
+    async function expectViews(ref: KnownLogs<TestModel>, expected: any[]) {        
         complete();
-        const r = await getView(ref);
-        expect(r).toEqual(expected);
+        expect(await getView(ref)).toEqual(expected);
     }
 
 
@@ -138,14 +136,6 @@ describe('viewer', () => {
         ripple$.complete();
         signal$.complete();
         doCommit$.complete();
-    }
-
-    function pullAll<V>() : MonoTypeOperatorFunction<V> {
-        return v$ => {
-            v$ = v$.pipe(shareReplay());
-            v$.subscribe();
-            return v$;
-        }
     }
 
 })

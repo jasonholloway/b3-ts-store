@@ -57,18 +57,18 @@ describe('evaluateBlocks', () => {
     describe('simple', () => {
         beforeEach(complete);
 
-        it('evaluates single block', async () => {
+        it('evaluates single block; emits only final view', async () => {
             const frame = await final(frame$);
-            const view = await final(frame.evaluate('myLog2'));
+            const views = await gather(frame.evaluate('myLog2'));
 
-            expect(view).toEqual('1,2,3');
+            expect(views).toEqual(['1,2,3']);
         })
 
         it('evaluates multiple block', async () => {
             const frame = await final(frame$);
-            const view = await final(frame.evaluate('myLog'));
+            const views = await gather(frame.evaluate('myLog'));
 
-            expect(view).toEqual('1,2,3,4,5');
+            expect(views).toEqual(['1,2,3,4,5']);
         })
 
         it('returns empty if log unknown in blocks', async () => {
@@ -103,16 +103,16 @@ describe('evaluateBlocks', () => {
 
         it('evaluates new blocks', async () => {
             const frame = await final(frame$);
-            const view = await final(frame.evaluate('myLog2'));
+            const views = await gather(frame.evaluate('myLog2'));
 
-            expect(view).toEqual('1,2,3,4,5,6');
+            expect(views).toEqual(['1,2,3,4,5,6']);
         })
 
         it('forgets previous blocks', async () => {
             const frame = await final(frame$);
-            const view = await final(frame.evaluate('myLog'));
+            const views = await gather(frame.evaluate('myLog'));
 
-            expect(view).toEqual('10');
+            expect(views).toEqual(['10']);
         })
     })
 

@@ -11,10 +11,11 @@ import { pusher } from "./pusher";
 import { createViewer } from "./viewer";
 import { tup, log } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
+import { evaluator, EvaluableEra } from "./evaluator";
 
 
 export interface Core<M extends Model> {
-    era$: Observable<EraWithSlices<Evaluable<M>>>,
+    era$: Observable<EvaluableEra<M>>,
     commit$: Observable<Commit>,
     view<K extends KnownLogs<M>>(ref: K): Observable<KnownAggr<M, K>>
 } 
@@ -51,19 +52,16 @@ export const createCore =
     const era$ = merge(epoch$, signal$).pipe(
                     specifier(),
                     slicer(ripple$),
-                    evaluateSlices(model));
-
+                    evaluator(model));
                     
     const commit$ = doCommit$.pipe(
                     committer(era$, signal$),
                     pusher(blockStore, manifestStore, pullManifest$));
 
-    const evaluable$ = era$.pipe(mapSlices(([_, evaluable]) => evaluable));
-
-    const viewer = createViewer(evaluable$);
+    const viewer = createViewer(era$);
 
     return {
-        era$: evaluable$,
+        era$,
         commit$,
         view<K extends KnownLogs<M>>(ref: K): Observable<KnownAggr<M, K>> {
             return viewer(ref);

@@ -1,14 +1,14 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
-import { pullAll, Ripple, EraWithSlices } from "../lib/core/slicer";
+import { pullAll, Ripple } from "../lib/core/slicer";
 import { map, concatMap, groupBy } from "rxjs/operators";
-import { Evaluable } from "../lib/core/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pause } from "./utils";
 import { Core, createCore } from "../lib/core";
+import { EvaluableEra } from "../lib/core/evaluator";
 
 type TestRipple = Dict<number[]>
 
@@ -24,7 +24,7 @@ describe('core', () => {
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
-    let era$: Observable<EraWithSlices<Evaluable<TestModel>>>
+    let era$: Observable<EvaluableEra<TestModel>>
     let commit$: Observable<Commit>
 
     let store: Core<TestModel>

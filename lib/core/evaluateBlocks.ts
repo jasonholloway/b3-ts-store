@@ -1,16 +1,12 @@
 import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluateSlices";
-import { OperatorFunction, pipe, empty, from, of, Observable } from "rxjs";
+import { OperatorFunction, pipe, empty, from, Observable } from "rxjs";
 import { BlockFrame } from "./pullBlocks";
-import { map, concatMap, scan } from "rxjs/operators";
-import { log } from "../utils";
-
-
+import { map, concatMap, scan, takeLast } from "rxjs/operators";
 
 export const evaluateBlocks = 
     <M extends Model>(model: M) : OperatorFunction<BlockFrame, Evaluable<M>> =>
     pipe(
         map(({manifest, load}) => {
-
             return {
                 logRef$: empty(),
 
@@ -20,7 +16,8 @@ export const evaluateBlocks =
                     return from(manifest.logBlocks[logRef] || [])
                             .pipe(
                                 concatMap(blockRef => load(blockRef)(logRef)),
-                                scan(m.add, m.zero));
+                                scan(m.add, m.zero),
+                                takeLast(1));
                 }
             }
         })

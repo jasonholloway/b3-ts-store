@@ -791,6 +791,279 @@ Slicer sets /era.from/, which compliments /era.threshold/
 now, this should only affect evaluation
 so an era should have an evaluate function, as well as logRefs
 
+-------------------------------------
+
+this idea that, given a forward shuffling of the threshold,
+views should remain the same...
+
+well, there's a problem with it:
+on a /reset/, the threshold will be moved forwards to wipe out /everything/
+
+on this shift forwards, we can't carry on serving the same view...
+
+so, on a commit as well, as the threshold is moved forwards to clear the staging area,
+we must view again from block storage, with of course a delay...
+
+if just the epoch changes, then we can check to see whether /we/ need to change in a certain log
+
+but if the threshold goes, then we must go with it
+
+the loading of a new block could be short-circuited if it's of our own creation
+
+--------
+
+all Evaluateds will have addresses to aid in deduping
+
+*logRef/head/slice/part*
+
+when an epoch changes, the head will change, even if slices are the same
+in this case the consumer will know not to filter new views coming through
+
+on a reset, the slice will move forwards, and will therefore appear fresh
+
+on a commit, /head/ should go forwards, even if /slice/ doesnt - effectively the same as an epoch change, for the consumer
+
+----
+
+so - the output of Evaluable must stream these markers out too
+
+and /blocks/? blocks.evaluate must say something about the head, yes; though nothing of slices and parts pertains to it
+
+these marks must be composable too - as views are composable
+
+/blocks/ will return a view marked with the head it relates to
+
+views built up on this view will then pass this mark through, but adding to its other components
+
+-----------------------
+
+currently the Viewer oddly gets views from blocks separately, and concats them with the evaluations of slices
+this is surely a mistaken leftover of an abandoned approach
+
+but the /EvaluableEra/ will have to delegate to /EvaluableBlocks/ too
+when /evaluate()/ is called, it will delegate to /EvaluableBlocks/
+and stream out views built on it
+
+but then: a new era begins, and the viewer will once again call /evaluate()/ with its ref
+if the constellations favour it, the immediate era will delegate down to the previous era,
+gathering only its final view that will hopefully (though not necessarily) have been memoised
+
+so, the viewer will potentially have its previous receivec view restated - but this is no problem
+
+but, if no final emission has been memoised by the below era, it may instead freshly gather up views
+from its own bank of slices - again this is absolutely fine, as the slices are finalised, and they belong to it
+
+but then, to fill out the bottom of the view, it will go to its /BlockFrame/ - and this will be newly out of date
+the latest /BlockFrame/ will exist only at the top of line of eras
+
+if the spec of our view says it needs to be based on a newer /head/ than that of the lower era provides, then
+we need to take charge at the top
+
+before the idea had been that the marker only gets communicated when the view is resolved, but really we need some up-front check
+so that unnecessary work isn't done
+
+each /Era/ knows exactly what it's capable of, as it knows its /Manifest/, its /BlockFrame/
+
+/evaluate()/ will say it needs /LogRef/head/ then the old era can say whether it can do it or not
+
+--------
+
+why are we even delegating to the previous era?
+because we want to aggressively memoize; we don't want to do work twice
+
+especially if there are long-running eras: if so, only a single external change would force all of the era to be replayed
+
+but - at least there would be no duplicates
+this is why we wanted markers on evaluated views: so that downstream consumers can pickily filter them
+
+the consumer would enforce monotonic marker movements: anything otherwise would be suppressed before it got to the UI
+
+but - undoing! when we undo, the latest slice will be removed, and so the view will go backwards
+
+unless all slices were hastily renumbered
+though this is kinda atrocious
+
+so, if we're gonna support undoing also, the viewer can't be enforcing this forward-moving thing
+
+it's no great problem fora restatement to come through - the problem is in going backwards transiently, which debouncing canonly fluff up, but not solve
+
+even with our putative cacheing scheme, restatements would occur, as new eras would have to state their beginning
+
+-----
+
+i don't want to just do monotonic marker filtering, as it won't scale to doing undos, which will be needed, like, ultimately
+
+so, is there some way to avoid restatements?
+well, if an era is newly viewed, it has to emit as many viewsas it can
+though consumers only care for the latest - this is the whole point of this wibbling
+
+so if we could guarantee them the latest, then we'd be, err, /sorted/
+
+------
+
+a live era however doesn't know what its is as it evaluates forwards
+
+well - actually it does, or at least could do
+as each slice is created and numbered, from that point on it does in fact know all about it
+
+/evaluate()/ is called, 
+but all it can see is the stream of slices, which can be attached to at that point
+and indeed to evaluate, it does need to go through all of them
+
+but, starting from the beginning, it can't see anything of the future
+
+unless, with each emitted slice, the viewer moved on (and resubscribed) and thereby had a handle on the latest news
+so we'd be back at EvaluableSlices, each one a slice (a-ha) of time from which t build a view
+
+the slice (usually the latest) would know its exact index, and would therefore know the exact view it wanted to summon
+
+to evaluate a log at this slice, the previous slice would be asked in turn (gosh)
+
+if the logHead had changed, we'd be in a new era
+and it might be that the previous slice was viewed under a previous regime of logHeads, no longer valid
+so, the slices, moving between eras, would on evaluation make sure that their memoied values still pertained
+
+but we want to takeadvantage of sequential access, or rather of consumers reading /through/ a stream, and not randomly
+from individual slices; although an initial subscription would have to summon up a view to the latest slice in particular
+
+the /Viewer/ asks the latest era for a view;
+the /Era/ knows the latest logHead; it also knows that some of its slices were prepared by its predecessor slice, and were coopted by it;
+so it can ask the previous Era to serve up its evaluation
+though the previous era, being a separate time, may have been based on a different LogHead, and indeed on a different selection of slices
+
+if the /threshold/ moved forwards through a commit,
+then there'd be a new logHead onlyif we were trying to view a log affected by the commit
+if it was a completely separate log, then the logHead would be the same,
+though the era would be fresh, and the threshold would be fresh too
+
+ie, threshold will have moved, specifying a new range of slices to view
+and so, the thought would go, the previous evaluation can't be valid
+
+though - a forward-moving threshold doesn't invalidate a view, does it? yes, it must: as on /reset/ the threshold must skip forwards, yet the intervening slices
+are obliterated rather than carried forwards 
+
+if the threshold moves, then the view must be regathered
+how can there be any cacheing in such case?
+well, if it has been a local commit, then the newly-missing swathe of slices has just moved into block storage, though it is semantically the same
+if only per-log views could be marked so that we could recognise the similarity...
+
+so given a new threshold, we have to regather all
+seems fair enough
+
+but a new epoch would only invalidate an existing viewif the relevant logHead had changed also (though we can keep things simple by just using /epoch version/ indiscriminately)
+
+----------------------------------------
+
+if evaluations are only going to show the latest that they know of, they have to take stock of where latest is supposed to be by asking for the last slice emitted
+though that slice may not exist of course;
+
+but, within the era, there could be a /latestSliceIndex$/
+that would start with /threshold/
+and with every output slice would increment
+
+a new evaluation would filter all views up to this index (though aggregation would still have to be done of course)
+with the possibility that a new slice would be emitted after this point
+but this would at least stop old views being restated, as if the view were before the threshold, then it wouldn't make it out
+
+and /undoing/? a new era would be begun but with the bad, unwanted slice filtered out
+though this buggers the monotonicity once more
+the only way to rescue it would be to restate an entire era afresh - then slices always move forwards
+
+and if they were restated, but with the latest filtered out, then would the new era know its /latestSliceIndex/?
+there'd be something of a race condition here, as it would be firstly set to /threshold/; and it would depend on the relative
+speeds of iteration of viewer and lastSliceIndex 
+
+------------------------------------
+
+and if /undoing/ was to restate and move the sliceIndex forwards, then the happy consumer-side filtering could be done
+monotonicity would be rescued
+
+if the viewer doesn't do the filtering, then /something else/ has to
+unless evaluation was explicitly done in two halves: building of base, then incremental streaming of new views
+
+having prior evaluables selectively serve their memoisations would be a wayf having this very split:
+anything memoised, or worked out by another evaluable, would be the building of a /base/;
+then the current era could stream out view after view based on this
+
+either we do this, or all is done as one big evaluation, and then we filter off what we don't want
+though there will /always/ be a two-part articulation: blocks at the very least serve a ready-made base
+
+so, a composite: blocks serve a ready-made base; eras re-evaluate and filter to always serve the latest
+
+at time of evaluation, we need to sample the latest slice so we know what to filter up to... then the problem doesnt seep out to the consumer
+
+-----------------
+
+unfortunately, it's not just the last slice we need to track, but the last update within that slice
+(unless intermediate aggrs within a slice /weren't output at all/ - this seems better actually; you don't want to split up the ripple)
+
+so we don't have to care for tracking updates; only slices. We just need to serve the latest slice when we evaluate
+
+---
+
+when a new era rolls in, if that era only serves its latest, and not its intermediates, then even if it re-aggregates wastefully (ie it doesn't use any kind of memoisation
+in the previous era, but just reruns all slices within it) it will at most just restate the final view of the previous era: there'll be no transient stepping back into
+the recent past, just to be immediately corrected: we won't need the indeterminate debouncer. The contract will be fulfilled.
+
+/latestSliceIndex/ will be sampled on evaluation; it will tell the evaluator which slice to aggregate to before it starts emitting
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
 
 
 

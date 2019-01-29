@@ -1,7 +1,8 @@
-import { pipe, OperatorFunction, empty, Observable, of } from "rxjs";
-import { EraWithSlices, Ripple } from "./slicer";
-import { scan, concatAll, concatMap, map, filter, defaultIfEmpty } from "rxjs/operators";
+import { pipe, OperatorFunction, empty, Observable, of, concat } from "rxjs";
+import { EraWithSlices, Ripple, pullAll } from "./slicer";
+import { scan, concatAll, concatMap, map, filter, defaultIfEmpty, tap, shareReplay } from "rxjs/operators";
 import { Evaluable, Model, KnownLogs } from "./evaluateSlices";
+import { log } from "../utils";
 
 
 export interface EvaluableEra<M extends Model> 
@@ -18,6 +19,9 @@ export const evaluator =
                                         concatMap(([_, part$]) => part$),
                                         concatMap(([ref]) => isKnownLog(model, ref) ? [ref] : [])) ; //and unique?
 
+                    const sliceId$ = era.slices.pipe(
+                                        map(([[id]]) => id));   //for plucking out latest sliceId (default to threshold)
+
                     return of(createEvaluableEra<M>({
                         ...era,
                         logRef$,
@@ -31,16 +35,20 @@ export const evaluator =
                                                         filter(([key, v]) => key == ref),
                                                         concatMap(([, v$]) => v$))));
                             
-                            const base$ = era.blocks
-                                            .evaluate(ref).pipe(
-                                                defaultIfEmpty(m.zero))
-
-                            return update$.pipe(
-                                    scan<any, Observable<any>>(
-                                        (ac$, v) => 
-                                            ac$.pipe(map(ac => m.add(ac, v))),
-                                        base$),
-                                    concatAll());
+                            const blockEval$ = era.blocks
+                                                .evaluate(ref)
+                                                .pipe(shareReplay(1));
+                                            
+                            return concat(
+                                    blockEval$, 
+                                    update$.pipe(
+                                        scan<any, Observable<any>>(
+                                            (ac$, v) => 
+                                                ac$.pipe(map(ac => m.add(ac, v))),
+                                            blockEval$
+                                                .pipe(defaultIfEmpty(m.zero))),
+                                        concatAll())
+                                    );
                         }
                     }));
                 },

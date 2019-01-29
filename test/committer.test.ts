@@ -2,35 +2,18 @@ import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFun
 import { reduceToArray, Dict, enumerate, tup, log } from "../lib/utils";
 import { slicer, Ripple, EraWithSlices, pullAll } from "../lib/core/slicer";
 import { map, concatMap, groupBy, startWith } from "rxjs/operators";
-import { evaluateSlices, Evaluable } from "../lib/core/evaluateSlices";
+import { Evaluable } from "../lib/core/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
 import { emptyManifest, specifier, Epoch } from "../lib/core/specifier";
 import { pause } from "./utils";
 import { newEpoch } from "../lib/core";
 import { emptyBlocks } from "../lib/core/pullBlocks";
+import { evaluator, EvaluableEra } from "../lib/core/evaluator";
 
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
-
-
-const digestor = 
-    () : MonoTypeOperatorFunction<EraWithSlices<Ripple>> => 
-    pipe(        
-        map(era => {
-            const r = era.slices.pipe(
-                map(([_, ripple]) => ripple)
-            );
-
-            return { ...era, /*slices*/ };
-        }));
-
-
-
-
-
-
 
 describe('committer', () => {
 
@@ -40,7 +23,7 @@ describe('committer', () => {
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
-    let era$: Observable<EraWithSlices<[Ripple, Evaluable<TestModel>]>>
+    let era$: Observable<EvaluableEra<TestModel>>
     let commit$: Observable<Commit>
 
     beforeEach(() => {
@@ -52,8 +35,7 @@ describe('committer', () => {
                 startWith(newEpoch(emptyManifest)),
                 specifier(),
                 slicer(ripple$),
-                digestor(),
-                evaluateSlices(model),
+                evaluator(model),
                 pullAll());
 
         commit$ = doCommit$.pipe(

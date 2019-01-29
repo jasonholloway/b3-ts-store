@@ -133,7 +133,7 @@ export function capture2<A, B>(project: (A) => Observable<B>) : OperatorFunction
 }
 
 
-export function log<T>(inp: ((val: T) => string) | string) : MonoTypeOperatorFunction<T> {
+export function log<T>(inp: string | ((val: T) => string)) : MonoTypeOperatorFunction<T> {
     return tap<T>(v => console.log(typeof inp === 'string' ? inp : inp(v)));
 }
 

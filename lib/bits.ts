@@ -1,5 +1,3 @@
-import { Dict, getOrSet, enumerate, tup } from "./utils";
-import { LogBlocks, LogSpec } from "./LogSpace";
 import { Manifest } from "./core/specifier";
 import { Observable } from "rxjs";
 
