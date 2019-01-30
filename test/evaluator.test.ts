@@ -1,7 +1,7 @@
-import { slicer, pullAllSlices, Ripple } from "../lib/core/slicer";
+import { slicer, pullAllSlices, Ripple, pullAll } from "../lib/core/slicer";
 import { Subject, from, Observable, zip, merge } from "rxjs";
-import { Dict, reduceToDict, tup, enumerate } from "../lib/utils";
-import { map, concatMap, groupBy, toArray } from "rxjs/operators";
+import { Dict, reduceToDict, tup, enumerate, log, concatMapEager } from "../lib/utils";
+import { map, concatMap, groupBy, toArray, flatMap } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { specifier, emptyManifest, Manifest, setThreshold, Signal, newEra } from "../lib/core/specifier";
 import { pullBlocks } from "../lib/core/pullBlocks";
@@ -9,6 +9,8 @@ import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
+import { LogRef, KnownLogs } from "../lib/core/evaluateSlices";
+import { pause } from "./utils";
 
 
 describe('evaluator', () => {
@@ -41,6 +43,7 @@ describe('evaluator', () => {
                     slicer(ripple$),
                     evaluator(model),
                     pullAllSlices());
+
 
         manifest$.next(emptyManifest);
     })
@@ -85,37 +88,84 @@ describe('evaluator', () => {
             ]);
         })
 
+        it('dedupes logRefs', async () => {
+            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
+            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
+            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
+        
+            await expectLogRefs([
+                ['myLog', 'myLog2']
+            ]);
+        })
+
     })
 
 
     describe('evaluate', () => {
-        it('single slice', async () => {
-            ripple({ myLog: [1, 2] });
-        
-            await expectAggrs([
-                { myLog: '1,2' }
-            ]);
+
+        it('returns zero by default', async () => {
+            complete();
+
+            expect(await view('myLog'))
+                .toEqual(['']);
         })
-    
-    
-        it('second slice', async () => {
+
+        it('single slice', async () => {
+            const viewing = view('myLog');
+
+            ripple({ myLog: [1, 2] });
+            complete();
+
+            expect(await viewing)
+                .toEqual(['', '1,2']);
+        })
+        
+        it('multiple slices', async () => {
+            const viewing = view('myLog');
+
             ripple({ myLog: [1, 2] });
             ripple({ myLog: [3, 4] });
+            complete();
     
-            await expectAggrs([
-                { myLog: '1,2,3,4' }
-            ]);
+            expect(await viewing)
+                .toEqual(['', '1,2', '1,2,3,4']);
+
+            //all the slices go past before the evaluation
+            //like there's some dependency
+            //
+            //
+        })
+
+        it('only emits from latest slice on', async () => {
+            ripple({ myLog: [1, 2] });
+            ripple({ myLog: [3, 4] });
+
+            const viewing = view('myLog');
+
+            ripple({ myLog: [5, 6] });
+            complete();
+
+            expect(await viewing)
+                .toEqual([
+                    '3,4', '3,4,5,6'
+                ]);
         })
 
         it('ignores before threshold', async () => {
+            const viewing = view('myLog');
+
             ripple({ myLog: [1, 2] });
             ripple({ myLog: [3, 4] });
             signal$.next(setThreshold(1));
-    
-            await expectAggrs([
-                { myLog: '1,2,3,4' },
-                { myLog: '3,4' }
-            ]);
+            complete();
+
+            expect(await viewing)
+                .toEqual([
+                    '',
+                    '1,2',
+                    '1,2,3,4',
+                    '3,4'
+                ]);
         })
 
         it('loads blocks first, given manifest', async () => {
@@ -133,11 +183,16 @@ describe('evaluator', () => {
                 }
             });
 
-            await expectAggrs([
-                { myLog: '5,6' },
-                { myLog: '1,2,3,4,5,6' }
-            ]);
+            complete();
+
+            expect(await view('myLog'))
+                .toEqual([
+                    '',
+                    '5,6',
+                    '1,2,3,4,5,6'
+                ]);
         })
+
     })
 
 
@@ -153,6 +208,13 @@ describe('evaluator', () => {
 
     })
 
+
+    function view(ref: KnownLogs<TestModel>): Promise<any[]> {
+        return era$.pipe(
+                concatMap(era => era.evaluate(ref)),
+                toArray())
+            .toPromise();
+    }
 
 
     function ripple(rip: Dict<number[]>) {
@@ -171,23 +233,6 @@ describe('evaluator', () => {
     }
 
 
-
-
-    async function expectAggrs(expected: Dict<string>[]) {
-        complete();
-
-        const all = await era$.pipe(
-                            concatMap(era =>
-                                era.logRef$.pipe(
-                                    concatMap(ref => 
-                                        era.evaluate(ref).pipe(
-                                            map(v => tup(ref, v)))),
-                                    reduceToDict())),
-                            toArray()
-                        ).toPromise();
-
-        expect(all).toEqual(expected);
-    }
 
     async function expectLogRefs(expected: string[][]) {
         complete();
