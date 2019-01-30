@@ -1,8 +1,7 @@
 import { ManifestStore, BlockStore } from "./bits";
 import { Subject, Observable, empty, of } from "rxjs";
-import { getOrSet, tup } from "./utils";
-import { InnerLog, createLogFacade } from "./Log";
-import { Model, KnownLogs, KnownAggr } from "./core/evaluateSlices";
+import { tup } from "./utils";
+import { Model, KnownLogs, KnownAggr } from "./core/evaluable";
 import { createCore } from "./core";
 import { Ripple } from "./core/slicer";
 import { DoCommit, Commit } from "./core/committer";

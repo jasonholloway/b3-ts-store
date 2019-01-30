@@ -1,4 +1,4 @@
-import { Evaluable, Model } from "./evaluateSlices";
+import { Evaluable, Model } from "./evaluable";
 import { Observable, OperatorFunction, Observer, pipe, empty, MonoTypeOperatorFunction } from "rxjs";
 import { share, withLatestFrom, concatMap, take, map, mapTo, reduce } from "rxjs/operators";
 import { Slice, Era, Ripple } from "./slicer";

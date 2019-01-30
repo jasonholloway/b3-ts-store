@@ -1,15 +1,15 @@
-import { Model, evaluateSlices, Evaluable, KnownLogs, KnownAggr } from "./evaluateSlices";
+import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
 import { BlockStore, ManifestStore } from "../bits";
-import { startWith, map, shareReplay, defaultIfEmpty } from "rxjs/operators";
-import { specifier, Signal, Manifest, Epoch, emptyManifest } from "./specifier";
+import { startWith, map, shareReplay } from "rxjs/operators";
+import { specifier, Signal, Manifest, Epoch } from "./specifier";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
-import { slicer, Ripple, EraWithSlices, mapSlices } from "./slicer";
+import { slicer, Ripple } from "./slicer";
 import { committer, DoCommit, Commit } from "./committer";
 import { Observable, Subject, merge, zip, empty } from "rxjs";
 import { pullManifests, PullManifest, pullManifest } from "./pullManifests";
 import { pusher } from "./pusher";
 import { createViewer } from "./viewer";
-import { tup, log } from "../utils";
+import { tup } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
 

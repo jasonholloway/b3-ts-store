@@ -1,8 +1,8 @@
-import { Subject, from, MonoTypeOperatorFunction, zip, merge } from "rxjs";
-import { reduceToArray, Dict, Keyed$, enumerate, tup } from "../lib/utils";
-import { slicer, Ripple, mapSlices, pullAll } from "../lib/core/slicer";
-import { map, concatMap, groupBy, shareReplay, startWith, toArray } from "rxjs/operators";
-import { evaluateSlices, KnownLogs } from "../lib/core/evaluateSlices";
+import { Subject, from, zip, merge } from "rxjs";
+import { Dict, enumerate, tup } from "../lib/utils";
+import { slicer, Ripple, pullAll } from "../lib/core/slicer";
+import { map, concatMap, groupBy, startWith } from "rxjs/operators";
+import { KnownLogs } from "../lib/core/evaluable";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/core/committer";
 import { Viewer, createViewer } from "../lib/core/viewer";

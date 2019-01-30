@@ -1,5 +1,5 @@
 import { Observable, OperatorFunction, pipe, from, empty } from "rxjs";
-import { LogRef } from "./evaluateSlices";
+import { LogRef } from "./evaluable";
 import { BlockStore, Block } from "../bits";
 import { map, concatMap, scan, concatAll, defaultIfEmpty } from "rxjs/operators";
 import { Manifest, emptyManifest } from "./specifier";

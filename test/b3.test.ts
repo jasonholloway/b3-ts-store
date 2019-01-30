@@ -37,27 +37,27 @@ type B3Data = Map<String, Map<Id, Product>>
 
 
 
-const b3Model = declareLogModel({
+// const b3Model = declareLogModel({
 
-    zero: Map({
-        products: Map<Id, Product>()
-    }),
+//     zero: Map({
+//         products: Map<Id, Product>()
+//     }),
 
-    add(data: B3Data, [_, type, body]: B3Update): B3Data {        
-        switch(type) {
-            case 'PutProduct':
-                return data.update('products', 
-                            ps => ps.update(body.id, p => p))
+//     add(data: B3Data, [_, type, body]: B3Update): B3Data {        
+//         switch(type) {
+//             case 'PutProduct':
+//                 return data.update('products', 
+//                             ps => ps.update(body.id, p => p))
 
-            default:
-                throw Error('Strange update!');
-        }
-    },
+//             default:
+//                 throw Error('Strange update!');
+//         }
+//     },
 
-    // view(data: B3Data) {
-    //     return {
-    //         products: data.get('products'),
-    //         taxonomy: null
-    //     }
-    // }
-})
+//     // view(data: B3Data) {
+//     //     return {
+//     //         products: data.get('products'),
+//     //         taxonomy: null
+//     //     }
+//     // }
+// })

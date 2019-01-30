@@ -1,4 +1,4 @@
-import { Model, KnownLogs, KnownAggr } from "./evaluateSlices";
+import { Model, KnownLogs, KnownAggr } from "./evaluable";
 import { Observable } from "rxjs";
 import { shareReplay, concatMap } from "rxjs/operators";
 import { EvaluableEra } from "./evaluator";

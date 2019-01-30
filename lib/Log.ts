@@ -1,7 +1,6 @@
 import { reduce, map, scan, concatMap } from "rxjs/operators";
 import { OperatorFunction, Observable, Subject, merge, from, concat, combineLatest } from "rxjs";
 import { AnyUpdate, Model, Log } from "./bits";
-import { LogSpec } from "./LogSpace";
 import { concatMapEager, scanToArray } from "./utils";
 
 type LogState<D> = {

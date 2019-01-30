@@ -9,7 +9,7 @@ import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
-import { LogRef, KnownLogs } from "../lib/core/evaluateSlices";
+import { LogRef, KnownLogs } from "../lib/core/evaluable";
 import { pause } from "./utils";
 
 
@@ -129,25 +129,20 @@ describe('evaluator', () => {
     
             expect(await viewing)
                 .toEqual(['', '1,2', '1,2,3,4']);
-
-            //all the slices go past before the evaluation
-            //like there's some dependency
-            //
-            //
         })
 
         it('only emits from latest slice on', async () => {
-            ripple({ myLog: [1, 2] });
-            ripple({ myLog: [3, 4] });
+            ripple({ myLog: [1] });
+            ripple({ myLog: [2] });
 
             const viewing = view('myLog');
 
-            ripple({ myLog: [5, 6] });
+            ripple({ myLog: [3] });
             complete();
 
             expect(await viewing)
                 .toEqual([
-                    '3,4', '3,4,5,6'
+                    '1,2', '1,2,3'
                 ]);
         })
 
@@ -169,6 +164,8 @@ describe('evaluator', () => {
         })
 
         it('loads blocks first, given manifest', async () => {
+            const viewing = view('myLog');
+
             ripple({ myLog: [ 5, 6 ] });
 
             blockStore.blocks = {
@@ -185,7 +182,7 @@ describe('evaluator', () => {
 
             complete();
 
-            expect(await view('myLog'))
+            expect(await viewing)
                 .toEqual([
                     '',
                     '5,6',

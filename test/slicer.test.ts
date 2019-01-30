@@ -1,7 +1,7 @@
 import { Observable, Subject, from, OperatorFunction, pipe, zip, merge } from "rxjs";
 import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap, toArray } from "rxjs/operators";
-import { Range, slicer, EraWithSlices, pullAllSlices } from "../lib/core/slicer";
+import { slicer, EraWithSlices, pullAllSlices, SliceId } from "../lib/core/slicer";
 import { emptyManifest, Signal, specifier, Manifest, setThreshold } from "../lib/core/specifier";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
@@ -53,7 +53,7 @@ describe('slicer', () => {
         
         await expectSlices([
             [
-                [[0, 1], { log1: [ 1, 2, 3 ] }]
+                [0, { log1: [ 1, 2, 3 ] }]
             ]
         ])                
     })
@@ -64,8 +64,8 @@ describe('slicer', () => {
 
         await expectSlices([
             [
-                [[0, 1], { log1: [ 1, 2, 3 ] }],
-                [[1, 2], { log2: [ 4, 5, 6 ] }]
+                [0, { log1: [ 1, 2, 3 ] }],
+                [1, { log2: [ 4, 5, 6 ] }]
             ]
         ])                
     })
@@ -76,7 +76,7 @@ describe('slicer', () => {
 
         await expectSlices([
             [
-                [[0, 1], { log1: [ 1, 2, 3 ] }]
+                [0, { log1: [ 1, 2, 3 ] }]
             ],
             []
         ])
@@ -90,10 +90,10 @@ describe('slicer', () => {
         
         await expectSlices([
             [
-                [[0, 1], { log1: [ 1, 2, 3 ] }]
+                [0, { log1: [ 1, 2, 3 ] }]
             ],
             [
-                [[1, 2], { log1: [ 4 ] }]
+                [1, { log1: [ 4 ] }]
             ]
         ])
     })
@@ -106,12 +106,12 @@ describe('slicer', () => {
         
         await expectSlices([
             [
-                [[0, 1], { log1: [ 1 ] }],
-                [[1, 2], { log1: [ 2 ] }],
-                [[2, 3], { log1: [ 3 ] }]
+                [0, { log1: [ 1 ] }],
+                [1, { log1: [ 2 ] }],
+                [2, { log1: [ 3 ] }]
             ],
             [
-                [[2, 3], { log1: [ 3 ] }]
+                [2, { log1: [ 3 ] }]
             ]
         ])
     })
@@ -123,8 +123,8 @@ describe('slicer', () => {
 
         await expectSlices([
             [
-                [[0, 1], { log1: [ 1, 2, 3 ] }],
-                [[1, 2], { log2: [ 4, 5, 6 ] }]
+                [0, { log1: [ 1, 2, 3 ] }],
+                [1, { log2: [ 4, 5, 6 ] }]
             ]
         ])
     })
@@ -151,12 +151,11 @@ describe('slicer', () => {
 
 
 
-    async function expectSlices(expected: [Range, Dict<number[]>][][]) {
+    async function expectSlices(expected: [SliceId, Dict<number[]>][][]) {
         complete();
         const eras = await era$.pipe(materializeEras()).toPromise();
         expect(eras).toMatchObject(expected);
     }
-
 
     function complete() {
         ripple$.complete();

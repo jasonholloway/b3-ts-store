@@ -1,4 +1,4 @@
-import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluateSlices";
+import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
 import { OperatorFunction, pipe, empty, from, Observable } from "rxjs";
 import { BlockFrame } from "./pullBlocks";
 import { map, concatMap, scan, takeLast, startWith } from "rxjs/operators";

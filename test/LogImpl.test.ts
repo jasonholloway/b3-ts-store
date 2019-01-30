@@ -1,7 +1,6 @@
 import { createLogMachine } from "../lib/Log";
-import { testLogModel, addUp, AddUp } from "./fakes/testModel";
+import { addUp, AddUp } from "./fakes/testModel";
 import { ReplaySubject, from, Subject, forkJoin, of } from "rxjs";
-import { LogSpec } from "../lib/LogSpace";
 import { reduce, last, delay, finalize, combineAll } from "rxjs/operators";
 import { reduceToArray } from "../lib/utils";
 
@@ -67,8 +66,8 @@ xdescribe('LogImpl', () => {
     it('emits view on staged updates', async () => {
         x.spec({ head: 0, blocks: [] });
 
-        x.stage(addUp(0, '1'));
-        x.stage(addUp(1, '2'));
+        x.stage(addUp('1'));
+        x.stage(addUp('2'));
 
         const { views } = await x.complete(); 
         expect(views).toEqual(['', '1', '1:2']);
@@ -76,8 +75,8 @@ xdescribe('LogImpl', () => {
 
     it('staged updates simply rebased onto new commits', async () => {
         x.spec({ head: 0, blocks: [] });
-        x.stage(addUp(0, '4'));
-        x.stage(addUp(1, '5'));
+        x.stage(addUp('4'));
+        x.stage(addUp('5'));
         x.spec({ head: 0, blocks: [ '1:2:3' ] });
 
         const { views } = await x.complete(); 
@@ -161,7 +160,7 @@ function createFixture() {
             }
         }
 
-        return from(specs.map(n => addUp(0, `${n}`)))
+        return from(specs.map(n => addUp(`${n}`)))
                 .pipe(delay(delayMs))
                 .pipe(finalize(() => loads.next(-1)))   
     }

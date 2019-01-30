@@ -1,14 +1,12 @@
-import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, OperatorFunction } from "rxjs";
-import { reduceToArray, Dict, enumerate, tup, log } from "../lib/utils";
-import { slicer, Ripple, EraWithSlices, pullAll } from "../lib/core/slicer";
+import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject } from "rxjs";
+import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
+import { slicer, Ripple, pullAll } from "../lib/core/slicer";
 import { map, concatMap, groupBy, startWith } from "rxjs/operators";
-import { Evaluable } from "../lib/core/evaluateSlices";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
 import { emptyManifest, specifier, Epoch } from "../lib/core/specifier";
 import { pause } from "./utils";
 import { newEpoch } from "../lib/core";
-import { emptyBlocks } from "../lib/core/pullBlocks";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
 
 type TestRipple = Dict<number[]>

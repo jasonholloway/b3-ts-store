@@ -4,7 +4,7 @@ import { enumerate } from "../lib/utils";
 import { addUp, TestModel } from "./fakes/testModel";
 import { LogSpace, createLogSpace, Log } from "../lib/LogSpace";
 import { final } from "./helpers";
-import { KnownLogs } from "../lib/core/evaluateSlices";
+import { KnownLogs } from "../lib/core/evaluable";
 import { pause } from "./utils";
 import { pullAll } from "../lib/core/slicer";
 import { Observable } from "rxjs";
