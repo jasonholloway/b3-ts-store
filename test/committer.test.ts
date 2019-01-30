@@ -8,6 +8,7 @@ import { emptyManifest, specifier, Epoch } from "../lib/core/specifier";
 import { pause } from "./utils";
 import { newEpoch } from "../lib/core";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
+import { KnownLogs } from "../lib/core/evaluable";
 
 type TestRipple = Dict<number[]>
 
@@ -47,11 +48,12 @@ describe('committer', () => {
     it('stores all slices of era', async () => {
         emit({ a: [ 1, 2 ] });
         emit({ b: [ 1 ] });
+        emit({ a: [ 3 ] });
         doCommit();
 
         await expectCommits([{
             data: { 
-                a: [ 1, 2 ] ,
+                a: [ 1, 2, 3 ],
                 b: [ 1 ]
             },
             // extent: 2

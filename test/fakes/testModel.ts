@@ -16,6 +16,9 @@ const logModel2 = {
 
 export class TestModel {
     logs = {
+        a: logModel,
+        b: logModel,
+
         myLog: logModel,
         myLog2: logModel,
         myLog3: logModel,

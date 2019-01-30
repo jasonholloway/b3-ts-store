@@ -1,9 +1,9 @@
-import { Evaluable, Model } from "./evaluable";
-import { Observable, OperatorFunction, Observer, pipe, empty, MonoTypeOperatorFunction } from "rxjs";
-import { share, withLatestFrom, concatMap, take, map, mapTo, reduce } from "rxjs/operators";
-import { Slice, Era, Ripple } from "./slicer";
+import { Model } from "./evaluable";
+import { Observable, OperatorFunction, Observer, empty } from "rxjs";
+import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll } from "rxjs/operators";
+import { Era, pullAll } from "./slicer";
 import { RefreshEra, newEra } from "./specifier";
-import { reduceToDict, reduceToArray, tup, Dict } from "../utils";
+import { reduceToDict, tup, Dict, logVal } from "../utils";
 import { EvaluableEra } from "./evaluator";
 
 export type DoCommit = {}
@@ -19,47 +19,24 @@ export const committer =
     <M extends Model>
     (era$: Observable<EvaluableEra<M>>, refreshEra$: Observer<RefreshEra>) : OperatorFunction<DoCommit, Commit> =>
         doCommit$ => {
-            const c$ = doCommit$.pipe(
-                        withLatestFrom(era$),
-                        share());
+            const commit$ = doCommit$.pipe(
+                                withLatestFrom(era$),
+                                share());
 
-            c$.pipe(mapTo(newEra()))
+            commit$.pipe(mapTo(newEra()))
                 .subscribe(refreshEra$);
             
-            return c$.pipe(
-                    concatMap(([_, era]) => 
+            return commit$.pipe(
+                    concatMap(([, era]) =>
                         era.slices.pipe(
-                            take(1),
-                            materialize(era))),
+                            concatMap(([, part$]) => part$),
+                            groupBy(([ref]) => ref, ([, v$]) => v$),
+                            concatMap(g$ => g$.pipe( 
+                                                concatAll(),
+                                                toArray(),
+                                                logVal('r'),
+                                                map(r => tup(g$.key, r)))),
+                            reduceToDict(),
+                            map(data => ({ data, extent: 1, era, errors: empty() })))),
                     share());
         };
-
-
-function reduceIntoOne() : MonoTypeOperatorFunction<Slice<[Ripple<any>, Evaluable]>> {
-    return pipe(
-        reduce((ac, [ripple, evaluable]) => {
-            throw 12345;
-        })
-    );
-    
-
-    //
-    //
-    //
-}
-
-
-
-function materialize(era: Era) : OperatorFunction<Slice<Ripple>, Commit> {
-    return pipe(
-        concatMap(([_, ripple]) =>
-            ripple.pipe(
-                concatMap(([k, u$]) => 
-                    u$.pipe(
-                        reduceToArray(),
-                        map(r => tup(k, r)))),             
-                reduceToDict(),
-                map(data => ({ data, extent: 1, era, errors: empty() }))
-            ))
-        );
-}

@@ -12,7 +12,7 @@ export interface LogSpace<M extends Model> {
 
     commit(): void,
     reset(): void,
-    complete(): void
+    complete(): void 
 
     commit$: Observable<Commit>
     error$: Observable<Error>   
