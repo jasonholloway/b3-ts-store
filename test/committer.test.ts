@@ -47,14 +47,14 @@ describe('committer', () => {
 
     it('stores all slices of era', async () => {
         emit({ a: [ 1, 2 ] });
-        emit({ b: [ 1 ] });
+        emit({ b: [ 4 ] });
         emit({ a: [ 3 ] });
         doCommit();
 
         await expectCommits([{
             data: { 
                 a: [ 1, 2, 3 ],
-                b: [ 1 ]
+                b: [ 4 ]
             },
             // extent: 2
         }]);
@@ -65,6 +65,15 @@ describe('committer', () => {
 
         await expectCommits([]);
     })
+
+    it('does nothing if no updates', async () => {
+        emit({});
+        emit({ a: [] });
+        doCommit();
+
+        await expectCommits([]);
+    })
+
 
     it('does nothing if slice incomplete', async () => {
         const listener = new BehaviorSubject<Commit>(null);

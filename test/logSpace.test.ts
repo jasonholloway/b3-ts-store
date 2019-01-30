@@ -12,7 +12,7 @@ import { Commit } from "../lib/core/committer";
 
 jest.setTimeout(400);
 
-describe('logSpace', () => {
+xdescribe('logSpace', () => {
 
     const model = new TestModel();
 

@@ -1,9 +1,9 @@
 import { Model } from "./evaluable";
 import { Observable, OperatorFunction, Observer, empty } from "rxjs";
-import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll } from "rxjs/operators";
-import { Era, pullAll } from "./slicer";
+import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll, flatMap, filter } from "rxjs/operators";
+import { Era } from "./slicer";
 import { RefreshEra, newEra } from "./specifier";
-import { reduceToDict, tup, Dict, logVal } from "../utils";
+import { reduceToDict, tup, Dict, logVal, enumerate } from "../utils";
 import { EvaluableEra } from "./evaluator";
 
 export type DoCommit = {}
@@ -31,12 +31,12 @@ export const committer =
                         era.slices.pipe(
                             concatMap(([, part$]) => part$),
                             groupBy(([ref]) => ref, ([, v$]) => v$),
-                            concatMap(g$ => g$.pipe( 
-                                                concatAll(),
-                                                toArray(),
-                                                logVal('r'),
-                                                map(r => tup(g$.key, r)))),
+                            flatMap(g$ => g$.pipe( 
+                                            concatAll(),
+                                            toArray(),
+                                            map(r => tup(g$.key, r)))),
                             reduceToDict(),
+                            filter(data => enumerate(data).length > 0),
                             map(data => ({ data, extent: 1, era, errors: empty() })))),
                     share());
         };

@@ -1,6 +1,6 @@
 import { Observable, empty, OperatorFunction, zip, pipe, of, MonoTypeOperatorFunction, concat } from "rxjs";
 import { scan, filter, shareReplay, window, map, skip, concatMap, flatMap, concatAll, share, last, defaultIfEmpty, withLatestFrom, max, tap } from "rxjs/operators";
-import { tup, reduceToArray } from "../utils";
+import { tup, reduceToArray, logVal } from "../utils";
 import { Manifest, emptyManifest } from "./specifier";
 import { Evaluable } from "./evaluable";
 
@@ -52,7 +52,7 @@ export const slicer =
             era$ = era$.pipe(shareReplay(16));
 
             const window$ = ripple$.pipe( 
-                                pullParts(),
+                                pullRipples(),
                                 window(era$),     
                                 skip(1));
 
@@ -103,24 +103,12 @@ export const slicer =
         };
 
 
-function pullParts() : MonoTypeOperatorFunction<Ripple> {
+export function pullRipples() : MonoTypeOperatorFunction<Ripple> {
     return pipe(
-        map(pull)
-    );
-}
-
-// function pullIntoSlices() : OperatorFunction<Ripple, Slice<Ripple>> {
-//     return pipe(
-//         map((part$, i) =>
-//             slice([i, i + 1], pull(part$)))
-//     );
-// }
-
-
-function pull<U>(part$: Part$<U>): Part$<U> {
-    return part$.pipe(
-        map(([k, u$]) => tup(k, u$.pipe(pullAll()))),
-        pullAll()
+        map(part$ => 
+            part$.pipe(
+                map(([k, v$]) => tup(k, v$.pipe(pullAll()))),
+                pullAll()))
     );
 }
 
@@ -128,67 +116,6 @@ function pull<U>(part$: Part$<U>): Part$<U> {
 export function slice<V>(sliceId: SliceId, v: V): Slice<V> {
     return tup(sliceId, v);
 }
-
-
-// export function scanSlices
-//     <V, Ac>
-//     (fn: (a: Ac, v: V) => Ac, zero: Ac): OperatorFunction<EraWithSlices<V>, EraWithSlices<Ac>> {
-//     return pipe(
-//         map(era => {
-//             const slices = era.slices.pipe(
-//                             scan<Slice<V>, Slice<Ac>>(
-//                                 ([_, ac], [range, v]) => tup(range, fn(ac, v)), 
-//                                 tup(null, zero))
-//                             );
-
-//             return { ...era, slices };
-//         })
-//     );
-// }
-
-// export const scanUnwrapSlices =
-//     <V, Ac>
-//     (fn: (a: Observable<Ac>, v: V, era: EraWithSlices<V>) => Observable<Ac>, zero: Observable<Ac> = empty()): OperatorFunction<EraWithSlices<V>, EraWithSlices<Ac>> =>
-//         pipe(
-//             map(era => {
-//                 const zeroWrapped = zero.pipe(map(z => slice([0, 0], z)));
-
-//                 const slices = era.slices.pipe(
-//                                 scan(
-//                                     (prev$: Observable<Slice<Ac>>, [range, v]: Slice<V>) => 
-//                                         fn(prev$.pipe(map(([_, prev]) => prev)), v, era)
-//                                             .pipe(
-//                                                 map(result => tup(range, result))
-//                                             ),                                                 
-//                                     zeroWrapped),
-//                                 concatAll()
-//                                 );
-
-//                 return { ...era, slices };
-//             })
-//         );
-
-
-
-// export function mapSlices
-//     <A, B>(fn: (a: A) => B): OperatorFunction<EraWithSlices<A>, EraWithSlices<B>> {
-//     return scanSlices<A, B>((_, v) => fn(v), null);
-// }
-
-
-// export function concatMapSlices
-//     <A, B>(fn: (a: A) => Observable<B>) : OperatorFunction<EraWithSlices<A>, EraWithSlices<B>>
-// {
-//     return pipe(
-//             map(era => {
-//                 const slices = era.slices.pipe(
-//                                 concatMap(([range, v]) => fn(v).pipe(
-//                                                             map(b => tup(range, b))))
-//                                 )
-
-//                 return { ...era, slices };
-//             }));   
-// }
 
     
 export function materializeSlices<V, I extends { slices: Slice$<V> }>() : OperatorFunction<I, Slice<V>[][]> {
