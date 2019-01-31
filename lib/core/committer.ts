@@ -2,7 +2,7 @@ import { Model } from "./evaluable";
 import { Observable, OperatorFunction, Observer, empty } from "rxjs";
 import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll, flatMap, filter } from "rxjs/operators";
 import { Era } from "./slicer";
-import { RefreshEra, newEra } from "./specifier";
+import { RefreshEra, refreshEra } from "./specifier";
 import { reduceToDict, tup, Dict, logVal, enumerate } from "../utils";
 import { EvaluableEra } from "./evaluator";
 
@@ -23,7 +23,7 @@ export const committer =
                                 withLatestFrom(era$),
                                 share());
 
-            commit$.pipe(mapTo(newEra()))
+            commit$.pipe(mapTo(refreshEra()))
                 .subscribe(refreshEra$);
             
             return commit$.pipe(

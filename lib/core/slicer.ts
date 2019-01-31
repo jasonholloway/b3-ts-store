@@ -28,7 +28,7 @@ export interface Era {
     thresh: number
 }
 
-export interface EraWithSlices<V> extends Era {
+export interface EraWithSlices<V = any> extends Era {
     from: number,
     oldSlice$: Slice$<V>,
     currSlice$: Slice$<V>,

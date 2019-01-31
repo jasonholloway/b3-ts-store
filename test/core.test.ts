@@ -1,7 +1,7 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
 import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
 import { pullAll, Ripple } from "../lib/core/slicer";
-import { map, concatMap, groupBy } from "rxjs/operators";
+import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
@@ -9,6 +9,8 @@ import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pause } from "./utils";
 import { Core, createCore } from "../lib/core";
 import { EvaluableEra } from "../lib/core/evaluator";
+import { gather } from "./helpers";
+import { DoReset } from "../lib/core/specifier";
 
 type TestRipple = Dict<number[]>
 
@@ -22,6 +24,7 @@ describe('core', () => {
     let blockStore: FakeBlockStore
 
     let ripple$: Subject<Ripple<number>>
+    let doReset$: Subject<DoReset>
     let doCommit$: Subject<DoCommit>
 
     let era$: Observable<EvaluableEra<TestModel>>
@@ -34,12 +37,13 @@ describe('core', () => {
         blockStore = new FakeBlockStore();
 
         ripple$ = new Subject<Ripple<number>>();
+        doReset$ = new Subject<DoReset>();
         doCommit$ = new Subject<DoCommit>();
 
         manifestStore.manifest = { version: 10, logBlocks: { myLog2: [ 'block1' ] } };
         blockStore.blocks = { block1: { myLog2: [ 4, 5, 6 ] } }
 
-        store = createCore(model, blockStore, manifestStore)(ripple$, doCommit$);
+        store = createCore(model, blockStore, manifestStore)(ripple$, doReset$, doCommit$);
 
         era$ = store.era$.pipe(pullAll());
         commit$ = store.commit$.pipe(pullAllCommits());
@@ -52,7 +56,7 @@ describe('core', () => {
             await pause();
             complete();
 
-            const r = await toArray(store.view('myLog'));
+            const r = await gather(store.view('myLog'));
             expect(r).toEqual([ '5,6,7' ]);
         })
 
@@ -60,8 +64,26 @@ describe('core', () => {
             await pause();
             complete();
 
-            const r = await toArray(store.view('myLog2'));
+            const r = await gather(store.view('myLog2'));
             expect(r).toEqual([ '4,5,6' ]);
+        })
+
+    })
+
+
+    describe('on reset', () => {
+
+        it('triggers new era', async () => {
+            emit({ myLog: [ 1, 2, 3 ] });
+            doReset$.next();
+            complete();        
+
+            const eras = await gather(era$);
+            expect(eras).toMatchObject([ { id: 0 }, { id: 1} ]);
+        })
+
+        it('reemits base view', async () => {
+            throw 'notimpl'
         })
 
     })
@@ -143,12 +165,8 @@ describe('core', () => {
 
 
     function getManifestVersions() {
-        return toArray(era$.pipe(
+        return gather(era$.pipe(
                 map(({ manifest: { version }}) => version)));
-    }
-
-    function toArray<V>(v$: Observable<V>) {
-        return v$.pipe(reduceToArray()).toPromise();
     }
 
     function pullAllCommits() : MonoTypeOperatorFunction<Commit> {

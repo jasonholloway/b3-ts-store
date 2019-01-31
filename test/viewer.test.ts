@@ -6,7 +6,7 @@ import { KnownLogs } from "../lib/core/evaluable";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/core/committer";
 import { Viewer, createViewer } from "../lib/core/viewer";
-import { specifier, Signal, newEra, emptyManifest, newManifest, Manifest } from "../lib/core/specifier";
+import { specifier, Signal, refreshEra, emptyManifest, newManifest, Manifest } from "../lib/core/specifier";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import { newEpoch } from "../lib/core";
@@ -47,7 +47,7 @@ describe('viewer', () => {
                     ).pipe(map(e => newEpoch(...e)));
 
         const era$ = merge(epoch$, signal$).pipe(
-                        startWith(newEra()),
+                        startWith(refreshEra()),
                         specifier(),
                         slicer(ripple$),
                         evaluator(model),
@@ -85,7 +85,7 @@ describe('viewer', () => {
             const viewing = getView('myLog');
 
             emit({ myLog: [ 13 ] });
-            signal$.next(newEra());
+            signal$.next(refreshEra());
             signal$.next(newManifest(emptyManifest));
 
             complete();

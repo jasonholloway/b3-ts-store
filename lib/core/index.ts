@@ -1,7 +1,7 @@
 import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
 import { BlockStore, ManifestStore } from "../bits";
 import { startWith, map, shareReplay } from "rxjs/operators";
-import { specifier, Signal, Manifest, Epoch } from "./specifier";
+import { specifier, Signal, Manifest, Epoch, DoReset } from "./specifier";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { slicer, Ripple } from "./slicer";
 import { committer, DoCommit, Commit } from "./committer";
@@ -32,7 +32,7 @@ export const newEpoch = (manifest: Manifest, blocks: Evaluable = emptyEvaluable)
 export const createCore =
     <M extends Model>
     (model: M, blockStore: BlockStore, manifestStore: ManifestStore) =>
-    (ripple$: Observable<Ripple<any>>, doCommit$: Observable<DoCommit>) : Core<M> => {
+    (ripple$: Observable<Ripple<any>>, doReset$: Observable<DoReset>, doCommit$: Observable<DoCommit>) : Core<M> => {
 
     const pullManifest$ = new Subject<PullManifest>();
     const signal$ = new Subject<Signal>();
@@ -49,7 +49,7 @@ export const createCore =
                         evaluateBlocks(model))
                     ).pipe(map(e => newEpoch(...e)));
     
-    const era$ = merge(epoch$, signal$).pipe(
+    const era$ = merge(epoch$, signal$, doReset$).pipe(
                     specifier(),
                     slicer(ripple$),
                     evaluator(model));

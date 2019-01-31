@@ -1,0 +1,85 @@
+
+where is threshold going to come from?
+we need to have access to current era to look at slices...
+
+so the erstwhile Specifier and Slicer need to operate in a loop:
+
+not so much a one-way pipeline after all
+but we've been here before: instead of imaning them as two free-floating components,
+dispatching ad hoc messages to each other in a sideways manner
+
+there should instead be a simple, unidirectional feedback loop
+so the Slicer will create eras with all the familiar specs,
+and the Specifier will immediately be informed
+
+hmm... feedback loops, simple?
+but it is at least a way to modularise
+instead of having everything within one complex bubble
+which amounts to a feedback loop, but ghettoized into a thing, as it were
+
+----------------------------------
+
+communicating facts instead of commands:
+requires a reliable means of propogation
+ie the fact will /magically/ find its way to the interested party
+a big circular feedback loop fits the bill...
+
+which really becomes a two-phase pipeline, with the consumption of one
+era outputting the spec of the next era
+/a dialogue/
+
+or rather, the speccing isn't direct
+it's a mediated dialogue
+if the consumer could issue its very own spec
+then it could just do so locally, couldn't it?
+but that's what it is doing, in its scanning
+all /scans/ are a dialogue between the present and a past
+but in splitting them into horizontal slices or layers
+the need arises for /propogation/
+
+it's a problem of modularisation
+by putting bits into layers (as strongly encouraged by rxjs)
+problems of cross-layer communication arise
+
+i'm imagining in its place, then, a spread-out /scan/
+whereby the last produced era is zipped back into the signal source
+as a signal comes in, it is combined with the last known era
+but how can we be sure the timings arein order? streams are free in this regard
+unless we were to know, magically, that a single era will be output
+
+why can't specifier and slicer be in a single stage?
+because we would in fact like to split them out somehow
+modularity is nice
+
+--------------------------------------------
+
+so the scanning of ErasWithSlices is where sliceIds reside
+
+but it's also only reachable - currently - by emitted eras, that have been paired with ripples
+
+it's like there has to be some kind of command channel between the specifier and the slicer
+evenif everything lived inside the slicer, the same split would have to be, as the scanning isn't of commands,
+but of agreed new eras - not every signal produces an era
+
+the thought occurs that eras shouldn't be specified in slices...
+but with /intents/ - very much like commands
+
+----
+
+well, era specification needs to know sliceIds, that's for definite
+
+so either we have a tight loop whereby the full previous era is available (scalable, nice)
+or a special /sliceId/ channel communicating back sliceIds with the threat of race conditions...
+
+hrmph, gotta be the former
+
+
+
+
+
+
+
+
+
+
+

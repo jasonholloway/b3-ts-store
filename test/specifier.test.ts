@@ -1,8 +1,8 @@
-import { Subject, of, forkJoin } from "rxjs";
-import { reduceToArray } from "../lib/utils";
-import { pullAll, Era } from "../lib/core/slicer";
-import { delay, startWith } from "rxjs/operators";
-import { Signal, newEra, newManifest, setThreshold, specifier, emptyManifest } from "../lib/core/specifier";
+import { Subject, of, forkJoin, Observable, empty, OperatorFunction, pipe } from "rxjs";
+import { reduceToArray, tup } from "../lib/utils";
+import { pullAll, Era, Ripple, slicer, EraWithSlices } from "../lib/core/slicer";
+import { delay, startWith, toArray, scan, concatAll, concatMap, map, withLatestFrom } from "rxjs/operators";
+import { Signal, refreshEra, newManifest, setThreshold, specifier, emptyManifest, doReset } from "../lib/core/specifier";
 import { pause } from "./utils";
 
 jest.setTimeout(400);
@@ -10,21 +10,45 @@ jest.setTimeout(400);
 describe('specifier', () => {
 
     let perform: () => Promise<void>
+
     let signal$: Subject<Signal>
-    let eras: Era[];
+    let ripple$: Subject<Ripple>
+    let era$: Observable<EraWithSlices>;
 
     beforeAll(() => {
         perform = async () => {}; 
     })
 
+
+    function scanLatest<Ac, V>(fn: (ac: Ac, v: V) => Observable<Ac>) : OperatorFunction<V, Ac> {
+        return pipe(
+            scan(
+                (ac$: Observable<Ac>, v: V) =>
+                    ac$.pipe(
+                        map(ac => tup(ac, v)),
+                        fn),
+                empty()
+            ),
+            concatAll()
+        );
+    }
+
+
     beforeEach(async () => {
         signal$ = new Subject<Signal>();
+        ripple$ = new Subject<Ripple>();
 
+        era$ = signal$.pipe(
+                startWith(refreshEra()),
+                specifier(era$),
+                slicer(ripple$));
+        
         [eras] = await forkJoin(
                         signal$.pipe(
-                            startWith(newEra()),
+                            startWith(refreshEra()),
                             specifier(),
-                            reduceToArray(),
+                            slicer(ripple$),
+                            toArray(),
                             pullAll()),
                         perform()
                             .then(complete))
@@ -40,8 +64,8 @@ describe('specifier', () => {
     describe('newEra', () => {
         beforeAll(() => {
             perform = async () => {
-                signal$.next(newEra());
-                signal$.next(newEra());
+                signal$.next(refreshEra());
+                signal$.next(refreshEra());
                 await pause();
             }
         })
@@ -52,6 +76,27 @@ describe('specifier', () => {
                 { id: 1, thresh: 0, manifest: emptyManifest }, 
                 { id: 2, thresh: 0, manifest: emptyManifest },
             ]))
+    })
+
+    describe('doReset', () => {
+        beforeAll(() => {
+            perform = async () => {
+                signal$.next(doReset());
+            }
+        })
+
+        it('triggers new era', () => 
+            expect(eras).toMatchObject([
+                { id: 0 }, 
+                { id: 1 },
+            ]))
+
+        it('moves threshold past last slice', () =>         
+            expect(eras).toMatchObject([
+                { id: 0 }, 
+                { id: 1 },
+            ]))
+
     })
 
     describe('setThreshold', () => {

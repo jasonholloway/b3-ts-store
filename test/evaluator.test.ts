@@ -3,7 +3,7 @@ import { Subject, from, Observable, zip, merge } from "rxjs";
 import { Dict, reduceToDict, tup, enumerate, log, concatMapEager } from "../lib/utils";
 import { map, concatMap, groupBy, toArray, flatMap } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { specifier, emptyManifest, Manifest, setThreshold, Signal, newEra } from "../lib/core/specifier";
+import { specifier, emptyManifest, Manifest, setThreshold, Signal, refreshEra } from "../lib/core/specifier";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { newEpoch } from "../lib/core";
@@ -68,7 +68,7 @@ describe('evaluator', () => {
 
         it('includes logRefs of eras within threshold', async () => {
             ripple({ myLog: [1] });
-            signal$.next(newEra());
+            signal$.next(refreshEra());
             ripple({ myLog2: [1] });
 
             await expectLogRefs([

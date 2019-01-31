@@ -12,7 +12,7 @@ import { Commit } from "../lib/core/committer";
 
 jest.setTimeout(400);
 
-xdescribe('logSpace', () => {
+describe('logSpace', () => {
 
     const model = new TestModel();
 
@@ -25,10 +25,6 @@ xdescribe('logSpace', () => {
     let error$: Observable<Error>
     let commit$: Observable<Commit>
 
-    function getLog<K extends KnownLogs<TestModel>>(logRef?: K) {
-        return space.getLog(logRef || 'test');
-    }
-
     beforeEach(() => {
         blockStore = new FakeBlockStore();
         manifestStore = new FakeManifestStore();
@@ -40,25 +36,13 @@ xdescribe('logSpace', () => {
         commit$ = space.commit$.pipe(pullAll());
     })
 
-    function complete() {
-        space.complete();
-    }
-
-    async function getView<V>(log: Log<TestModel, any, V>) {
-        const viewing = final(log.view$);
-        pause();
-        complete();
-        return await viewing;
-    }
-
-
     it('logs aggregates staged updates into view', async () => {
         log.stage(addUp('1'));
         log.stage(addUp('2'));
         log.stage(addUp('3'));
 
-        const view = await getView(log);
-        expect(view).toBe('1:2:3');
+        expect(await view(log))
+            .toBe('1:2:3');
     })
 
     it('using same log key gets same log', async () => {
@@ -67,9 +51,9 @@ xdescribe('logSpace', () => {
         log1.stage(addUp('456'));        
 
         const log2 = getLog('hello');
-        const view = await getView(log2);
 
-        expect(view).toBe('123:456');
+        expect(await view(log2))
+            .toBe('123:456');
     })
 
 
@@ -77,12 +61,12 @@ xdescribe('logSpace', () => {
 
         describe('after reset', () => {
             it('resets to zero', async () => {
-                log.stage(addUp('9'));
-                log.stage(addUp('8'));
+                log.stage(addUp('1'));
+                log.stage(addUp('2'));
                 space.reset();
     
-                const view = await getView(log);
-                expect(view).toBe('');
+                expect(await view(log))
+                    .toBe('');
             })
         })
 
@@ -190,11 +174,29 @@ xdescribe('logSpace', () => {
                 space.commit();
                 await pause();
 
-                const view = await getView(log);
-                expect(view).toBe('999:1');
+                expect(await view(log))
+                    .toBe('999:1');
             })
         })
 
     })
+
+
+
+    function getLog<K extends KnownLogs<TestModel>>(logRef?: K) {
+        return space.getLog(logRef || 'test');
+    }
+
+    function complete() {
+        space.complete();
+    }
+
+    async function view<V>(log: Log<TestModel, any, V>) {
+        const viewing = final(log.view$);
+        pause();
+        complete();
+        return await viewing;
+    }
+
 
 })
