@@ -9,10 +9,11 @@ export type SetThreshold = ['SetThreshold', number]
 export type NewManifest = ['NewManifest', Manifest]
 export type DoReset = ['DoReset']
 export type NewSlice = ['NewSlice', number]
+export type Start = ['Start']
 
 export interface Epoch extends Tuple2<'Epoch', [Manifest, Evaluable<any>]> {}
 
-export type Signal = RefreshEra | NewManifest | SetThreshold | Epoch | DoReset
+export type Signal = RefreshEra | NewManifest | SetThreshold | Epoch | DoReset | Start
 
 
 

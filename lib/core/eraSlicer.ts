@@ -1,7 +1,7 @@
-import { Observable, empty, OperatorFunction, zip, pipe, of, MonoTypeOperatorFunction, concat, Subject } from "rxjs";
-import { scan, filter, shareReplay, window, map, skip, concatMap, flatMap, concatAll, share, last, defaultIfEmpty, withLatestFrom, max, tap, mapTo, startWith, first } from "rxjs/operators";
-import { tup, reduceToArray, logVal } from "../utils";
-import { Manifest, emptyManifest, Signal, refreshEra } from "./specifier";
+import { Observable, empty, OperatorFunction, pipe, of, MonoTypeOperatorFunction, concat, forkJoin } from "rxjs";
+import { scan, filter, shareReplay, map, concatMap, concatAll, share, defaultIfEmpty, max, startWith } from "rxjs/operators";
+import { tup, reduceToArray } from "../utils";
+import { Manifest, emptyManifest, Signal, Start } from "./specifier";
 import { Evaluable } from "./evaluable";
 import { Windower } from "./windower";
 
@@ -20,23 +20,25 @@ export type SliceId = number
 export interface Slice<V = Ripple> extends Tuple2<SliceId, V> {}
 
 export type Slice$<V> = Observable<Slice<V>>
-export type EraSpec = number;
 
-export interface Era {
+export interface Era<V = any> {
     id: number,
     manifest: Manifest,
     blocks: Evaluable<any>,
     thresh: number
-}
-
-export interface EraWithSlices<V = any> extends Era {
     from: number,
     oldSlice$: Slice$<V>,
     currSlice$: Slice$<V>,
     slices: Slice$<V>,
 }
 
-const emptyEra: EraWithSlices<Ripple> = {
+interface Spec {
+    from$: Observable<number>,
+    thresh$: Observable<number>
+}
+
+
+const emptyEra: Era = {
     id: -1,
     thresh: 0,
     from: 0,
@@ -47,136 +49,110 @@ const emptyEra: EraWithSlices<Ripple> = {
     blocks: null,
 }
 
-interface State {
-    era: EraWithSlices,
-    out$?: Observable<EraWithSlices>
-}
-
 
 export const eraSlicer =
-    (getWindow: Windower<Ripple>): OperatorFunction<Signal, EraWithSlices<Ripple>> =>
+    (getWindow: Windower<Ripple>): OperatorFunction<Signal, Era> =>
         pipe(
-            startWith(refreshEra()),
-            scan((state$: Observable<State>, signal: Signal) =>
-                state$.pipe(
-                    handleSignal(signal),
-                    prepSlices(getWindow)),
-                of({ era: emptyEra })),
+            startWith(['Start'] as Start),
+            scan((prev$: Observable<Era>, signal: Signal) =>
+                prev$.pipe(
+                    digestPrevious(),
+                    handle(signal),
+                    setEraId(),
+                    sliceRipples(getWindow),
+                    shareReplay(1)
+                ),
+                of(emptyEra)),
 
             concatAll(),
-            concatMap(({ out$ }) => out$),
-            map((era, id) => ({ ...era, id }))
         );
 
 
-function handleSignal(signal: Signal): OperatorFunction<State, State> {      
-    return map(({era: prevEra}) => {
+function digestPrevious() : OperatorFunction<Era, [Era, Spec, Era]> {
+    return map((prev: Era) => {
+        const from$ = prev.slices.pipe(
+                                map(([sliceId]) => sliceId),
+                                max(),
+                                map(i => i + 1),
+                                defaultIfEmpty(prev.from),
+                                shareReplay(1));
+
+        const spec = {
+            from$,
+            thresh$: of(prev.thresh)
+        };
+
+        return tup(prev, spec, { ...prev });
+    })
+}
+
+
+
+
+function handle(signal: Signal): MonoTypeOperatorFunction<[Era, Spec, Era]> {
+    return map(([prev, spec, era]) => {
         switch(signal[0]) {
+            case 'Start':
             case 'RefreshEra': {
-                const era = { ...prevEra };
-                return { 
-                    era,
-                    out$: of(era)
-                };
+                return tup(prev, spec, era);
             }
             case 'DoReset': {
-                return { 
-                    era: prevEra,
-                    out$: of(prevEra)
-                };
+                return tup(prev, { ...spec, thresh$: spec.from$ }, era);
             }
             case 'Epoch': {
                 const [manifest, blocks] = signal[1];
-                const era = { ...prevEra, manifest, blocks };
-                return { 
-                    era,
-                    out$: of(era)
-                };
+                return tup(prev, spec, { ...era, manifest, blocks });
             }
             case 'NewManifest': {
                 const manifest = signal[1];
-                const era = { ...prevEra, manifest };
-                return {
-                    era,
-                    out$: of(era)
-                };
+                return tup(prev, spec, { ...era, manifest });
             }
             case 'SetThreshold': {
                 const thresh = signal[1];
-                const era = { ...prevEra, thresh };
-                return {
-                    era,
-                    out$: of(era)
-                };
+                return tup(prev, { ...spec, thresh$: of(thresh) }, era);
             }
             default:
                 throw `Strange Signal: ${signal[0]}`;
         }
-    });                          
+    });
 }
 
 
-function prepSlices(getRipple$: Windower<Ripple>): OperatorFunction<State, State> {
-    return pipe();
+function setEraId() : MonoTypeOperatorFunction<[Era, Spec, Era]> {
+    return map(([prev, spec, era]) => 
+                tup(prev, spec, { ...era, id: era.id + 1 }));
 }
 
-        
 
-
-
-        // era$ => {
-        //     era$ = era$.pipe(shareReplay(16));
-
-        //     const window$ = ripple$.pipe( 
-        //                         pullRipples(),
-        //                         window(era$),     
-        //                         skip(1));
-
-        //     return zip(era$, window$)
-        //             .pipe(
-        //                 scan(   
-        //                     (prevEra$: Observable<EraWithSlices<Ripple>>, [era, ripple$]: [Era, Observable<Ripple>]) => {
-
-        //                         //*************************************
-        //                         //from should default to thresh!
-        //                         //need to expose faultiness via test 1st
-        //                         //**************************************
-
-        //                         const from$ = prevEra$.pipe(
-        //                                         concatMap(prev => 
-        //                                             prev.slices.pipe(
-        //                                                 map(([sliceId]) => sliceId + 1),
-        //                                                 defaultIfEmpty(prev.from),
-        //                                                 max())),
-        //                                         defaultIfEmpty(0),
-        //                                         shareReplay(1));
-
-        //                         const oldSlice$ = prevEra$.pipe(
-        //                                             concatMap(prev => prev.slices),
-        //                                             filter(([sliceId]) => sliceId >= era.thresh),
-        //                                             shareReplay());
-
-        //                         const currSlice$ = ripple$.pipe(
-        //                                             withLatestFrom(from$),
-        //                                             map(([part$, start], i) => slice(start + i, part$)),
-        //                                             shareReplay());
-
-        //                         const slice$ = concat(oldSlice$, currSlice$);
-        //                         slice$.subscribe();
-
-        //                         return from$.pipe(
-        //                             map(from => ({
-        //                                 ...era,
-        //                                 from,
-        //                                 oldSlice$,
-        //                                 currSlice$,
-        //                                 slices: slice$
-        //                             })));
-        //                     },
-        //                     empty()),
-        //                 concatAll()
-        //             );
-        // };
+function sliceRipples(getWindow: Windower<Ripple>) : OperatorFunction<[Era, Spec, Era], Era> {
+    return concatMap(([, spec, era]) => {
+        const ripple$ = getWindow()
+                        .pipe(pullAll());
+    
+        return forkJoin(spec.from$, spec.thresh$).pipe(
+                map(([from, thresh]) => {
+                    const oldSlice$ = era.slices.pipe(
+                                        filter(([sliceId]) => sliceId >= thresh),
+                                        shareReplay());
+    
+                    const currSlice$ = ripple$.pipe(
+                                        map((part$, i) => slice(from + i, part$)),
+                                        shareReplay());
+    
+                    const slice$ = concat(oldSlice$, currSlice$);
+                    slice$.subscribe();
+    
+                    return {
+                        ...era,
+                        from,
+                        thresh,
+                        oldSlice$,
+                        currSlice$,
+                        slices: slice$
+                    };
+                }))  
+    });
+}
 
 
 export function pullRipples() : MonoTypeOperatorFunction<Ripple> {
@@ -213,13 +189,13 @@ export function pullAll<I>(replay = true) : MonoTypeOperatorFunction<I> {
 }
 
 
-export function pullAllSlices<A, I extends EraWithSlices<A>>() : MonoTypeOperatorFunction<I> {
+export function pullAllSlices<A, I extends Era<A>>() : MonoTypeOperatorFunction<I> {
     return eras => {
         const x = eras.pipe(
                     map(era => {
                         const slices = era.slices.pipe(shareReplay());
                         slices.subscribe();
-                        return { ...era as EraWithSlices<A>, slices } as I
+                        return { ...era as Era<A>, slices } as I
                     }),
                     shareReplay())
 

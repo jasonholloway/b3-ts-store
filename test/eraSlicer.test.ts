@@ -1,7 +1,7 @@
 import { Observable, Subject, from, OperatorFunction, pipe, zip, merge, empty, forkJoin } from "rxjs";
-import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
+import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict, logVal } from "../lib/utils";
 import { map, concatMap, toArray, scan, concatAll, startWith } from "rxjs/operators";
-import { EraWithSlices, pullAllSlices, SliceId, pullAll, Ripple, eraSlicer } from "../lib/core/eraSlicer";
+import { Era, pullAllSlices, SliceId, pullAll, Ripple, eraSlicer, pullRipples } from "../lib/core/eraSlicer";
 import { emptyManifest, Signal, specifier, Manifest, setThreshold, refreshEra, doReset, newManifest } from "../lib/core/specifier";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
@@ -23,7 +23,7 @@ describe('eraSlicer', () => {
     let ripple$: Subject<Ripple<number>>
     let signal$: Subject<Signal>
 
-    let era$: Observable<EraWithSlices<Ripple<number>>>
+    let era$: Observable<Era<Ripple<number>>>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
@@ -156,9 +156,9 @@ describe('eraSlicer', () => {
     }
 
     function complete() {
-        manifest$.complete();
         ripple$.complete();
         signal$.complete();
+        manifest$.complete();
     }
 
     function threshold(n: number) {
@@ -172,7 +172,7 @@ describe('eraSlicer', () => {
         );
     }
 
-    function materializeEras() : OperatorFunction<EraWithSlices<Ripple<number>>, any> {
+    function materializeEras() : OperatorFunction<Era<Ripple<number>>, any> {
         return pipe(
             concatMap(({ slices }) => slices.pipe(
                 concatMap(([sliceId, parts]) => parts.pipe(
@@ -194,7 +194,7 @@ describe('eraSlicer as specifier', () => {
 
     let signal$: Subject<Signal>
     let ripple$: Subject<Ripple>
-    let eras: EraWithSlices[]
+    let eras: Era[]
 
     beforeAll(() => {
         perform = async () => {}; 
