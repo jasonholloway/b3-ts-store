@@ -125,13 +125,13 @@ function setEraId() : MonoTypeOperatorFunction<[Era, Spec, Era]> {
 
 
 function sliceRipples(getWindow: Windower<Ripple>) : OperatorFunction<[Era, Spec, Era], Era> {
-    return concatMap(([, spec, era]) => {
+    return concatMap(([prev, spec, era]) => {
         const ripple$ = getWindow()
                         .pipe(pullAll());
     
         return forkJoin(spec.from$, spec.thresh$).pipe(
                 map(([from, thresh]) => {
-                    const oldSlice$ = era.slices.pipe(
+                    const oldSlice$ = prev.slices.pipe(
                                         filter(([sliceId]) => sliceId >= thresh),
                                         shareReplay());
     
