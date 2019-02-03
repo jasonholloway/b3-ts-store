@@ -1,9 +1,10 @@
 import { Observable, empty, OperatorFunction, pipe, of, MonoTypeOperatorFunction, concat, forkJoin } from "rxjs";
-import { scan, filter, shareReplay, map, concatMap, concatAll, share, defaultIfEmpty, max, startWith } from "rxjs/operators";
+import { scan, filter, shareReplay, map, concatMap, concatAll, share, defaultIfEmpty, max, startWith, merge } from "rxjs/operators";
 import { tup, reduceToArray } from "../utils";
-import { Manifest, emptyManifest, Signal, Start } from "./specifier";
-import { Evaluable } from "./evaluable";
-import { Windower } from "./windower";
+import { Manifest, emptyManifest, Signal, Start } from "./signals";
+import { Evaluable, emptyEvaluable } from "./evaluable";
+import { Windower, createWindower } from "./windower";
+import { newEpoch } from ".";
 
 
 export interface Tuple2<A, B> extends Array<A | B> {
@@ -46,14 +47,37 @@ const emptyEra: Era = {
     currSlice$: empty(),
     slices: empty(),
     manifest: emptyManifest,
-    blocks: null,
+    blocks: emptyEvaluable,
+}
+
+export type Epoch = [Manifest, Evaluable]
+
+export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Ripple>) : OperatorFunction<Epoch, Era> {
+    const getWindow = createWindower(ripple$);
+    return pipe(
+        map(([manifest, blocks]) => 
+            newEpoch(manifest, blocks)),
+        merge(signal$),
+        scan((prev$: Observable<Era>, signal: Signal) =>
+            prev$.pipe(
+                digestPrevious(),
+                handle(signal),
+                setEraId(),
+                sliceRipples(getWindow),
+                shareReplay(1)
+            ),
+            of(emptyEra)),
+
+        concatAll()
+    );
 }
 
 
-export const eraSlicer =
+export const _eraSlicer =
     (getWindow: Windower<Ripple>): OperatorFunction<Signal, Era> =>
         pipe(
             startWith(['Start'] as Start),
+
             scan((prev$: Observable<Era>, signal: Signal) =>
                 prev$.pipe(
                     digestPrevious(),
@@ -141,7 +165,7 @@ function sliceRipples(getWindow: Windower<Ripple>) : OperatorFunction<[Era, Spec
     
                     const slice$ = concat(oldSlice$, currSlice$);
                     slice$.subscribe();
-    
+                        
                     return {
                         ...era,
                         from,

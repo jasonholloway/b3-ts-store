@@ -1,4 +1,4 @@
-import { Manifest } from "./core/specifier";
+import { Manifest } from "./core/signals";
 import { Observable } from "rxjs";
 
 export function declareLogModel<U extends AnyUpdate, D>(m: Model<U, D>): Model<U, D> {

@@ -1,10 +1,10 @@
 import { Model } from "./evaluable";
 import { Observable, OperatorFunction, Observer, empty } from "rxjs";
 import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll, flatMap, filter } from "rxjs/operators";
-import { Era } from "./slicer";
-import { RefreshEra, refreshEra } from "./specifier";
-import { reduceToDict, tup, Dict, logVal, enumerate } from "../utils";
+import { reduceToDict, tup, Dict, enumerate } from "../utils";
 import { EvaluableEra } from "./evaluator";
+import { Era } from "./eraSlicer";
+import { RefreshEra, refreshEra } from "./signals";
 
 export type DoCommit = {}
 

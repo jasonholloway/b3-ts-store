@@ -1,9 +1,8 @@
 import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
 import { BlockStore, ManifestStore } from "../bits";
-import { startWith, map, shareReplay } from "rxjs/operators";
-import { specifier, Signal, Manifest, Epoch, DoReset } from "./specifier";
+import { startWith, shareReplay, mapTo, tap } from "rxjs/operators";
+import { Signal, Manifest, NewEpoch, doReset } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
-import { slicer, Ripple } from "./slicer";
 import { committer, DoCommit, Commit } from "./committer";
 import { Observable, Subject, merge, zip, empty } from "rxjs";
 import { pullManifests, PullManifest, pullManifest } from "./pullManifests";
@@ -12,6 +11,7 @@ import { createViewer } from "./viewer";
 import { tup } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
+import { eraSlicer, Ripple } from "./eraSlicer";
 
 
 export interface Core<M extends Model> {
@@ -25,17 +25,21 @@ const emptyEvaluable: Evaluable = {
     evaluate: () => empty()
 }
 
-export const newEpoch = (manifest: Manifest, blocks: Evaluable = emptyEvaluable): Epoch => 
+export const newEpoch = (manifest: Manifest, blocks: Evaluable = emptyEvaluable): NewEpoch => 
     ['Epoch', tup(manifest, blocks)];
 
 
 export const createCore =
     <M extends Model>
     (model: M, blockStore: BlockStore, manifestStore: ManifestStore) =>
-    (ripple$: Observable<Ripple<any>>, doReset$: Observable<DoReset>, doCommit$: Observable<DoCommit>) : Core<M> => {
+    (ripple$: Observable<Ripple<any>>, doReset$: Observable<void>, doCommit$: Observable<DoCommit>) : Core<M> => {
 
     const pullManifest$ = new Subject<PullManifest>();
     const signal$ = new Subject<Signal>();
+
+    ripple$ = tapCompletion(ripple$);
+    doReset$ = tapCompletion(doReset$);
+    doCommit$ = tapCompletion(doCommit$);
 
     const manifest$ = pullManifest$.pipe(
                         startWith(pullManifest()),
@@ -46,14 +50,14 @@ export const createCore =
                     manifest$,
                     manifest$.pipe(
                         pullBlocks(blockStore),
-                        evaluateBlocks(model))
-                    ).pipe(map(e => newEpoch(...e)));
+                        evaluateBlocks(model)));
     
-    const era$ = merge(epoch$, signal$, doReset$).pipe(
-                    specifier(),
-                    slicer(ripple$),
+    const allSignal$ = merge(signal$, doReset$.pipe(mapTo(doReset())));
+
+    const era$ = epoch$.pipe(
+                    eraSlicer(allSignal$, ripple$),
                     evaluator(model));
-                    
+                
     const commit$ = doCommit$.pipe(
                     committer(era$, signal$),
                     pusher(blockStore, manifestStore, pullManifest$));
@@ -67,4 +71,13 @@ export const createCore =
             return viewer(ref);
         }
     };
+
+    function tapCompletion<V>(o$: Observable<V>): Observable<V> {
+        return o$.pipe(tap({
+            complete: () => {
+                pullManifest$.complete();
+                signal$.complete();
+            } 
+        }))
+    }
 }

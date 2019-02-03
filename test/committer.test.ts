@@ -1,14 +1,18 @@
-import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject } from "rxjs";
+import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, zip, empty } from "rxjs";
 import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
-import { slicer, Ripple, pullAll } from "../lib/core/slicer";
 import { map, concatMap, groupBy, startWith } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
-import { emptyManifest, specifier, Epoch } from "../lib/core/specifier";
+import { emptyManifest, NewEpoch, Manifest } from "../lib/core/signals";
 import { pause } from "./utils";
 import { newEpoch } from "../lib/core";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
 import { KnownLogs } from "../lib/core/evaluable";
+import { Ripple, pullAll, eraSlicer } from "../lib/core/eraSlicer";
+import { createWindower } from "../lib/core/windower";
+import { pullBlocks } from "../lib/core/pullBlocks";
+import FakeBlockStore from "./fakes/FakeBlockStore";
+import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 
 type TestRipple = Dict<number[]>
 
@@ -18,7 +22,7 @@ describe('committer', () => {
 
     const model = new TestModel();
 
-    let epoch$: Subject<Epoch>
+    let manifest$: Subject<Manifest>
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
@@ -26,14 +30,18 @@ describe('committer', () => {
     let commit$: Observable<Commit>
 
     beforeEach(() => {
-        epoch$ = new Subject<Epoch>();
+        manifest$ = new BehaviorSubject(emptyManifest);
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
+        const epoch$ = zip(
+                        manifest$,
+                        manifest$.pipe(
+                            pullBlocks(new FakeBlockStore()),
+                            evaluateBlocks(model)));
+
         era$ = epoch$.pipe(
-                startWith(newEpoch(emptyManifest)),
-                specifier(),
-                slicer(ripple$),
+                eraSlicer(empty(), ripple$),
                 evaluator(model),
                 pullAll());
 
@@ -119,8 +127,8 @@ describe('committer', () => {
     }
 
     function complete() {
+        manifest$.complete();
         ripple$.complete();
-        epoch$.complete();
         doCommit$.complete();
     }
 

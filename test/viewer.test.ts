@@ -1,18 +1,17 @@
-import { Subject, from, zip, merge } from "rxjs";
+import { Subject, from, zip, BehaviorSubject } from "rxjs";
 import { Dict, enumerate, tup } from "../lib/utils";
-import { slicer, Ripple, pullAll } from "../lib/core/slicer";
-import { map, concatMap, groupBy, startWith } from "rxjs/operators";
+import { map, concatMap, groupBy } from "rxjs/operators";
 import { KnownLogs } from "../lib/core/evaluable";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/core/committer";
 import { Viewer, createViewer } from "../lib/core/viewer";
-import { specifier, Signal, refreshEra, emptyManifest, newManifest, Manifest } from "../lib/core/specifier";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pullBlocks } from "../lib/core/pullBlocks";
-import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator } from "../lib/core/evaluator";
 import { gather } from "./helpers";
+import { Manifest, Signal, emptyManifest, newManifest, refreshEra } from "../lib/core/signals";
+import { Ripple, pullAll, eraSlicer } from "../lib/core/eraSlicer";
 
 type TestRipple = Dict<number[]>
 
@@ -34,7 +33,7 @@ describe('viewer', () => {
     beforeEach(() => {
         blockStore = new FakeBlockStore();
 
-        manifest$ = new Subject<Manifest>();
+        manifest$ = new BehaviorSubject(emptyManifest);
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
@@ -43,17 +42,12 @@ describe('viewer', () => {
                         manifest$,
                         manifest$.pipe(
                             pullBlocks(blockStore),
-                            evaluateBlocks(model))
-                    ).pipe(map(e => newEpoch(...e)));
+                            evaluateBlocks(model)));
 
-        const era$ = merge(epoch$, signal$).pipe(
-                        startWith(refreshEra()),
-                        specifier(),
-                        slicer(ripple$),
+        const era$ = epoch$.pipe(
+                        eraSlicer(signal$, ripple$),
                         evaluator(model),
                         pullAll());
-
-        manifest$.next(emptyManifest);
 
         view = createViewer(era$);
     })
@@ -138,6 +132,7 @@ describe('viewer', () => {
     }
 
     function complete() {
+        manifest$.complete();
         ripple$.complete();
         signal$.complete();
         doCommit$.complete();

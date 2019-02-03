@@ -1,6 +1,5 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
-import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
-import { pullAll, Ripple } from "../lib/core/slicer";
+import { Dict, enumerate, tup } from "../lib/utils";
 import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
@@ -10,7 +9,7 @@ import { pause } from "./utils";
 import { Core, createCore } from "../lib/core";
 import { EvaluableEra } from "../lib/core/evaluator";
 import { gather } from "./helpers";
-import { DoReset } from "../lib/core/specifier";
+import { pullAll, Ripple } from "../lib/core/eraSlicer";
 
 type TestRipple = Dict<number[]>
 
@@ -24,47 +23,48 @@ describe('core', () => {
     let blockStore: FakeBlockStore
 
     let ripple$: Subject<Ripple<number>>
-    let doReset$: Subject<DoReset>
+    let doReset$: Subject<void>
     let doCommit$: Subject<DoCommit>
 
     let era$: Observable<EvaluableEra<TestModel>>
     let commit$: Observable<Commit>
 
-    let store: Core<TestModel>
+    let core: Core<TestModel>
 
     beforeEach(() => {
         manifestStore = new FakeManifestStore();
         blockStore = new FakeBlockStore();
 
         ripple$ = new Subject<Ripple<number>>();
-        doReset$ = new Subject<DoReset>();
+        doReset$ = new Subject<void>();
         doCommit$ = new Subject<DoCommit>();
 
         manifestStore.manifest = { version: 10, logBlocks: { myLog2: [ 'block1' ] } };
         blockStore.blocks = { block1: { myLog2: [ 4, 5, 6 ] } }
 
-        store = createCore(model, blockStore, manifestStore)(ripple$, doReset$, doCommit$);
+        core = createCore(model, blockStore, manifestStore)(ripple$, doReset$, doCommit$);
 
-        era$ = store.era$.pipe(pullAll());
-        commit$ = store.commit$.pipe(pullAllCommits());
+        era$ = core.era$.pipe(pullAll());
+        commit$ = core.commit$.pipe(pullAllCommits());
     })
 
     describe('viewing', () => {
 
         it('serves views of staged updates', async () => {
-            emit({ myLog: [ 5, 6, 7 ] });
+            const viewing = gather(core.view('myLog'));
+
+            emit({ myLog: [ 1, 2, 3 ] });
             await pause();
             complete();
 
-            const r = await gather(store.view('myLog'));
-            expect(r).toEqual([ '5,6,7' ]);
+            expect(await viewing).toEqual([ '1,2,3' ]);
         })
 
         it('serves views of existing blocks', async () => {
             await pause();
             complete();
 
-            const r = await gather(store.view('myLog2'));
+            const r = await gather(core.view('myLog2'));
             expect(r).toEqual([ '4,5,6' ]);
         })
 
@@ -75,15 +75,22 @@ describe('core', () => {
 
         it('triggers new era', async () => {
             emit({ myLog: [ 1, 2, 3 ] });
-            doReset$.next();
-            complete();        
+            doReset();
+            complete();
 
             const eras = await gather(era$);
-            expect(eras).toMatchObject([ { id: 0 }, { id: 1} ]);
+            expect(eras).toMatchObject([ { id: 0 }, { id: 1 } ]);
         })
 
         it('reemits base view', async () => {
-            throw 'notimpl'
+            emit({ myLog2: [ 7, 8, 9 ] });
+            await pause();
+            doReset();
+            await pause();
+            complete();
+
+            const r = await gather(core.view('myLog2'));
+            expect(r).toEqual([ '4,5,6' ]);
         })
 
     })
@@ -111,10 +118,7 @@ describe('core', () => {
             }))
 
         it('triggers new era (to grab slice)', async () => {            
-            const eras = await era$
-                                .pipe(reduceToArray())
-                                .toPromise();
-
+            const eras = await gather(era$);
             expect(eras).toMatchObject([ { id: 0 }, { id: 1} ]);
         })
 
@@ -154,11 +158,7 @@ describe('core', () => {
                 .toEqual([ 10, 10, 999 ]));
 
         it('error emitted into Commit', async () => {
-            const errs = await commit$.pipe(
-                                concatMap(c => c.errors),
-                                reduceToArray()
-                            ).toPromise();
-
+            const errs = await gather(commit$.pipe(concatMap(c => c.errors)));
             expect(errs).toMatchObject([ 'Newer manifest in place!' ]);
         })
     })
@@ -196,9 +196,14 @@ describe('core', () => {
         doCommit$.next();
     }
 
+    function doReset() {
+        doReset$.next();
+    }
+
     function complete() {
         ripple$.complete();
         doCommit$.complete();
+        doReset$.complete();
     }
 
 })

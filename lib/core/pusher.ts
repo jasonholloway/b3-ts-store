@@ -3,7 +3,7 @@ import { Observer, OperatorFunction, pipe, of, Observable, MonoTypeOperatorFunct
 import { Commit } from "./committer";
 import { concatMap, tap, mapTo, catchError, defaultIfEmpty } from "rxjs/operators";
 import { enumerate, log } from "../utils";
-import { Manifest } from "./specifier";
+import { Manifest } from "./signals";
 import { PullManifest } from "./pullManifests";
 
 export const pusher =

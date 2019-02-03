@@ -1,16 +1,14 @@
-import { slicer, pullAllSlices, Ripple, pullAll } from "../lib/core/slicer";
-import { Subject, from, Observable, zip, merge } from "rxjs";
-import { Dict, reduceToDict, tup, enumerate, log, concatMapEager } from "../lib/utils";
-import { map, concatMap, groupBy, toArray, flatMap } from "rxjs/operators";
+import { Subject, from, Observable, zip, BehaviorSubject } from "rxjs";
+import { Dict, tup, enumerate } from "../lib/utils";
+import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { specifier, emptyManifest, Manifest, setThreshold, Signal, refreshEra } from "../lib/core/specifier";
+import { Manifest, setThreshold, Signal, refreshEra, emptyManifest } from "../lib/core/signals";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
-import { LogRef, KnownLogs } from "../lib/core/evaluable";
-import { pause } from "./utils";
+import { KnownLogs } from "../lib/core/evaluable";
+import { eraSlicer, Ripple, pullAllSlices } from "../lib/core/eraSlicer";
 
 
 describe('evaluator', () => {
@@ -27,7 +25,7 @@ describe('evaluator', () => {
     beforeEach(() => {
         blockStore = new FakeBlockStore();
 
-        manifest$ = new Subject<Manifest>();
+        manifest$ = new BehaviorSubject(emptyManifest);
         signal$= new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
 
@@ -35,17 +33,12 @@ describe('evaluator', () => {
                         manifest$,
                         manifest$.pipe(
                             pullBlocks(blockStore),
-                            evaluateBlocks(model))
-                    ).pipe(map(e => newEpoch(...e)));
+                            evaluateBlocks(model)));
 
-        era$ = merge(signal$, epoch$).pipe(
-                    specifier(),
-                    slicer(ripple$),
+        era$ = epoch$.pipe(
+                    eraSlicer(signal$, ripple$),
                     evaluator(model),
                     pullAllSlices());
-
-
-        manifest$.next(emptyManifest);
     })
 
 
@@ -225,8 +218,9 @@ describe('evaluator', () => {
     }
 
     function complete() {
-        ripple$.complete();
         manifest$.complete();
+        signal$.complete();
+        ripple$.complete();
     }
 
 

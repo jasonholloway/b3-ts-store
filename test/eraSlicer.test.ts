@@ -1,15 +1,13 @@
-import { Observable, Subject, from, OperatorFunction, pipe, zip, merge, empty, forkJoin } from "rxjs";
-import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict, logVal } from "../lib/utils";
-import { map, concatMap, toArray, scan, concatAll, startWith } from "rxjs/operators";
-import { Era, pullAllSlices, SliceId, pullAll, Ripple, eraSlicer, pullRipples } from "../lib/core/eraSlicer";
-import { emptyManifest, Signal, specifier, Manifest, setThreshold, refreshEra, doReset, newManifest } from "../lib/core/specifier";
+import { Observable, Subject, from, OperatorFunction, pipe, zip, merge, forkJoin, BehaviorSubject } from "rxjs";
+import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
+import { map, concatMap, toArray } from "rxjs/operators";
+import { Era, pullAllSlices, SliceId, pullAll, Ripple, eraSlicer } from "../lib/core/eraSlicer";
+import { emptyManifest, Signal, Manifest, setThreshold, refreshEra, doReset, newManifest } from "../lib/core/signals";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
-import { newEpoch } from "../lib/core";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { TestModel } from "./fakes/testModel";
 import { pause } from "./utils";
-import { createWindower } from "../lib/core/windower";
 
 jest.setTimeout(500);
 
@@ -28,7 +26,7 @@ describe('eraSlicer', () => {
     beforeEach(() => {
         blockStore = new FakeBlockStore();
 
-        manifest$ = new Subject<Manifest>();
+        manifest$ = new BehaviorSubject(emptyManifest);
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
 
@@ -36,13 +34,10 @@ describe('eraSlicer', () => {
                         manifest$,
                         manifest$.pipe(
                             pullBlocks(blockStore),
-                            evaluateBlocks(model))
-                    ).pipe(map(e => newEpoch(...e)));
+                            evaluateBlocks(model)));
 
-        const windower = createWindower(ripple$);
-
-        era$ = merge(epoch$, signal$).pipe(
-                eraSlicer(windower),
+        era$ = epoch$.pipe(
+                eraSlicer(signal$, ripple$),
                 pullAllSlices());
     })
 
@@ -194,6 +189,7 @@ describe('eraSlicer as specifier', () => {
 
     let signal$: Subject<Signal>
     let ripple$: Subject<Ripple>
+    let manifest$: Subject<Manifest>
     let eras: Era[]
 
     beforeAll(() => {
@@ -204,12 +200,17 @@ describe('eraSlicer as specifier', () => {
     beforeEach(async () => {
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Ripple>();
-
-        const windower = createWindower(ripple$);
+        manifest$ = new BehaviorSubject(emptyManifest);
         
+        const epoch$ = zip(
+                        manifest$,
+                        manifest$.pipe(
+                            pullBlocks(new FakeBlockStore()),
+                            evaluateBlocks(new TestModel())));
+                            
         [eras] = await forkJoin(
-                        signal$.pipe(
-                            eraSlicer(windower),
+                        epoch$.pipe(
+                            eraSlicer(signal$, ripple$),
                             toArray(),
                             pullAll()),
                         perform()
@@ -326,7 +327,9 @@ describe('eraSlicer as specifier', () => {
 
     async function complete() {
         await pause();
+        manifest$.complete();
         signal$.complete();
+        ripple$.complete();
     }
 
 

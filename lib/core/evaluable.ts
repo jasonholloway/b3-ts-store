@@ -1,4 +1,4 @@
-import { Observable } from "rxjs";
+import { Observable, empty } from "rxjs";
 import { Model as LogModel } from '../bits'
 
 export type LogRef = string;
@@ -25,4 +25,9 @@ export function createEvaluable<M extends Model>(raw: Evaluable<M>) : Evaluable<
 
 export function isKnownLog<M extends Model>(model: M, ref: string) : ref is KnownLogs<M> {
     return model.logs[ref] !== undefined;
+}
+
+export const emptyEvaluable: Evaluable = {
+    logRef$: empty(),
+    evaluate: () => empty()
 }

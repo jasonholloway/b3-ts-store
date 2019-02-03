@@ -3,8 +3,8 @@ import { Subject, Observable, empty, of } from "rxjs";
 import { tup } from "./utils";
 import { Model, KnownLogs, KnownAggr } from "./core/evaluable";
 import { createCore } from "./core";
-import { Ripple } from "./core/slicer";
 import { DoCommit, Commit } from "./core/committer";
+import { Ripple } from "./core/eraSlicer";
 
 
 export interface LogSpace<M extends Model> {
@@ -29,9 +29,10 @@ export interface Log<M extends Model, K extends KnownLogs<M>, V extends KnownAgg
 export function createLogSpace<M extends Model>(model: M, manifests: ManifestStore, blocks: BlockStore): LogSpace<M> {
 
     const ripple$ = new Subject<Ripple>();
+    const doReset$ = new Subject<void>();
     const doCommit$ = new Subject<DoCommit>();
 
-    const core = createCore(model, blocks, manifests)(ripple$, doCommit$);
+    const core = createCore(model, blocks, manifests)(ripple$, doReset$, doCommit$);
 
     return {
         getLog<K extends KnownLogs<M>, V extends KnownAggr<M, K>>(ref: K): Log<M, K, V> {

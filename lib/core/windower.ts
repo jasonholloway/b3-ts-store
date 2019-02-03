@@ -1,6 +1,6 @@
 import { Observable, Subject } from "rxjs";
-import { pullAll } from "./slicer";
 import { first, concatAll, window, skip, share } from "rxjs/operators";
+import { pullAll } from "./eraSlicer";
 
 export type Windower<V> = () => Observable<V>
 

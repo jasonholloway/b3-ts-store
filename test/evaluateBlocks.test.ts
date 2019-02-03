@@ -1,13 +1,13 @@
-import { pullAll } from "../lib/core/slicer";
 import { Subject, Observable } from "rxjs";
 import { startWith } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { Manifest } from "../lib/core/specifier";
+import { Manifest } from "../lib/core/signals";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { Evaluable } from "../lib/core/evaluable";
 import { final, gather } from "./helpers";
+import { pullAll } from "../lib/core/eraSlicer";
 
 
 describe('evaluateBlocks', () => {

@@ -1,18 +1,18 @@
 import { pipe, OperatorFunction, empty, Observable, of } from "rxjs";
-import { EraWithSlices, Ripple, Slice } from "./slicer";
 import { scan, concatAll, concatMap, map, filter, defaultIfEmpty, startWith, single, last, distinct, takeLast, withLatestFrom } from "rxjs/operators";
 import { Evaluable, Model, KnownLogs } from "./evaluable";
 import { tup } from "../utils";
+import { Era, Ripple, Slice } from "./eraSlicer";
 
 
 export interface EvaluableEra<M extends Model> 
-    extends EraWithSlices<Ripple>, Evaluable<M> { }
+    extends Era<Ripple>, Evaluable<M> { }
 
 
 export const evaluator = 
-    <M extends Model>(model: M) : OperatorFunction<EraWithSlices<Ripple>, EvaluableEra<M>> => 
+    <M extends Model>(model: M) : OperatorFunction<Era<Ripple>, EvaluableEra<M>> => 
         pipe(
-            scan<EraWithSlices<Ripple>, Observable<EvaluableEra<M>>>(
+            scan<Era<Ripple>, Observable<EvaluableEra<M>>>(
                 (prev$, era) => of(createEvaluableEra<M>({
                     ...era,
 
