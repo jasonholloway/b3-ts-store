@@ -12,6 +12,8 @@ class FakeBlockStore implements BlockStore {
     }
 
     async save(key: string, block: Block): Promise<void> {
+        if(this.errorsOnPersist) throw Error('Failed to store block (as planned!)');
+
         if(this.blocks[key]) throw Error('Blocks are immutable!');
         this.blocks[key] = block;
 

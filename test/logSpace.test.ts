@@ -9,6 +9,7 @@ import { Observable } from "rxjs";
 import { Commit } from "../lib/core/committer";
 import { pullAll } from "../lib/core/eraSlicer";
 import { first, timeout } from "rxjs/operators";
+import { gather } from "./helpers";
 
 jest.setTimeout(400);
 
@@ -116,8 +117,6 @@ describe('logSpace', () => {
             })
 
             it('stores block', async () => {
-                console.log(blockStore.blocks);
-
                 const [[_, block]] = enumerate(blockStore.blocks);
                 
                 expect(block[log.ref]).toEqual([ 
@@ -127,8 +126,6 @@ describe('logSpace', () => {
             })
 
             it('stores manifest, referring to stored block', () => {
-                console.log(manifestStore.manifest);
-
                 const blocks = manifestStore.manifest.logBlocks[log.ref];
                 expect(blocks).toBeDefined();
                 expect(blocks.length).toBe(1);
@@ -144,7 +141,28 @@ describe('logSpace', () => {
             it('increments manifest version', () => {
                 expect(manifestStore.manifest.version).toBe(1);
             })
+        })
 
+
+        describe('after multiple commits', () => {
+            beforeEach(async () => {
+                log.stage(addUp('1'));
+                space.commit();
+                await pause(50);
+
+                log.stage(addUp('2'));
+                space.commit();
+            })
+
+            it('full view summoned', async () => {
+                const space2 = createLogSpace(model, manifestStore, blockStore);
+                const log2 = space2.getLog(log.ref);
+
+                console.log(manifestStore.manifest)
+
+                expect(await view(log2))
+                    .toEqual('1:2');
+            })
         })
 
 
@@ -172,6 +190,12 @@ describe('logSpace', () => {
 
             beforeEach(() => {
                 blockStore.errorsOnPersist = true;
+            })
+
+            it('error streamed back to caller', async () => {
+                log.stage('1');
+                const messages = await gather(space.commit());
+                expect(messages[0]).toBeInstanceOf(Error);
             })
 
             it('staged updates left in place', async () => {

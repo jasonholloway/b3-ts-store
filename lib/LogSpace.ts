@@ -1,16 +1,17 @@
 import { ManifestStore, BlockStore } from "./bits";
 import { Subject, Observable, empty, of } from "rxjs";
-import { tup } from "./utils";
+import { tup, logVal } from "./utils";
 import { Model, KnownLogs, KnownAggr } from "./core/evaluable";
 import { createCore } from "./core";
 import { DoCommit, Commit } from "./core/committer";
-import { Ripple } from "./core/eraSlicer";
-
+import { Ripple, pullAll } from "./core/eraSlicer";
+import uuid = require("uuid");
+import { filter, map, concatMap, timeout, first } from "rxjs/operators";
 
 export interface LogSpace<M extends Model> {
     getLog<K extends KnownLogs<M>, V extends KnownAggr<M, K>>(key: K): Log<M, K, V>,
 
-    commit(): void,
+    commit(): Observable<Error>,
     reset(): void,
     complete(): void 
 
@@ -44,15 +45,20 @@ export function createLogSpace<M extends Model>(model: M, manifests: ManifestSto
                     ripple$.next(ripple);
                 }
             };
-
-            // const entry = getOrSet(logs, key, () => { 
-            //     return createLogFacade(model, null, null);
-            // });
-            // return entry;
         },
 
-        commit(): void {
-            doCommit$.next(123);
+        commit(): Observable<Error> {
+            const id = uuid();
+
+            const commit$ = core.commit$.pipe(
+                                first(c => c.id == id),
+                                timeout(200),
+                                concatMap(c => c.errors),
+                                pullAll())
+
+            doCommit$.next({ id });
+
+            return commit$;
         },
 
         reset(): void {
