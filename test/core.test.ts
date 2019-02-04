@@ -52,12 +52,13 @@ describe('core', () => {
 
         it('serves views of staged updates', async () => {
             const viewing = gather(core.view('myLog'));
+            await pause();
 
             emit({ myLog: [ 1, 2, 3 ] });
             await pause();
             complete();
 
-            expect(await viewing).toEqual([ '1,2,3' ]);
+            expect(await viewing).toEqual([ '', '1,2,3' ]);
         })
 
         it('serves views of existing blocks', async () => {

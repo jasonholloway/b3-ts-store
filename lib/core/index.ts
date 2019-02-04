@@ -8,7 +8,7 @@ import { Observable, Subject, merge, zip, empty } from "rxjs";
 import { pullManifests, PullManifest, pullManifest } from "./pullManifests";
 import { pusher } from "./pusher";
 import { createViewer } from "./viewer";
-import { tup } from "../utils";
+import { tup, log } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
 import { eraSlicer, Ripple } from "./eraSlicer";
@@ -56,7 +56,8 @@ export const createCore =
 
     const era$ = epoch$.pipe(
                     eraSlicer(allSignal$, ripple$),
-                    evaluator(model));
+                    evaluator(model),   //would be nice if this were part of the interior scan(?)
+                    shareReplay(1));  
                 
     const commit$ = doCommit$.pipe(
                     committer(era$, signal$),

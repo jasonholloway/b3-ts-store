@@ -24,7 +24,7 @@ export const evaluator =
                     evaluate(ref) {
                         const m = model.logs[ref];
                         
-                        const blockView$ = era.blocks.evaluate(ref)
+                        const blockView$ = era.blocks.evaluate(ref)         //if we could look at previous era here, we could check to see if we have to refetch...
                                                 .pipe(single());
 
                         const oldView$ = blockView$.pipe(
