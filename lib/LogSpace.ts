@@ -56,16 +56,16 @@ export function createLogSpace<M extends Model>(model: M, manifests: ManifestSto
         },
 
         reset(): void {
-            // enumerate(this.logs)
-                // .forEach(([_, l]) => l.reset());
+            doReset$.next();
         },
 
         commit$: core.commit$,
 
         error$: empty(),
 
-        complete() {
+        complete() {            
             ripple$.complete();
+            doReset$.complete();
             doCommit$.complete();
         }
     };

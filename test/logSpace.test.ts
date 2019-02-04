@@ -3,12 +3,12 @@ import FakeManifestStore from "./fakes/FakeManifestStore";
 import { enumerate } from "../lib/utils";
 import { addUp, TestModel } from "./fakes/testModel";
 import { LogSpace, createLogSpace, Log } from "../lib/LogSpace";
-import { final } from "./helpers";
 import { KnownLogs } from "../lib/core/evaluable";
 import { pause } from "./utils";
-import { pullAll } from "../lib/core/slicer";
 import { Observable } from "rxjs";
 import { Commit } from "../lib/core/committer";
+import { pullAll } from "../lib/core/eraSlicer";
+import { first, timeout } from "rxjs/operators";
 
 jest.setTimeout(400);
 
@@ -35,6 +35,8 @@ describe('logSpace', () => {
         error$ = space.error$.pipe(pullAll());
         commit$ = space.commit$.pipe(pullAll());
     })
+
+    afterEach(complete);
 
     it('logs aggregates staged updates into view', async () => {
         log.stage(addUp('1'));
@@ -78,14 +80,14 @@ describe('logSpace', () => {
             it('aggregated data stays same', async () => {
                 log.stage(addUp('5'));
                 log.stage(addUp('5'));
-                expect(await final(log.view$)).toBe('5:5');
+                expect(await view(log)).toBe('5:5');
 
                 const committing = space.commit();
-                expect(await final(log.view$)).toBe('5:5');
+                expect(await view(log)).toBe('5:5');
 
                 blockStore.respond();
                 await committing;
-                expect(await final(log.view$)).toBe('5:5');
+                expect(await view(log)).toBe('5:5');
             })
         })
 
@@ -98,7 +100,7 @@ describe('logSpace', () => {
                 log.stage(addUp('2'));
                 await space.commit();
 
-                expect(await final(log.view$)).toBe('1:2');
+                expect(await view(log)).toBe('1:2');
             })
 
         })
@@ -114,6 +116,8 @@ describe('logSpace', () => {
             })
 
             it('stores block', async () => {
+                console.log(blockStore.blocks);
+
                 const [[_, block]] = enumerate(blockStore.blocks);
                 
                 expect(block[log.ref]).toEqual([ 
@@ -123,6 +127,8 @@ describe('logSpace', () => {
             })
 
             it('stores manifest, referring to stored block', () => {
+                console.log(manifestStore.manifest);
+
                 const blocks = manifestStore.manifest.logBlocks[log.ref];
                 expect(blocks).toBeDefined();
                 expect(blocks.length).toBe(1);
@@ -191,11 +197,15 @@ describe('logSpace', () => {
         space.complete();
     }
 
-    async function view<V>(log: Log<TestModel, any, V>) {
-        const viewing = final(log.view$);
-        pause();
-        complete();
-        return await viewing;
+    function view<V>(log: Log<TestModel, any, V>) {
+        return latest(log.view$);
+    }
+
+    function latest<V>(o$: Observable<V>): Promise<V> {
+        return o$.pipe(
+                first(), 
+                timeout(100)
+            ).toPromise();
     }
 
 
