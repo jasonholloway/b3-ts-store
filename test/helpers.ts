@@ -1,12 +1,10 @@
-import { toArray, last } from "rxjs/operators";
+import { toArray, last, timeout } from "rxjs/operators";
 import { Observable } from "rxjs";
-import { pullAll } from "../lib/core/eraSlicer";
-
 
 export function gather<V>(v$: Observable<V>) {
-    return v$.pipe(toArray()).toPromise();
+    return v$.pipe(toArray(), timeout(1000)).toPromise();
 }
 
 export function final<V>(v$: Observable<V>) {
-    return v$.pipe(last()).toPromise();
+    return v$.pipe(last(), timeout(1000)).toPromise();
 }

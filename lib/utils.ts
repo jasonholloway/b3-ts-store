@@ -1,4 +1,4 @@
-import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer } from 'rxjs/operators';
+import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile } from 'rxjs/operators';
 import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable } from 'rxjs';
 
 
@@ -108,6 +108,10 @@ export function bufferAll<V>() : OperatorFunction<V, V[]> {
     return buffer(empty());
 }
 
+
+export const skipAll = 
+    (): OperatorFunction<any, null> =>
+        pipe(skipWhile(() => true));
 
 
 export function capture<A, B>(project: (A) => Observable<B>) : OperatorFunction<A, [A, Observable<B>]> {

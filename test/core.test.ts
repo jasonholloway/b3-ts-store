@@ -1,6 +1,6 @@
-import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
-import { Dict, propsToArray, tup, valsToArray as valsToArray } from "../lib/utils";
-import { map, concatMap, groupBy, toArray } from "rxjs/operators";
+import { Subject, from, pipe, Observable, MonoTypeOperatorFunction, empty } from "rxjs";
+import { Dict, propsToArray, tup, valsToArray as valsToArray, log, scanToArray } from "../lib/utils";
+import { map, concatMap, groupBy, toArray, tap, timeout } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
@@ -118,9 +118,9 @@ describe('core', () => {
                 .toHaveLength(1);
         })                
 
-        it('triggers new era (to grab slice)', async () => {            
+        it('triggers new era with new thresh', async () => {
             const eras = await gather(era$);
-            expect(eras).toMatchObject([ { id: 0 }, { id: 1} ]);
+            expect(eras.map(({id}) => ({id}))).toMatchObject([ { id: 0 }, { id: 1} ]);
         })
     })
 
@@ -153,8 +153,8 @@ describe('core', () => {
             expect(manifestStore.manifest.version).toBe(999));
         
         it('newer manifest percolates into new era', async () =>
-            expect(await getManifestVersions())
-                .toEqual([ 10, 10, 999 ]));
+            expect(await getManifestVersions())                
+                .toContain(999));
 
         it('error emitted into Commit', async () => {
             const errs = await gather(commit$.pipe(concatMap(c => c.errors)));

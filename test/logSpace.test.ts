@@ -148,7 +148,7 @@ describe('logSpace', () => {
             beforeEach(async () => {
                 log.stage(addUp('1'));
                 space.commit();
-                await pause(100);
+                await pause();
 
                 log.stage(addUp('2'));
                 space.commit();
@@ -159,10 +159,17 @@ describe('logSpace', () => {
                 const log2 = space2.getLog(log.ref);
 
                 console.log(manifestStore.manifest)
-
+                
                 expect(await view(log2))
                     .toEqual('1:2');
             })
+
+            //problem above is that staged updates aren't cleared in time on commit...
+            //so second commit includes first slice...
+            //
+            //when commit succeeds, should update thresh at same time as pulling new manifest
+            //but the two commands don't even go to the same place: 
+
         })
 
 

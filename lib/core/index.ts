@@ -57,10 +57,10 @@ export const createCore =
     const era$ = epoch$.pipe(
                     eraSlicer(allSignal$, ripple$),
                     evaluator(model),   //would be nice if this were part of the interior scan(?)
-                    shareReplay(1));  
+                    shareReplay(1));
                 
     const commit$ = doCommit$.pipe(
-                    committer(era$, signal$),
+                    committer(era$),
                     pusher(blockStore, manifestStore, pullManifest$));
 
     const viewer = createViewer(era$);

@@ -1,9 +1,9 @@
 import { Model } from "./evaluable";
-import { Observable, OperatorFunction, Observer, empty, pipe, of } from "rxjs";
-import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll, flatMap, filter, scan, exhaustMap, tap } from "rxjs/operators";
-import { reduceToDict, tup, Dict, propsToArray, log, logVal } from "../utils";
+import { Observable, OperatorFunction, Observer, concat, empty, pipe, of, from, fromEvent, fromEventPattern, forkJoin, merge, UnaryFunction } from "rxjs";
+import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll, flatMap, filter, scan, exhaustMap, tap, sample, startWith, takeUntil, takeWhile, skipWhile, mergeScan, endWith, switchMapTo } from "rxjs/operators";
+import { reduceToDict, tup, Dict, propsToArray, log, logVal, scanToArray, skipAll } from "../utils";
 import { EvaluableEra } from "./evaluator";
-import { Era } from "./eraSlicer";
+import { Era, Slice } from "./eraSlicer";
 import { RefreshEra, refreshEra } from "./signals";
 
 export interface DoCommit {
@@ -43,29 +43,47 @@ export interface Commit {
 //we shouldn't be able to commit again until staging /has updated/ following the previous commit
 //...
 
+
+const trackSlices =
+    pipe(
+        concatMap((era: Era) =>
+            era.currSlice$.pipe(
+                scanToArray(),
+                startWith([] as Slice[]),
+                map(currSlices => ({
+                    era,
+                    slice$: concat(era.oldSlice$, currSlices)
+                }) 
+            )))
+    );
+
+
 export const committer =
     <M extends Model>
-    (era$: Observable<EvaluableEra<M>>, refreshEra$: Observer<RefreshEra>) : OperatorFunction<DoCommit, Commit> =>
+    (era$: Observable<EvaluableEra<M>>) : OperatorFunction<DoCommit, Commit> =>
         pipe(
-            withLatestFrom(era$),
-            exhaustMap(([{id}, era]) =>
-                era.slices.pipe(
-                    tap(() => refreshEra$.next(refreshEra())), //should be wired up outside... but then we'd have to eagerly emit a commit
-                    concatMap(([, part$]) => part$),
-                    groupBy(([ref]) => ref, ([, v$]) => v$),
-                    flatMap(g$ => g$.pipe( 
-                                    concatAll(),
-                                    toArray(),
-                                    map(r => tup(g$.key, r)))),                                            
-                    reduceToDict(),
-                    filter(data => propsToArray(data).length > 0),
-                    map(data => ({ 
-                        id, 
-                        data, 
-                        extent: 1, 
-                        era, 
-                        errors: empty() 
-                    }))
+            withLatestFrom(trackSlices(era$)),                                       //this should really get head and remainder, so we can attach to it below
+            exhaustMap(([{id}, {era, slice$}]) =>
+                merge(
+                    era$.pipe(                                                      //will complete when our commit has made it into era - opening up more commits!
+                        takeWhile(era => era.manifest.version != 9),
+                        skipAll()),
+                    slice$.pipe(
+                        concatMap(([, part$]) => part$),
+                        groupBy(([ref]) => ref, ([, v$]) => v$),
+                        flatMap(g$ => g$.pipe( 
+                                        concatAll(),
+                                        toArray(),
+                                        map(r => tup(g$.key, r)))),                                            
+                        reduceToDict(),
+                        filter(data => propsToArray(data).length > 0),
+                        map(data => ({ 
+                            id, 
+                            data, 
+                            extent: 1, 
+                            era, 
+                            errors: empty() 
+                        })))
                 )),
             share()
         );

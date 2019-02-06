@@ -3,7 +3,7 @@ import { reduceToArray, Dict, propsToArray, tup } from "../lib/utils";
 import { map, concatMap, groupBy, startWith, toArray, concatAll, flatMap } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
-import { emptyManifest, NewEpoch, Manifest } from "../lib/core/signals";
+import { emptyManifest, NewEpoch, Manifest, RefreshEra } from "../lib/core/signals";
 import { pause } from "./utils";
 import { newEpoch } from "../lib/core";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
@@ -47,7 +47,7 @@ describe('committer', () => {
                 pullAll());
 
         commit$ = doCommit$.pipe(
-                    committer(era$, null),
+                    committer(era$),
                     pullAllCommits());
     })
 

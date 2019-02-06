@@ -18,7 +18,7 @@ export interface Part$<V> extends Observable<Part<V>> {}
 export interface Ripple<U = any> extends Part$<U> {}
 
 export type SliceId = number
-export interface Slice<V = Ripple> extends Tuple2<SliceId, V> {}
+export interface Slice<V = any> extends Tuple2<SliceId, Ripple<V>> {}
 
 export type Slice$<V> = Observable<Slice<V>>
 
@@ -168,8 +168,8 @@ export function pullRipples() : MonoTypeOperatorFunction<Ripple> {
 }
 
 
-export function slice<V>(sliceId: SliceId, v: V): Slice<V> {
-    return tup(sliceId, v);
+export function slice<V>(sliceId: SliceId, ripple: Ripple<V>): Slice<V> {
+    return tup(sliceId, ripple);
 }
 
     

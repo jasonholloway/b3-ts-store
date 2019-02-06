@@ -1,0 +1,139 @@
+
+/newManifest/ and /shiftThresh/ both need to be applied on successful commit
+
+notonly should they trigger a new era,
+they should also, once applied, free up new commits to be made
+
+new commits can only be made when the previous commit is not just out of the way,
+but is /applied/
+
+so incoming DoCommits, which are currently exhaustMapped only at the head of the pipeline,
+must be rejected immediately if a commit is ongoing for the current era
+
+the only confirmation of a commit having been applied is with the publishing of a new era
+
+I'm imagining a two phase approach here: an outer exhaustMap will flat out reject a commit while a commit is ongoing
+in the inner layer, a commit is left going until confirmation is received from the era stream
+only when the era evidently includes the commit (or an error has occurred) will the commit finish, and new commits will be allowed in
+
+----------------------------------------
+
+but how can an Era make it obvious that a commit has been applied?
+if its manifest version is that of the commit?
+
+most easily, the manifest id /could be the commit id/
+but then all hope of having manifest ids nicely ordered falls away
+keeping manifest versions simple is something to be pursued
+
+turning the tactic on its head: the /commitId/ could always be the /epochId/
+no more arbitrary, ugly Guid!
+
+but then, in picking up and matching changes, the Committer (for instance)
+could mismatch another's change: if a competing commit was made by another party,
+then the new epoch would be indistinguishable from an epoch of our own making
+
+commits must therefore have locally unique ids
+that are distinguished from the ids of non-local commits by actually being present in the new era
+if an era has been created via a commit, then it should advertise the fact
+commitIds themselves could be simple incrementing numbers - no guid needed 
+
+-----------------------------------------
+
+so, on the successful push of a new manifest, a /Committed(CommitId, SliceRange, Manifest)/ event should be fed back
+which should be interpreted into a new epoch etc
+
+but the initial /EraRefresh/ is a separate command - could even be a /Committing/ event - though it seems we lose something here by turning it into an event...
+
+----------
+
+the handling of /Committed/ has to create a new epoch just like that: but it has to be applied in two places:
+both in the creation of the epoch and the creation of the era
+the epoch as a whole can be said to be the result of a commit, rather than just the era
+
+but slices and thresholds - surely this is era-owned stuff?
+well, they are - but if the commit info just said its slice range on it, next to its commitId and manifest,
+then the eraSlicer could interpret it in its threshold terms
+
+---------
+
+so - on successful push, a /Committed/ event needs to be fed back to the epoch-making mechanism
+it will contain commit info that will be percolated as far as the eraSlicer
+
+meanwhile, /DoCommits/ will only be accepted if the previous commit has cleared
+
+
+
+
+- pushing is nested within /Committer/
+- commits wait for era to confirm (or error)
+- /Committed(CommitId, SliceRange, Manifest)/ published
+- committed event interpreted into epoch and era
+
+  
+
+
+if committer has to wait for next era it's ok - it receives eras happily
+but errors won't be known to it: pushing has to be nested within it
+
+how else could it be? it'd have to deal in some other kind of monad
+as in, not just data would be pipelined, but some kind of job - like express as it happens
+
+or - a /CommitFailed/ event; but in which case we'd need a general event bus, which we don't have
+nesting it is
+
+-----------------------
+
+updates relating to the commit will be streamed out as part of the Commit stream - a structured stream of substreams...
+
+instead of explicitly saying /RefreshEra/, a new commit would be piped out straight away, and would be received by the slicer
+
+------
+
+the commit pipeline could be within a scan, so that /committer/ would be able to evaluate the last output commit
+if there were errors on it, then it would let in a new commit
+
+a local feedback loop
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
