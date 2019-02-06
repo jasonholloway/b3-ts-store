@@ -122,7 +122,6 @@ describe('core', () => {
             const eras = await gather(era$);
             expect(eras).toMatchObject([ { id: 0 }, { id: 1} ]);
         })
-
     })
 
     describe('on start', () => {
