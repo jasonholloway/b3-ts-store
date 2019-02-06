@@ -1,6 +1,6 @@
 import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, zip, empty } from "rxjs";
 import { reduceToArray, Dict, propsToArray, tup } from "../lib/utils";
-import { map, concatMap, groupBy, startWith } from "rxjs/operators";
+import { map, concatMap, groupBy, startWith, toArray, concatAll, flatMap } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
 import { emptyManifest, NewEpoch, Manifest } from "../lib/core/signals";
@@ -13,6 +13,7 @@ import { createWindower } from "../lib/core/windower";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
+import { gather } from "./helpers";
 
 type TestRipple = Dict<number[]>
 
@@ -58,6 +59,7 @@ describe('committer', () => {
         emit({ b: [ 4 ] });
         emit({ a: [ 3 ] });
         doCommit();
+        await pause()
 
         await expectCommits([{
             data: { 
@@ -110,18 +112,20 @@ describe('committer', () => {
         ripple$.next(ripple);
     }
 
-    function doCommit() {
-        doCommit$.next();
+    function doCommit(id: string = 'someCommitId') {
+        doCommit$.next({ id });
     }
 
 
     async function expectCommits(commits: { data: Dict<number[]>, extent?: number }[]) {
         complete();
 
-        const r = await commit$
-                        .pipe(map(({data, extent}) => ({ data, extent })))
-                        .pipe(reduceToArray())
-                        .toPromise();
+        const r = await gather(commit$.pipe(
+                                flatMap(comm =>
+                                    comm.errors.pipe(
+                                        toArray(),
+                                        map(errs => ({ ...comm, errors: errs }))))
+                                ));
 
         expect(r).toMatchObject(commits);
     }
