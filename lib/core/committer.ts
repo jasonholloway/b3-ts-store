@@ -18,12 +18,13 @@ export interface Commit {
     errors: Observable<Error>
 }
 
-//commits should concatMapped only after capturing the current era
-//which is actually what happens: 
+
+//yarp - the problem we have isn't a bug, but a blindspot
 //
-//a commit raised while another is ongoing should be ignored;
-//unless it covers more slices than the other,
-//in which case, 
+//for commits to work, there can only be one at a time
+//the slice threshold is only moved forwards when a commit completes (if even then)
+//
+//but the commit is completing...
 //
 
 
@@ -46,9 +47,8 @@ export const committer =
                             flatMap(g$ => g$.pipe( 
                                             concatAll(),
                                             toArray(),
-                                            map(r => tup(g$.key, r)))),
+                                            map(r => tup(g$.key, r)))),                                            
                             reduceToDict(),
-                            logVal(`Committing era ${era.id}; manifest ${era.manifest.version}`),
                             filter(data => propsToArray(data).length > 0),
                             map(data => ({ 
                                 id, 

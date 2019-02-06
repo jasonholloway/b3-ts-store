@@ -148,7 +148,7 @@ describe('logSpace', () => {
             beforeEach(async () => {
                 log.stage(addUp('1'));
                 space.commit();
-                await pause(50);
+                await pause(100);
 
                 log.stage(addUp('2'));
                 space.commit();

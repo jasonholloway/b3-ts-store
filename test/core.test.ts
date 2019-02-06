@@ -107,16 +107,16 @@ describe('core', () => {
         })
 
         it('saves new block', () => 
-            expect(blockStore.blocks)
-                .toHaveProperty('block0', { myLog: [ 1, 2, 3 ] }))
+            expect(valsToArray(blockStore.blocks))
+                .toContainEqual({ myLog: [ 1, 2, 3 ] }))
                 
-        it('saves new manifest', () => 
-            expect(manifestStore.manifest).toEqual({
-                version: 11,
-                logBlocks: {
-                    myLog: [ 'block0' ]
-                }
-            }))
+        it('saves new manifest', () => {
+            expect(manifestStore.manifest)
+                .toHaveProperty('version', 11);
+
+            expect(manifestStore.manifest.logBlocks.myLog)
+                .toHaveLength(1);
+        })                
 
         it('triggers new era (to grab slice)', async () => {            
             const eras = await gather(era$);
@@ -124,7 +124,6 @@ describe('core', () => {
         })
 
     })
-
 
     describe('on start', () => {
         beforeEach(async () => {
@@ -194,7 +193,7 @@ describe('core', () => {
     }
 
     function doCommit() {
-        doCommit$.next();
+        doCommit$.next({ id: 'someCommitId' });
     }
 
     function doReset() {
