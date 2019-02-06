@@ -1,5 +1,5 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
-import { Dict, enumerate, tup } from "../lib/utils";
+import { Dict, propsToArray, tup, valsToArray as valsToArray } from "../lib/utils";
 import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
@@ -182,7 +182,7 @@ describe('core', () => {
 
     
     function emit(rip: TestRipple) {
-        const ripple = from(enumerate(rip)).pipe(
+        const ripple = from(propsToArray(rip)).pipe(
                         concatMap(
                             ([k, r]) => from(r).pipe(map(v => tup(k, v)))),
                         groupBy(

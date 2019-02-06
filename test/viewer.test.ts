@@ -1,5 +1,5 @@
 import { Subject, from, zip, BehaviorSubject } from "rxjs";
-import { Dict, enumerate, tup } from "../lib/utils";
+import { Dict, propsToArray, tup } from "../lib/utils";
 import { map, concatMap, groupBy } from "rxjs/operators";
 import { KnownLogs } from "../lib/core/evaluable";
 import { TestModel } from "./fakes/testModel";
@@ -123,7 +123,7 @@ describe('viewer', () => {
 
 
     function emit(rip: TestRipple) {
-        const ripple = from(enumerate(rip)).pipe(
+        const ripple = from(propsToArray(rip)).pipe(
                         concatMap(([k, r]) => from(r).pipe(map(v => tup(k, v)))),
                         groupBy(([k]) => k, ([_, v]) => v),
                         map(g => tup(g.key, g)));

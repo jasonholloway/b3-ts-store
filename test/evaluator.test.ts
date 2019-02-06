@@ -1,5 +1,5 @@
 import { Subject, from, Observable, zip, BehaviorSubject } from "rxjs";
-import { Dict, tup, enumerate } from "../lib/utils";
+import { Dict, tup, propsToArray } from "../lib/utils";
 import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { Manifest, setThreshold, Signal, refreshEra, emptyManifest } from "../lib/core/signals";
@@ -208,7 +208,7 @@ describe('evaluator', () => {
 
 
     function ripple(rip: Dict<number[]>) {
-        const ripple = from(enumerate(rip)).pipe(
+        const ripple = from(propsToArray(rip)).pipe(
                             concatMap(([k, r]) => from(r).pipe(
                                                     map(v => tup(k, v)))),
                             groupBy(([k, _]) => k, ([_, v]) => v),

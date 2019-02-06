@@ -26,10 +26,15 @@ export type sumReturnTypes<A extends ((...args: any[]) => any), B extends ((...a
 export type Dict<V = any> = { [key: string]: V }
             
 
-export function enumerate<V>(d: Dict<V>): [string, V][] {
+export function propsToArray<V>(d: Dict<V>): [string, V][] {
     return Object.getOwnPropertyNames(d)
             .map(key => tup(key, d[key]));
 }
+
+export function valsToArray(obj: { [k: string]: any }) {
+    return propsToArray(obj).map(([,v]) => v);
+}
+
 
 export function tup<T extends any[]>(...args: T): T {
     return args;
@@ -47,7 +52,7 @@ export const mergeDicts = <V>(mergeVals: (v0: V, v1: V) => V) => {
         else {
             const merged = { ...head };
 
-            enumerate(merge(tail))
+            propsToArray(merge(tail))
                 .forEach(([k, v]) => {
                     merged[k] = merged[k] 
                                 ? mergeVals(merged[k], v)

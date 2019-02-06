@@ -1,6 +1,6 @@
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import FakeManifestStore from "./fakes/FakeManifestStore";
-import { enumerate } from "../lib/utils";
+import { propsToArray } from "../lib/utils";
 import { addUp, TestModel } from "./fakes/testModel";
 import { LogSpace, createLogSpace, Log } from "../lib/LogSpace";
 import { KnownLogs } from "../lib/core/evaluable";
@@ -117,7 +117,7 @@ describe('logSpace', () => {
             })
 
             it('stores block', async () => {
-                const [[_, block]] = enumerate(blockStore.blocks);
+                const [[_, block]] = propsToArray(blockStore.blocks);
                 
                 expect(block[log.ref]).toEqual([ 
                     ['ADD', '4'], 

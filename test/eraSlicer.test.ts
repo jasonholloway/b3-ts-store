@@ -1,5 +1,5 @@
 import { Observable, Subject, from, OperatorFunction, pipe, zip, merge, forkJoin, BehaviorSubject } from "rxjs";
-import { Dict, scanToArray, enumerate, reduceToArray, tup, reduceToDict } from "../lib/utils";
+import { Dict, scanToArray, propsToArray, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap, toArray } from "rxjs/operators";
 import { Era, pullAllSlices, SliceId, pullAll, Ripple, eraSlicer } from "../lib/core/eraSlicer";
 import { emptyManifest, Signal, Manifest, setThreshold, refreshEra, doReset, newManifest } from "../lib/core/signals";
@@ -162,7 +162,7 @@ describe('eraSlicer', () => {
     
     function ripple(sl: Dict<number[]>) {
         ripple$.next(
-             from(enumerate(sl))
+             from(propsToArray(sl))
                  .pipe(map(([k, r]) => tup(k, from(r))))
         );
     }
@@ -335,7 +335,7 @@ describe('eraSlicer as specifier', () => {
 
     function emit(sl: Dict<number[]>) {
         ripple$.next(
-             from(enumerate(sl))
+             from(propsToArray(sl))
                  .pipe(map(([k, r]) => tup(k, from(r))))
         );
     }

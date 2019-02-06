@@ -1,7 +1,7 @@
 import { Model } from "./evaluable";
 import { Observable, OperatorFunction, Observer, empty } from "rxjs";
 import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll, flatMap, filter } from "rxjs/operators";
-import { reduceToDict, tup, Dict, enumerate, log, logVal } from "../utils";
+import { reduceToDict, tup, Dict, propsToArray, log, logVal } from "../utils";
 import { EvaluableEra } from "./evaluator";
 import { Era } from "./eraSlicer";
 import { RefreshEra, refreshEra } from "./signals";
@@ -48,8 +48,8 @@ export const committer =
                                             toArray(),
                                             map(r => tup(g$.key, r)))),
                             reduceToDict(),
-                            logVal(`Committing era ${era.id}`),
-                            filter(data => enumerate(data).length > 0),
+                            logVal(`Committing era ${era.id}; manifest ${era.manifest.version}`),
+                            filter(data => propsToArray(data).length > 0),
                             map(data => ({ 
                                 id, 
                                 data, 

@@ -1,5 +1,5 @@
 import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, zip, empty } from "rxjs";
-import { reduceToArray, Dict, enumerate, tup } from "../lib/utils";
+import { reduceToArray, Dict, propsToArray, tup } from "../lib/utils";
 import { map, concatMap, groupBy, startWith } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
@@ -102,7 +102,7 @@ describe('committer', () => {
 
 
     function emit(rip: TestRipple) {
-        const ripple = from(enumerate(rip)).pipe(
+        const ripple = from(propsToArray(rip)).pipe(
                         concatMap(([k, r]) => from(r).pipe(map(v => tup(k, v)))),
                         groupBy(([k]) => k, ([_, v]) => v),
                         map(g => tup(g.key, g)));

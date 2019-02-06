@@ -2,7 +2,7 @@ import { BlockStore, ManifestStore } from "../bits";
 import { Observer, OperatorFunction, pipe, of, Observable, MonoTypeOperatorFunction, concat, from } from "rxjs";
 import { Commit } from "./committer";
 import { concatMap, tap, mapTo, catchError, defaultIfEmpty, map, groupBy, reduce } from "rxjs/operators";
-import { enumerate, log, reduceToDict, tup, logVal } from "../utils";
+import { propsToArray, log, reduceToDict, tup, logVal } from "../utils";
 import { Manifest } from "./signals";
 import { PullManifest, pullManifest } from "./pullManifests";
 import uuid from 'uuid/v1'
@@ -18,9 +18,9 @@ export const pusher =
                     return tup(ref, data);
                 }),
                 concatMap(([blockRef, blockData]) => {
-                    const oldLogBlock$ = from(enumerate(commit.era.manifest.logBlocks));
+                    const oldLogBlock$ = from(propsToArray(commit.era.manifest.logBlocks));
 
-                    const newLogBlock$ = from(enumerate(blockData))
+                    const newLogBlock$ = from(propsToArray(blockData))
                                             .pipe(map(([k]) => tup(k, [blockRef])));
 
                     return concat(oldLogBlock$, newLogBlock$).pipe(
