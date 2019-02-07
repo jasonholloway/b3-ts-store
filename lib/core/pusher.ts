@@ -1,14 +1,13 @@
 import { BlockStore, ManifestStore } from "../bits";
-import { Observer, OperatorFunction, pipe, of, Observable, MonoTypeOperatorFunction, concat, from } from "rxjs";
-import { Commit } from "./committer";
-import { concatMap, tap, mapTo, catchError, defaultIfEmpty, map, groupBy, reduce, flatMap } from "rxjs/operators";
-import { propsToArray, log, reduceToDict, tup, logVal } from "../utils";
+import { OperatorFunction, pipe, of, Observable, MonoTypeOperatorFunction, concat, from } from "rxjs";
+import { Commit, Committed, CommitEvent } from "./committer";
+import { concatMap, mapTo, catchError, defaultIfEmpty, map, groupBy, reduce, flatMap } from "rxjs/operators";
+import { propsToArray, reduceToDict, tup } from "../utils";
 import { Manifest } from "./signals";
-import { PullManifest, pullManifest } from "./pullManifests";
 import uuid from 'uuid/v1'
 
 export const pusher =
-    (blockStore: BlockStore, manifestStore: ManifestStore, pull$: Observer<PullManifest>) : OperatorFunction<Commit, Commit> =>
+    (blockStore: BlockStore, manifestStore: ManifestStore) : OperatorFunction<Commit, Commit> =>
     pipe(
         concatMap(commit =>
             of(commit.data).pipe(
@@ -39,13 +38,22 @@ export const pusher =
                     };
 
                     return manifestStore.save(manifest) //but the store also needs to return an etag for us to merge into the next manifest
-                            .pipe(defaultIfEmpty());
+                            .pipe(
+                                defaultIfEmpty(), 
+                                mapTo(manifest));
                 }),
-                mapTo(commit),
-                mergeErrorsInto(commit),
-                tap(() => pull$.next(pullManifest()))
+                map(manifest => ({ 
+                    ...commit,
+                    event$: concat(commit.event$, of(committed({ manifest, commit })))
+                })),
+                mergeErrorsInto(commit)
             ))
         );
+
+
+function committed(o: { commit: Commit, manifest: Manifest}): CommitEvent {
+    return ['Committed', o as Committed];
+}
 
 //on successful push of manifest,
 //threshold needs to move forwards
@@ -65,10 +73,10 @@ export const pusher =
 //then, instead of simply appending on prev, there should be a kind of inverse
 //switchMap
 
-function mergeErrorsInto<F extends { errors: Observable<Error> }>(frame: F) : MonoTypeOperatorFunction<F> {
-    return catchError(err => 
-        of({ 
+function mergeErrorsInto<F extends { error$: Observable<Error> }>(frame: F) : MonoTypeOperatorFunction<F> {
+    return catchError(err =>
+        of({
             ...frame as object,
-            errors: concat(frame.errors, of(err)) 
+            error$: concat(frame.error$, of(err))
         } as F));
 }

@@ -122,7 +122,7 @@ describe('committer', () => {
 
         const r = await gather(commit$.pipe(
                                 flatMap(comm =>
-                                    comm.errors.pipe(
+                                    comm.error$.pipe(
                                         toArray(),
                                         map(errs => ({ ...comm, errors: errs }))))
                                 ));
@@ -141,7 +141,7 @@ describe('committer', () => {
         return pipe(
             map(commit => ({ 
                 ...commit ,
-                errors: commit.errors.pipe(pullAll())
+                errors: commit.error$.pipe(pullAll())
             })),
             pullAll())
     }

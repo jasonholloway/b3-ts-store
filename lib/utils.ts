@@ -1,4 +1,4 @@
-import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile } from 'rxjs/operators';
+import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter } from 'rxjs/operators';
 import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable } from 'rxjs';
 
 
@@ -152,3 +152,16 @@ export function logVal<T>(s: string) : MonoTypeOperatorFunction<T> {
 
 export type Keyed$<U> = Observable<GroupedObservable<string, U>>
 
+
+
+type ExtractEventNames<M> = M extends [infer K, any] ? K : never
+type ExtractEventValues<M, K> = M extends [K, infer V] ? V : never
+
+export const extract = 
+    <A, B, M extends [A, B], K extends ExtractEventNames<M> & string, V extends ExtractEventValues<M, K>>
+    (key: K) : OperatorFunction<M, V> =>
+    pipe(
+        filter(([k]) => k == key),
+        map(([, v]) => v as V)
+    );
+    

@@ -64,12 +64,27 @@ meanwhile, /DoCommits/ will only be accepted if the previous commit has cleared
 
 
 
+- /Committed(CommitId, SliceRange, Manifest)/ published
 - pushing is nested within /Committer/
 - commits wait for era to confirm (or error)
-- /Committed(CommitId, SliceRange, Manifest)/ published
 - committed event interpreted into epoch and era
 
   
+
+the Committer emits /Commits/ 
+somehow the /Committed/ event is to be emitted through the /Commit/
+
+you could say the commit is a channel for informational elements:
+mostly errors, but also Committed
+
+it'd seem like it'd be nice to have these multiplexed, so that /messages/ could be generally emmitted
+
+anyway, however the commit will be structured, we want a nested stream to send the /Committed/ event
+
+
+
+
+
 
 
 if committer has to wait for next era it's ok - it receives eras happily

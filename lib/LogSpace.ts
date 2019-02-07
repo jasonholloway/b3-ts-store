@@ -53,7 +53,7 @@ export function createLogSpace<M extends Model>(model: M, manifests: ManifestSto
             const commit$ = core.commit$.pipe(
                                 first(c => c.id == id),
                                 timeout(200),
-                                concatMap(c => c.errors),
+                                concatMap(c => c.error$),
                                 pullAll())
 
             doCommit$.next({ id });

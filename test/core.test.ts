@@ -157,7 +157,7 @@ describe('core', () => {
                 .toContain(999));
 
         it('error emitted into Commit', async () => {
-            const errs = await gather(commit$.pipe(concatMap(c => c.errors)));
+            const errs = await gather(commit$.pipe(concatMap(c => c.error$)));
             expect(errs).toMatchObject([ 'Newer manifest in place!' ]);
         })
     })
@@ -172,7 +172,7 @@ describe('core', () => {
         return pipe(
             map(commit => ({ 
                 ...commit ,
-                errors: commit.errors.pipe(pullAll())
+                errors: commit.error$.pipe(pullAll())
             })),
             pullAll())
     }

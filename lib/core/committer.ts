@@ -1,21 +1,30 @@
 import { Model } from "./evaluable";
-import { Observable, OperatorFunction, Observer, concat, empty, pipe, of, from, fromEvent, fromEventPattern, forkJoin, merge, UnaryFunction } from "rxjs";
-import { share, withLatestFrom, concatMap, map, mapTo, toArray, groupBy, concatAll, flatMap, filter, scan, exhaustMap, tap, sample, startWith, takeUntil, takeWhile, skipWhile, mergeScan, endWith, switchMapTo } from "rxjs/operators";
-import { reduceToDict, tup, Dict, propsToArray, log, logVal, scanToArray, skipAll } from "../utils";
+import { Observable, OperatorFunction, concat, empty, pipe, merge } from "rxjs";
+import { share, withLatestFrom, concatMap, map, toArray, groupBy, concatAll, flatMap, filter, exhaustMap, startWith, takeWhile } from "rxjs/operators";
+import { reduceToDict, tup, Dict, propsToArray, scanToArray, skipAll } from "../utils";
 import { EvaluableEra } from "./evaluator";
 import { Era, Slice } from "./eraSlicer";
-import { RefreshEra, refreshEra } from "./signals";
+import { Manifest } from "./signals";
 
 export interface DoCommit {
     id: string
 }
+
+export type Committed = { 
+    commit: Commit,
+    manifest: Manifest
+}
+
+
+export type CommitEvent = ['Error', Error] | ['Committed', Committed]
 
 export interface Commit {
     id: string,
     era: Era
     data: Dict<any[]>
     extent: number,
-    errors: Observable<Error>
+    error$: Observable<Error>
+    event$: Observable<CommitEvent>
 }
 
 
@@ -53,7 +62,7 @@ const trackSlices =
                 map(currSlices => ({
                     era,
                     slice$: concat(era.oldSlice$, currSlices)
-                }) 
+                })
             )))
     );
 
@@ -71,18 +80,19 @@ export const committer =
                     slice$.pipe(
                         concatMap(([, part$]) => part$),
                         groupBy(([ref]) => ref, ([, v$]) => v$),
-                        flatMap(g$ => g$.pipe( 
+                        flatMap(g$ => g$.pipe(
                                         concatAll(),
                                         toArray(),
-                                        map(r => tup(g$.key, r)))),                                            
+                                        map(r => tup(g$.key, r)))),
                         reduceToDict(),
                         filter(data => propsToArray(data).length > 0),
-                        map(data => ({ 
-                            id, 
-                            data, 
-                            extent: 1, 
-                            era, 
-                            errors: empty() 
+                        map(data => ({
+                            id,
+                            data,
+                            extent: 1,
+                            era,
+                            error$: empty(),
+                            event$: empty()
                         })))
                 )),
             share()
