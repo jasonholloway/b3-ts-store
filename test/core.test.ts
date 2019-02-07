@@ -1,6 +1,6 @@
-import { Subject, from, pipe, Observable, MonoTypeOperatorFunction, empty } from "rxjs";
-import { Dict, propsToArray, tup, valsToArray as valsToArray, log, scanToArray } from "../lib/utils";
-import { map, concatMap, groupBy, toArray, tap, timeout, pluck } from "rxjs/operators";
+import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
+import { Dict, propsToArray, tup, valsToArray as valsToArray } from "../lib/utils";
+import { map, concatMap, groupBy, pluck } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
@@ -9,7 +9,7 @@ import { pause } from "./utils";
 import { Core, createCore } from "../lib/core";
 import { EvaluableEra } from "../lib/core/evaluator";
 import { gather } from "./helpers";
-import { pullAll, Ripple } from "../lib/core/eraSlicer";
+import { pullAll, Ripple, pullAllSlices } from "../lib/core/eraSlicer";
 
 type TestRipple = Dict<number[]>
 
@@ -31,7 +31,7 @@ describe('core', () => {
 
     let core: Core<TestModel>
 
-    beforeEach(() => {
+    beforeEach(async () => {
         manifestStore = new FakeManifestStore();
         blockStore = new FakeBlockStore();
 
@@ -46,29 +46,25 @@ describe('core', () => {
 
         era$ = core.era$.pipe(pullAll());
         commit$ = core.commit$.pipe(pullAllCommits());
+
+        await pause();
     })
 
     describe('viewing', () => {
 
         it('serves views of staged updates', async () => {
             const viewing = gather(core.view('myLog'));
-            await pause();
-
             emit({ myLog: [ 1, 2, 3 ] });
-            await pause();
             complete();
 
             expect(await viewing).toEqual([ '', '1,2,3' ]);
         })
 
         it('serves views of existing blocks', async () => {
-            await pause();
             complete();
-
             const r = await gather(core.view('myLog2'));
             expect(r).toEqual([ '4,5,6' ]);
         })
-
     })
 
 
@@ -77,8 +73,6 @@ describe('core', () => {
         it('triggers new era', async () => {
             emit({ myLog: [ 1, 2, 3 ] });
             doReset();
-
-            // await pause();
             complete();
 
             const eras = await gather(era$);
@@ -88,8 +82,6 @@ describe('core', () => {
         it('reemits base view', async () => {
             emit({ myLog2: [ 7, 8, 9 ] });
             doReset();
-
-            await pause();
             complete();
 
             const r = await gather(core.view('myLog2'));
@@ -103,8 +95,6 @@ describe('core', () => {
         beforeEach(async () => {
             emit({ myLog: [ 1, 2, 3 ] });
             doCommit();
-
-            await pause();    
             complete();
         })
 
@@ -215,10 +205,8 @@ describe('core', () => {
         doReset$.next();
     }
 
-    function complete() {
-        ripple$.complete();
-        doCommit$.complete();
-        doReset$.complete();
+    async function complete() {
+        core.close();
     }
 
 })

@@ -1,5 +1,5 @@
-import { Observable, Subject, from, OperatorFunction, pipe, zip, merge, forkJoin, BehaviorSubject, of } from "rxjs";
-import { Dict, scanToArray, propsToArray, reduceToArray, tup, reduceToDict } from "../lib/utils";
+import { Observable, Subject, from, OperatorFunction, pipe, forkJoin, BehaviorSubject, of } from "rxjs";
+import { Dict, scanToArray, propsToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap, toArray } from "rxjs/operators";
 import { Era, pullAllSlices, SliceId, pullAll, Ripple, eraSlicer } from "../lib/core/eraSlicer";
 import { emptyManifest, Signal, Manifest, setThreshold, refreshEra, doReset, newManifest } from "../lib/core/signals";
@@ -80,7 +80,10 @@ describe('eraSlicer', () => {
 
     it('new slices into new era', async () => {
         ripple({ log1: [ 1, 2, 3 ] });
+        await pause();
         threshold(1);
+
+        await pause();
         ripple({ log1: [ 4 ] });
         
         await expectSlices([
@@ -174,11 +177,11 @@ describe('eraSlicer', () => {
             concatMap(({ slices }) => slices.pipe(
                 concatMap(([sliceId, parts]) => parts.pipe(
                     concatMap(([logRef, updates]) => updates.pipe(                                                                                                                            
-                                                        reduceToArray(),
+                                                        toArray(),
                                                         map(r => tup(logRef, r)))),
                     reduceToDict(),
                     map(u => tup(sliceId, u)))),
-                reduceToArray())),
+                toArray())),
             scanToArray());
     }
 

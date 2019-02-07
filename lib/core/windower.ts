@@ -1,6 +1,7 @@
 import { Observable, Subject } from "rxjs";
-import { first, concatAll, window, skip, share } from "rxjs/operators";
+import { concatAll, window, skip, share, take } from "rxjs/operators";
 import { pullAll } from "./eraSlicer";
+import { logVal } from "../utils";
 
 export type Windower<V> = () => Observable<V>
 
@@ -16,7 +17,7 @@ export function createWindower<V>(v$: Observable<V>): Windower<V> {
 
     return () => {
         const myVal$ = window$.pipe(
-                        first(),
+                        take(1),                    
                         concatAll(),
                         pullAll());
 

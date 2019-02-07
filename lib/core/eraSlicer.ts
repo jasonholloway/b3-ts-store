@@ -1,7 +1,7 @@
 import { Observable, empty, OperatorFunction, pipe, of, MonoTypeOperatorFunction, concat, forkJoin } from "rxjs";
-import { scan, filter, shareReplay, map, concatMap, concatAll, share, defaultIfEmpty, max, startWith, merge } from "rxjs/operators";
-import { tup, reduceToArray, logVal, log } from "../utils";
-import { Manifest, emptyManifest, Signal, Start } from "./signals";
+import { filter, shareReplay, map, concatMap, share, defaultIfEmpty, merge, takeLast, toArray } from "rxjs/operators";
+import { tup, concatScan, logVal } from "../utils";
+import { Manifest, emptyManifest, Signal } from "./signals";
 import { Evaluable, emptyEvaluable } from "./evaluable";
 import { Windower, createWindower } from "./windower";
 import { newEpoch } from ".";
@@ -55,35 +55,39 @@ const emptyEra: Era = {
 export type Epoch = { manifest: Manifest, commit?: Commit }
 
 
+//reset sends a signal into scan
+//but then completion occurs
+//
+//which biffs the prev$ that would otherwise be piped from
+//signal$ needs to complete before era$
+//
+
+
 export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Ripple>) : OperatorFunction<Epoch & Evaluable, Era> {
     const getWindow = createWindower(ripple$);
     return pipe(
         map(epoch => 
             newEpoch(epoch.manifest, epoch)),
         merge(signal$),
-        scan((prev$: Observable<Era>, signal: Signal) => {
-            return prev$.pipe(
-                digestPrevious(),
-                handle(signal),
-                setEraId(),
-                sliceRipples(getWindow),
-                shareReplay(1)
-            ) },
-            of(emptyEra)),
-
-        concatAll()
-    );
+        concatScan(
+            (prev: Era, signal: Signal) =>
+                of(prev).pipe(
+                    digestPrevious(),
+                    handle(signal),
+                    setEraId(),
+                    sliceRipples(getWindow),
+                    shareReplay(1)
+                ), emptyEra));
 }
 
 
 function digestPrevious() : OperatorFunction<Era, [Era, Spec, Era]> {
     return map((prev: Era) => {
-        const from$ = prev.slices.pipe(
-                                map(([sliceId]) => sliceId),
-                                max(),
-                                map(i => i + 1),
-                                defaultIfEmpty(prev.from),
-                                shareReplay(1));
+        const from$ = prev.currSlice$.pipe(
+                        takeLast(1),
+                        map(([i]) => i + 1),
+                        defaultIfEmpty(prev.from),
+                        shareReplay(1));
 
         const spec = {
             from$,
@@ -134,13 +138,13 @@ function sliceRipples(getWindow: Windower<Ripple>) : OperatorFunction<[Era, Spec
     return concatMap(([prev, spec, era]) => {
         const ripple$ = getWindow()
                         .pipe(pullAll());
-            
+
         return forkJoin(spec.from$, spec.thresh$).pipe(
                 map(([from, thresh]) => {
                     const oldSlice$ = prev.slices.pipe(
                                         filter(([sliceId]) => sliceId >= thresh),
                                         shareReplay());
-    
+
                     const currSlice$ = ripple$.pipe(
                                         map((part$, i) => slice(from + i, part$)),
                                         shareReplay());
@@ -179,12 +183,19 @@ export function slice<V>(sliceId: SliceId, ripple: Ripple<V>): Slice<V> {
 export function materializeSlices<V, I extends { slices: Slice$<V> }>() : OperatorFunction<I, Slice<V>[][]> {
     return pipe(
         concatMap(({ slices }) =>
-            slices.pipe(
-                reduceToArray()
-                )),
-        reduceToArray()
+            slices.pipe(toArray())),
+        toArray()
         );
 }
+
+export function pullReplay<V>(n: number = undefined) : MonoTypeOperatorFunction<V> {
+    return era$ => {
+        const x = era$.pipe(shareReplay(n));
+        x.subscribe();
+        return x;
+    };
+}
+
 
 export function pullAll<I>(replay = true) : MonoTypeOperatorFunction<I> {
     return era$ => {

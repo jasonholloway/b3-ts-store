@@ -1,16 +1,16 @@
-import { toArray, last, flatMap, delay } from "rxjs/operators";
-import { Observable, of, throwError, merge } from "rxjs";
+import { toArray, last, timeout, defaultIfEmpty } from "rxjs/operators";
+import { Observable } from "rxjs";
 
 export function gather<V>(v$: Observable<V>) {
-    return merge(
-        of(1).pipe(delay(500), flatMap(_ => throwError('TIMEOUT!'))),
-        v$.pipe(toArray()),
+    return v$.pipe(        
+        toArray(),
+        timeout(500)
     ).toPromise();
 }
 
 export function final<V>(v$: Observable<V>) {
-    return merge(
-        of(1).pipe(delay(500), flatMap(_ => throwError('TIMEOUT!'))),
-        v$.pipe(last()),
+    return v$.pipe(
+        last(),
+        timeout(500)
     ).toPromise();
 }

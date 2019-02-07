@@ -1,8 +1,7 @@
 import { createLogMachine } from "../lib/Log";
 import { addUp, AddUp } from "./fakes/testModel";
-import { ReplaySubject, from, Subject, forkJoin, of } from "rxjs";
-import { reduce, last, delay, finalize, combineAll } from "rxjs/operators";
-import { reduceToArray } from "../lib/utils";
+import { ReplaySubject, from, Subject, forkJoin } from "rxjs";
+import { reduce, last, delay, finalize, toArray } from "rxjs/operators";
 
 xdescribe('LogImpl', () => {
 
@@ -112,7 +111,7 @@ function createFixture() {
 
 
     const allViews = log.views
-                        .pipe(reduceToArray(), last());
+                        .pipe(toArray(), last());
 
     const maxLoads = loads
                         .pipe(reduce((ac, v) => ac + v, 0));

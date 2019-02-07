@@ -1,6 +1,6 @@
 import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
 import { BlockStore, ManifestStore } from "../bits";
-import { shareReplay, mapTo, tap, concatMap, map, flatMap, startWith, takeUntil } from "rxjs/operators";
+import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil } from "rxjs/operators";
 import { Signal, Manifest, NewEpoch, doReset } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { committer, DoCommit, Commit, Committed } from "./committer";
@@ -8,16 +8,17 @@ import { Observable, Subject, merge, empty, timer, of } from "rxjs";
 import { pullManifests } from "./pullManifests";
 import { pusher } from "./pusher";
 import { createViewer } from "./viewer";
-import { tup, extract, log } from "../utils";
+import { tup, extract, logComplete, log } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
-import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
+import { eraSlicer, Ripple, Epoch, pullReplay } from "./eraSlicer";
 
 
 export interface Core<M extends Model> {
     era$: Observable<EvaluableEra<M>>,
     commit$: Observable<Commit>,
-    view<K extends KnownLogs<M>>(ref: K): Observable<KnownAggr<M, K>>
+    view<K extends KnownLogs<M>>(ref: K): Observable<KnownAggr<M, K>>,
+    close()
 } 
 
 const emptyEvaluable: Evaluable = {
@@ -34,19 +35,20 @@ export const createCore =
     (model: M, blockStore: BlockStore, manifestStore: ManifestStore) =>
     (ripple$: Observable<Ripple<any>>, doReset$: Observable<void>, doCommit$: Observable<DoCommit>) : Core<M> => {
 
-    const signal$ = new Subject<Signal>();
     const committed$ = new Subject<Committed>();
     const close$ = new Subject();
 
-    ripple$ = tapCompletion(ripple$);
-    doReset$ = tapCompletion(doReset$);
-    doCommit$ = tapCompletion(doCommit$);
+    doReset$ = completeOnClose(doReset$);
+    ripple$ = completeOnClose(ripple$);
+    doCommit$ = completeOnClose(doCommit$);
     
     const epoch$ = merge<Epoch>(
                     timer(0, 10000).pipe(
+                        takeUntil(close$),
                         pullManifests(manifestStore),
                         map(manifest => ({ manifest }))),
-                    committed$);
+                    committed$.pipe(
+                        takeUntil(close$)));
                             
     const evalEpoch$ = epoch$.pipe(
                         concatMap(epoch => 
@@ -56,18 +58,16 @@ export const createCore =
                                 map(evaluable => ({ ...epoch, ...evaluable }))
                             )));
                         
-    const allSignal$ = merge(signal$, doReset$.pipe(mapTo(doReset())));
+    const reset$ = doReset$.pipe(mapTo(doReset()));
 
     const era$ = evalEpoch$.pipe(
-                    eraSlicer(allSignal$, ripple$),
+                    eraSlicer(reset$, ripple$),
                     evaluator(model),   //would be nice if this were part of the interior scan(?)
-                    takeUntil(close$),
                     shareReplay(1));
 
-    const commit$ = doCommit$.pipe(
+    const commit$ = doCommit$.pipe(                    
                     committer(era$),
                     pusher(blockStore, manifestStore),              //remember... pusher should be moved inside committer to catch errors
-                    takeUntil(close$),
                     shareReplay(1));
 
     commit$.pipe(
@@ -82,16 +82,13 @@ export const createCore =
         commit$,
         view<K extends KnownLogs<M>>(ref: K): Observable<KnownAggr<M, K>> {
             return viewer(ref);
+        },
+        close() {
+            close$.next();
         }
     };
 
-    function tapCompletion<V>(o$: Observable<V>): Observable<V> {
-        return o$.pipe(tap({
-            complete: () => {
-                close$.next();
-                // committed$.complete();
-                // signal$.complete();
-            } 
-        }))
+    function completeOnClose<V>(o$: Observable<V>): Observable<V> {
+        return o$.pipe(takeUntil(close$));
     }
 }

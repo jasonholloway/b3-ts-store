@@ -1,5 +1,5 @@
-import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter } from 'rxjs/operators';
-import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable } from 'rxjs';
+import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter, concatAll, shareReplay } from 'rxjs/operators';
+import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable, of } from 'rxjs';
 
 
 
@@ -91,11 +91,6 @@ export function scanToArray<V>() {
         );
 }
 
-
-export function reduceToArray<V>() {
-    return reduce<V, V[]>((ac, v) => [...ac, v], []);
-}
-
 export function reduceToDict<V>(): OperatorFunction<[string, V], { [key: string]: V }> {
     return reduce<[string, V], Dict<V>>((ac, [k, v]) => ({ ...ac, [k]: v }), {});
 }
@@ -148,6 +143,12 @@ export function logVal<T>(s: string) : MonoTypeOperatorFunction<T> {
     return tap(v => console.log(s, v));
 }
 
+export function logComplete<V>(s: string = ''): MonoTypeOperatorFunction<V> {
+    return pipe(tap({
+            error: er => console.log('ERROR', s, er),
+            complete: () => console.log('COMPLETE', s)
+        }));
+}
 
 
 export type Keyed$<U> = Observable<GroupedObservable<string, U>>
@@ -165,3 +166,20 @@ export const extract =
         map(([, v]) => v as V)
     );
     
+
+
+
+
+//TODO: below should take liveness from input stream!!!!!!!!!!!
+//ie completion at the top level matters, not at the nested-within level
+//(this also creates a memory leak)
+export function concatScan<V, Ac>(acc: (ac: Ac, v: V) => Observable<Ac>, seed: Ac) : OperatorFunction<V, Ac> {
+    return pipe(
+        scan((ac$: Observable<Ac>, v: V) => 
+            ac$.pipe(
+                concatMap(ac => acc(ac, v)),                
+                shareReplay()),                     //mem leak??? yup 
+            of(seed)),
+        concatAll()
+    );
+}

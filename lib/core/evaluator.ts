@@ -1,7 +1,7 @@
-import { pipe, OperatorFunction, empty, Observable, of } from "rxjs";
-import { scan, concatAll, concatMap, map, filter, defaultIfEmpty, startWith, single, last, distinct, takeLast, withLatestFrom } from "rxjs/operators";
+import { pipe, OperatorFunction, empty, of } from "rxjs";
+import { scan, concatMap, map, filter, defaultIfEmpty, startWith, single, distinct, takeLast, withLatestFrom } from "rxjs/operators";
 import { Evaluable, Model, KnownLogs } from "./evaluable";
-import { tup } from "../utils";
+import { tup, concatScan, logVal, logComplete } from "../utils";
 import { Era, Ripple, Slice } from "./eraSlicer";
 
 
@@ -12,8 +12,8 @@ export interface EvaluableEra<M extends Model>
 export const evaluator = 
     <M extends Model>(model: M) : OperatorFunction<Era<Ripple>, EvaluableEra<M>> => 
         pipe(
-            scan<Era<Ripple>, Observable<EvaluableEra<M>>>(
-                (prev$, era) => of(createEvaluableEra<M>({
+            concatScan((prev: EvaluableEra<M>, era: Era) =>
+                of(createEvaluableEra<M>({
                     ...era,
 
                     logRef$: era.slices.pipe(
@@ -30,20 +30,16 @@ export const evaluator =
                         const oldView$ = blockView$.pipe(
                                             concatMap(blockView => 
                                                 era.oldSlice$.pipe(
-                                                    scan<Slice, Observable<any>>(
-                                                        (prev$, [, part$]) => 
-                                                            prev$.pipe(
-                                                                concatMap(prev => 
-                                                                    part$.pipe(
-                                                                        filter(([key]) => key == ref),
-                                                                        concatMap(([, v$]) => v$),
-                                                                        scan(m.add, prev),
-                                                                        last()))),
-                                                        of(blockView)),
-                                                    concatAll(),
-                                                    takeLast(1),
-                                                    defaultIfEmpty(blockView))
-                                                ));
+                                                    startWith(tup(era.thresh - 1, empty())),
+                                                    concatScan((prev, [, part$]: Slice) =>
+                                                        part$.pipe(
+                                                            filter(([key]) => key == ref),
+                                                            concatMap(([, v$]) => v$),
+                                                            scan(m.add, prev),
+                                                            defaultIfEmpty(prev),
+                                                            takeLast(1)),
+                                                        blockView),
+                                                    takeLast(1))));
                         
                         const sliceId$ = era.currSlice$.pipe(
                                             map(([sliceId]) => sliceId),
@@ -52,27 +48,23 @@ export const evaluator =
                         return oldView$.pipe(
                                 concatMap(oldView =>
                                     era.currSlice$.pipe(
-                                        scan<Slice, Observable<[number, any]>>(
-                                            (prev$, [sliceId, part$]) => 
-                                                prev$.pipe(
-                                                    concatMap(([, prev]) => part$.pipe(
-                                                        filter(([key]) => key == ref),
-                                                        concatMap(([, v$]) => v$),
-                                                        scan(m.add, prev),
-                                                        last())),
-                                                    map(v => tup(sliceId, v))
-                                                ),
-                                            of(tup(era.from - 1, oldView))),
-                                        concatAll(),
-                                        startWith(tup(era.from - 1, oldView))
+                                        startWith(tup(era.from - 1, empty())),
+                                        concatScan(([, prev]: [number, any], [sliceId, part$]: Slice) =>
+                                            part$.pipe(                                                
+                                                filter(([key]) => key == ref),
+                                                concatMap(([, v$]) => v$),
+                                                scan(m.add, prev),
+                                                defaultIfEmpty(prev),
+                                                takeLast(1),
+                                                map(v => tup(sliceId, v))),
+                                            tup(null, oldView)),
                                     )),
                                 withLatestFrom(sliceId$),
                                 filter(([[sliceId], latestSliceId]) => sliceId >= latestSliceId),
                                 map(([[, v]]) => v));
                         }
                     })),
-                empty()),
-            concatAll()
+                null)
         );
 
 

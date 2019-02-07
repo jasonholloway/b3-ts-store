@@ -1,21 +1,22 @@
 import { Subject, from, Observable, zip, BehaviorSubject, of } from "rxjs";
-import { Dict, tup, propsToArray } from "../lib/utils";
-import { map, concatMap, groupBy, toArray } from "rxjs/operators";
+import { Dict, tup, propsToArray, log, logComplete } from "../lib/utils";
+import { map, concatMap, groupBy, toArray, tap, startWith } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { Manifest, setThreshold, Signal, refreshEra, emptyManifest } from "../lib/core/signals";
+import { Manifest, setThreshold, Signal, refreshEra, emptyManifest, DoReset } from "../lib/core/signals";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
 import { KnownLogs } from "../lib/core/evaluable";
-import { eraSlicer, Ripple, pullAllSlices } from "../lib/core/eraSlicer";
+import { eraSlicer, Ripple, pullAllSlices, Epoch } from "../lib/core/eraSlicer";
+import { pause } from "./utils";
 
 
 describe('evaluator', () => {
 
     const model = new TestModel();
 
-    let manifest$: Subject<Manifest>
+    let epoch$: Subject<Epoch>
     let signal$: Subject<Signal>
     let ripple$: Subject<Ripple<number>>
     let blockStore: FakeBlockStore
@@ -25,19 +26,20 @@ describe('evaluator', () => {
     beforeEach(() => {
         blockStore = new FakeBlockStore();
 
-        manifest$ = new BehaviorSubject(emptyManifest);
+        epoch$ = new Subject<Epoch>();
         signal$= new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
 
-        const epoch$ = manifest$.pipe(
-                        concatMap(manifest => 
-                            of(manifest).pipe(
-                                pullBlocks(blockStore),
-                                evaluateBlocks(model),
-                                map(evaluable => ({ manifest, ...evaluable }))
-                            )));
+        const evalEpoch$ = epoch$.pipe(
+                            startWith({ manifest: emptyManifest }),
+                            concatMap(epoch => 
+                                of(epoch.manifest).pipe(
+                                    pullBlocks(blockStore),
+                                    evaluateBlocks(model),
+                                    map(evaluable => ({ ...epoch, ...evaluable }))
+                                )));
 
-        era$ = epoch$.pipe(
+        era$ = evalEpoch$.pipe(
                 eraSlicer(signal$, ripple$),
                 evaluator(model),
                 pullAllSlices());
@@ -63,7 +65,7 @@ describe('evaluator', () => {
 
         it('includes logRefs of eras within threshold', async () => {
             ripple({ myLog: [1] });
-            signal$.next(refreshEra());
+            epoch$.next({ manifest: emptyManifest });
             ripple({ myLog2: [1] });
 
             await expectLogRefs([
@@ -109,6 +111,8 @@ describe('evaluator', () => {
             const viewing = view('myLog');
 
             ripple({ myLog: [1, 2] });
+
+            await pause();
             complete();
 
             expect(await viewing)
@@ -168,10 +172,12 @@ describe('evaluator', () => {
                 block1: { myLog: [ 3, 4 ] }
             };
 
-            manifest$.next({
-                version: 1,
-                logBlocks: {
-                    myLog: ['block0', 'block1']
+            epoch$.next({
+                manifest: {
+                    version: 1,
+                    logBlocks: {
+                        myLog: ['block0', 'block1']
+                    }
                 }
             });
 
@@ -220,7 +226,7 @@ describe('evaluator', () => {
     }
 
     function complete() {
-        manifest$.complete();
+        epoch$.complete();
         signal$.complete();
         ripple$.complete();
     }

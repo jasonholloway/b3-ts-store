@@ -1,6 +1,5 @@
 import { Subject, of, forkJoin } from "rxjs";
-import { reduceToArray } from "../lib/utils";
-import { concatMap, catchError, startWith } from "rxjs/operators";
+import { concatMap, catchError, startWith, toArray } from "rxjs/operators";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import { Manifest, emptyManifest } from "../lib/core/signals";
@@ -31,7 +30,7 @@ describe('pullBlocks', () => {
                                 concatMap(frame =>
                                     frame.load('block0')('myLog')
                                         .pipe(catchError(err => of(err)))),
-                                reduceToArray()),
+                                toArray()),
                             complete())
                         .toPromise();        
     })

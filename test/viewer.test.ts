@@ -1,6 +1,6 @@
-import { Subject, from, zip, BehaviorSubject, of } from "rxjs";
-import { Dict, propsToArray, tup } from "../lib/utils";
-import { map, concatMap, groupBy } from "rxjs/operators";
+import { Subject, from, zip, BehaviorSubject, of, MonoTypeOperatorFunction, pipe } from "rxjs";
+import { Dict, propsToArray, tup, logComplete } from "../lib/utils";
+import { map, concatMap, groupBy, tap, startWith } from "rxjs/operators";
 import { KnownLogs } from "../lib/core/evaluable";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/core/committer";
@@ -33,12 +33,13 @@ describe('viewer', () => {
     beforeEach(() => {
         blockStore = new FakeBlockStore();
 
-        manifest$ = new BehaviorSubject(emptyManifest);
+        manifest$ = new Subject();
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
         const epoch$ = manifest$.pipe(
+            startWith(emptyManifest),
             concatMap(manifest => 
                 of(manifest).pipe(
                     pullBlocks(blockStore),
