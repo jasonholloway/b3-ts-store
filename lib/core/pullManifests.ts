@@ -3,21 +3,17 @@ import { OperatorFunction, pipe, of } from "rxjs";
 import { Manifest, emptyManifest } from "./signals";
 import { concatMap, share, defaultIfEmpty } from "rxjs/operators";
 
-export type PullManifest = ['PullManifest', {}]
-
-export const pullManifest = (): PullManifest => ['PullManifest', {}];
-
 export const pullManifests =
-    (manifestStore: ManifestStore) : OperatorFunction<PullManifest, Manifest> =>
+    (manifestStore: ManifestStore) : OperatorFunction<any, Manifest> =>
     pipe(
-        concatMap(([_]) => 
+        concatMap(() => 
             manifestStore.load()
                 .pipe(defaultIfEmpty(emptyManifest))),
         share()
     );
 
 
-    //
-    //
+    //what else does this need?
+    //not much - 
     //
     //

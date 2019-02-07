@@ -154,11 +154,11 @@ export type Keyed$<U> = Observable<GroupedObservable<string, U>>
 
 
 
-type ExtractEventNames<M> = M extends [infer K, any] ? K : never
-type ExtractEventValues<M, K> = M extends [K, infer V] ? V : never
+type GetNames<M> = M extends [infer K, any] ? K : never
+type GetValues<M, K> = M extends [K, infer V] ? V : never
 
 export const extract = 
-    <A, B, M extends [A, B], K extends ExtractEventNames<M> & string, V extends ExtractEventValues<M, K>>
+    <M extends [string, any], K extends GetNames<M> & string, V extends GetValues<M, K>>
     (key: K) : OperatorFunction<M, V> =>
     pipe(
         filter(([k]) => k == key),

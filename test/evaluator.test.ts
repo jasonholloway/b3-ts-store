@@ -1,4 +1,4 @@
-import { Subject, from, Observable, zip, BehaviorSubject } from "rxjs";
+import { Subject, from, Observable, zip, BehaviorSubject, of } from "rxjs";
 import { Dict, tup, propsToArray } from "../lib/utils";
 import { map, concatMap, groupBy, toArray } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
@@ -29,16 +29,18 @@ describe('evaluator', () => {
         signal$= new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
 
-        const epoch$ = zip(
-                        manifest$,
-                        manifest$.pipe(
-                            pullBlocks(blockStore),
-                            evaluateBlocks(model)));
+        const epoch$ = manifest$.pipe(
+                        concatMap(manifest => 
+                            of(manifest).pipe(
+                                pullBlocks(blockStore),
+                                evaluateBlocks(model),
+                                map(evaluable => ({ manifest, ...evaluable }))
+                            )));
 
         era$ = epoch$.pipe(
-                    eraSlicer(signal$, ripple$),
-                    evaluator(model),
-                    pullAllSlices());
+                eraSlicer(signal$, ripple$),
+                evaluator(model),
+                pullAllSlices());
     })
 
 

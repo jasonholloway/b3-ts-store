@@ -1,4 +1,4 @@
-import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, zip, empty } from "rxjs";
+import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, zip, empty, of } from "rxjs";
 import { reduceToArray, Dict, propsToArray, tup } from "../lib/utils";
 import { map, concatMap, groupBy, startWith, toArray, concatAll, flatMap } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
@@ -35,11 +35,13 @@ describe('committer', () => {
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        const epoch$ = zip(
-                        manifest$,
-                        manifest$.pipe(
-                            pullBlocks(new FakeBlockStore()),
-                            evaluateBlocks(model)));
+        const epoch$ = manifest$.pipe(
+                        concatMap(manifest => 
+                            of(manifest).pipe(
+                                pullBlocks(new FakeBlockStore()),
+                                evaluateBlocks(model),
+                                map(evaluable => ({ manifest, ...evaluable }))
+                            )));
 
         era$ = epoch$.pipe(
                 eraSlicer(empty(), ripple$),

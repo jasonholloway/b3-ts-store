@@ -85,9 +85,9 @@ export const committer =
                                         toArray(),
                                         map(r => tup(g$.key, r)))),
                         reduceToDict(),
-                        filter(data => propsToArray(data).length > 0),
-                        map(data => ({
-                            id,
+                        filter(data => propsToArray(data).length > 0),      //if the slices are empty, then this will get trapped!!!
+                        map(data => ({                                      //will end up waiting for confirmation that never comes,
+                            id,                                             //as commit nevermade (rightfully)
                             data,
                             extent: 1,
                             era,
@@ -97,3 +97,7 @@ export const committer =
                 )),
             share()
         );
+
+//seems to me that each commit, even if skipped, should return some kind of result
+//
+//

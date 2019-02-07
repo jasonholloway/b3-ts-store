@@ -1,4 +1,3 @@
-import { Map } from 'immutable'
 import { declareUpdate } from '../lib/utils';
 import { declareLogModel } from '../lib/bits';
 

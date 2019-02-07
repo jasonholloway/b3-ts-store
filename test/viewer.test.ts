@@ -1,4 +1,4 @@
-import { Subject, from, zip, BehaviorSubject } from "rxjs";
+import { Subject, from, zip, BehaviorSubject, of } from "rxjs";
 import { Dict, propsToArray, tup } from "../lib/utils";
 import { map, concatMap, groupBy } from "rxjs/operators";
 import { KnownLogs } from "../lib/core/evaluable";
@@ -38,11 +38,13 @@ describe('viewer', () => {
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
 
-        const epoch$ = zip(
-                        manifest$,
-                        manifest$.pipe(
-                            pullBlocks(blockStore),
-                            evaluateBlocks(model)));
+        const epoch$ = manifest$.pipe(
+            concatMap(manifest => 
+                of(manifest).pipe(
+                    pullBlocks(blockStore),
+                    evaluateBlocks(model),
+                    map(evaluable => ({ manifest, ...evaluable }))
+                )));
 
         const era$ = epoch$.pipe(
                         eraSlicer(signal$, ripple$),

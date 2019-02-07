@@ -5,6 +5,7 @@ import { Manifest, emptyManifest, Signal, Start } from "./signals";
 import { Evaluable, emptyEvaluable } from "./evaluable";
 import { Windower, createWindower } from "./windower";
 import { newEpoch } from ".";
+import { Commit } from "./committer";
 
 
 export interface Tuple2<A, B> extends Array<A | B> {
@@ -50,13 +51,15 @@ const emptyEra: Era = {
     blocks: emptyEvaluable,
 }
 
-export type Epoch = [Manifest, Evaluable]
 
-export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Ripple>) : OperatorFunction<Epoch, Era> {
+export type Epoch = { manifest: Manifest, commit?: Commit }
+
+
+export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Ripple>) : OperatorFunction<Epoch & Evaluable, Era> {
     const getWindow = createWindower(ripple$);
     return pipe(
-        map(([manifest, blocks]) => 
-            newEpoch(manifest, blocks)),
+        map(epoch => 
+            newEpoch(epoch.manifest, epoch)),
         merge(signal$),
         scan((prev$: Observable<Era>, signal: Signal) => {
             return prev$.pipe(

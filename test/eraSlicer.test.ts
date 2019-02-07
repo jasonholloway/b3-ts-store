@@ -1,4 +1,4 @@
-import { Observable, Subject, from, OperatorFunction, pipe, zip, merge, forkJoin, BehaviorSubject } from "rxjs";
+import { Observable, Subject, from, OperatorFunction, pipe, zip, merge, forkJoin, BehaviorSubject, of } from "rxjs";
 import { Dict, scanToArray, propsToArray, reduceToArray, tup, reduceToDict } from "../lib/utils";
 import { map, concatMap, toArray } from "rxjs/operators";
 import { Era, pullAllSlices, SliceId, pullAll, Ripple, eraSlicer } from "../lib/core/eraSlicer";
@@ -30,11 +30,13 @@ describe('eraSlicer', () => {
         signal$ = new Subject<Signal>();
         ripple$ = new Subject<Ripple<number>>();
 
-        const epoch$ = zip(
-                        manifest$,
-                        manifest$.pipe(
-                            pullBlocks(blockStore),
-                            evaluateBlocks(model)));
+        const epoch$ = manifest$.pipe(
+                        concatMap(manifest => 
+                            of(manifest).pipe(
+                                pullBlocks(blockStore),
+                                evaluateBlocks(model),
+                                map(evaluable => ({ manifest, ...evaluable }))
+                            )));
 
         era$ = epoch$.pipe(
                 eraSlicer(signal$, ripple$),
@@ -202,11 +204,13 @@ describe('eraSlicer as specifier', () => {
         ripple$ = new Subject<Ripple>();
         manifest$ = new BehaviorSubject(emptyManifest);
         
-        const epoch$ = zip(
-                        manifest$,
-                        manifest$.pipe(
-                            pullBlocks(new FakeBlockStore()),
-                            evaluateBlocks(new TestModel())));
+        const epoch$ = manifest$.pipe(
+                        concatMap(manifest => 
+                            of(manifest).pipe(
+                                pullBlocks(new FakeBlockStore()),
+                                evaluateBlocks(new TestModel()),
+                                map(evaluable => ({ manifest, ...evaluable }))
+                            )));
                             
         [eras] = await forkJoin(
                         epoch$.pipe(

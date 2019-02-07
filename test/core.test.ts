@@ -1,6 +1,6 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction, empty } from "rxjs";
 import { Dict, propsToArray, tup, valsToArray as valsToArray, log, scanToArray } from "../lib/utils";
-import { map, concatMap, groupBy, toArray, tap, timeout } from "rxjs/operators";
+import { map, concatMap, groupBy, toArray, tap, timeout, pluck } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
@@ -77,6 +77,8 @@ describe('core', () => {
         it('triggers new era', async () => {
             emit({ myLog: [ 1, 2, 3 ] });
             doReset();
+
+            // await pause();
             complete();
 
             const eras = await gather(era$);
@@ -85,8 +87,8 @@ describe('core', () => {
 
         it('reemits base view', async () => {
             emit({ myLog2: [ 7, 8, 9 ] });
-            await pause();
             doReset();
+
             await pause();
             complete();
 
@@ -101,9 +103,9 @@ describe('core', () => {
         beforeEach(async () => {
             emit({ myLog: [ 1, 2, 3 ] });
             doCommit();
-    
+
+            await pause();    
             complete();
-            await pause();
         })
 
         it('saves new block', () => 
@@ -118,10 +120,24 @@ describe('core', () => {
                 .toHaveLength(1);
         })                
 
-        it('triggers new era with new thresh', async () => {
-            const eras = await gather(era$);
-            expect(eras.map(({id}) => ({id}))).toMatchObject([ { id: 0 }, { id: 1} ]);
+        describe('new era', () => {
+
+            it('triggered', async () => {
+                const eraIds = await gather(era$.pipe(pluck('id')));
+                expect(eraIds).toEqual([ 0, 1 ]);
+            })
+
+            it('has shifted thresh', async () => {
+                const thresholds = await gather(era$.pipe(pluck('thresh')));
+                expect(thresholds).toEqual([ 0, 1 ]);
+            })
+
+            it('has commit info', async () => {
+                throw 1234;
+            })
+
         })
+
     })
 
     describe('on start', () => {
