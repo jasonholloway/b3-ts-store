@@ -11,6 +11,7 @@ import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { gather } from "./helpers";
+import FakeManifestStore from "./fakes/FakeManifestStore";
 
 type TestRipple = Dict<number[]>
 
@@ -20,14 +21,20 @@ describe('committer', () => {
 
     const model = new TestModel();
 
+    let blockStore: FakeBlockStore;
+    let manifestStore: FakeManifestStore;
+
     let manifest$: Subject<Manifest>
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
     let era$: Observable<EvaluableEra<TestModel>>
     let commit$: Observable<Commit>
-
+    
     beforeEach(() => {
+        blockStore = new FakeBlockStore();
+        manifestStore = new FakeManifestStore();
+
         manifest$ = new BehaviorSubject(emptyManifest);
         ripple$ = new Subject<Ripple<number>>();
         doCommit$ = new Subject<DoCommit>();
@@ -46,7 +53,7 @@ describe('committer', () => {
                 pullAll());
 
         commit$ = doCommit$.pipe(
-                    committer(era$),
+                    committer(era$, blockStore, manifestStore),
                     pullAllCommits());
     })
 

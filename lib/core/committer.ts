@@ -5,6 +5,8 @@ import { reduceToDict, tup, Dict, propsToArray, scanToArray, skipAll } from "../
 import { EvaluableEra } from "./evaluator";
 import { Era, Slice } from "./eraSlicer";
 import { Manifest } from "./signals";
+import { pusher } from "./pusher";
+import { BlockStore, ManifestStore } from "../bits";
 
 export interface DoCommit {
     id: string
@@ -69,7 +71,7 @@ const trackSlices =
 
 export const committer =
     <M extends Model>
-    (era$: Observable<EvaluableEra<M>>) : OperatorFunction<DoCommit, Commit> =>
+    (era$: Observable<EvaluableEra<M>>, blockStore: BlockStore, manifestStore: ManifestStore) : OperatorFunction<DoCommit, Commit> =>
         pipe(
             withLatestFrom(trackSlices(era$)),                                       //this should really get head and remainder, so we can attach to it below
             exhaustMap(([{id}, {era, slice$}]) =>
@@ -93,10 +95,16 @@ export const committer =
                             era,
                             error$: empty(),
                             event$: empty()
-                        })))
+                        })),                        
+                        pusher(blockStore, manifestStore))
                 )),
             share()
         );
+
+//2 error responses:
+//- pullnew manifest
+//- exhaust commit
+
 
 //seems to me that each commit, even if skipped, should return some kind of result
 //

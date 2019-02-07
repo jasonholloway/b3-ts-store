@@ -66,8 +66,7 @@ export const createCore =
                     shareReplay(1));
 
     const commit$ = doCommit$.pipe(                    
-                    committer(era$),
-                    pusher(blockStore, manifestStore),              //remember... pusher should be moved inside committer to catch errors
+                    committer(era$, blockStore, manifestStore),
                     shareReplay(1));
 
     commit$.pipe(
