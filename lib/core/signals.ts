@@ -1,6 +1,6 @@
 import { Dict, tup } from "../utils";
 import { Evaluable } from "./evaluable";
-import { Tuple2, Era } from "./eraSlicer";
+import { Tuple2, Era, Epoch } from "./eraSlicer";
 
 export type RefreshEra = ['RefreshEra']
 export type SetThreshold = ['SetThreshold', number]
@@ -9,7 +9,7 @@ export type DoReset = ['DoReset']
 export type NewSlice = ['NewSlice', number]
 export type Start = ['Start']
 
-export interface NewEpoch extends Tuple2<'Epoch', [Manifest, Evaluable<any>]> {}
+export interface NewEpoch extends Tuple2<'Epoch', [Epoch, Evaluable<any>]> {}
 
 export type Signal = RefreshEra | NewManifest | SetThreshold | NewEpoch | DoReset | Start
 

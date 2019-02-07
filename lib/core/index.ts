@@ -4,11 +4,11 @@ import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil } from "rxjs/ope
 import { Signal, Manifest, NewEpoch, doReset } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { committer, DoCommit, Commit, Committed } from "./committer";
-import { Observable, Subject, merge, empty, timer, of } from "rxjs";
+import { Observable, Subject, merge, empty, timer, of, interval } from "rxjs";
 import { pullManifests } from "./pullManifests";
 import { pusher } from "./pusher";
 import { createViewer } from "./viewer";
-import { tup, extract, logComplete, log } from "../utils";
+import { tup, extract, logComplete, log, logVal } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
 import { eraSlicer, Ripple, Epoch, pullReplay } from "./eraSlicer";
@@ -26,8 +26,8 @@ const emptyEvaluable: Evaluable = {
     evaluate: () => empty()
 }
 
-export const newEpoch = (manifest: Manifest, blocks: Evaluable = emptyEvaluable): NewEpoch => 
-    ['Epoch', tup(manifest, blocks)];
+export const newEpoch = (epoch: Epoch, blocks: Evaluable): NewEpoch => 
+    ['Epoch', tup(epoch, blocks)];
 
 
 export const createCore =

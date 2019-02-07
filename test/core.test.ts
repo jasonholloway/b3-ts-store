@@ -95,6 +95,8 @@ describe('core', () => {
         beforeEach(async () => {
             emit({ myLog: [ 1, 2, 3 ] });
             doCommit();
+
+            await pause();
             complete();
         })
 

@@ -22,7 +22,7 @@ export interface Commit {
     id: string,
     era: Era
     data: Dict<any[]>
-    extent: number,
+    range: [number, number],
     error$: Observable<Error>
     event$: Observable<CommitEvent>
 }
@@ -89,7 +89,7 @@ export const committer =
                         map(data => ({                                      //will end up waiting for confirmation that never comes,
                             id,                                             //as commit nevermade (rightfully)
                             data,
-                            extent: 1,
+                            range: tup(era.thresh, 1),
                             era,
                             error$: empty(),
                             event$: empty()

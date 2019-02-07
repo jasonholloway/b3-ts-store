@@ -66,8 +66,7 @@ export type Epoch = { manifest: Manifest, commit?: Commit }
 export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Ripple>) : OperatorFunction<Epoch & Evaluable, Era> {
     const getWindow = createWindower(ripple$);
     return pipe(
-        map(epoch => 
-            newEpoch(epoch.manifest, epoch)),
+        map(e => newEpoch(e, e)),
         merge(signal$),
         concatScan(
             (prev: Era, signal: Signal) =>
@@ -110,8 +109,16 @@ function handle(signal: Signal): MonoTypeOperatorFunction<[Era, Spec, Era]> {
                 return tup(prev, { ...spec, thresh$: spec.from$ }, era);
             }
             case 'Epoch': {
-                const [manifest, blocks] = signal[1];
-                return tup(prev, spec, { ...era, manifest, blocks });
+                const [epoch, blocks] = signal[1];
+                return tup(
+                    {   ...prev }, 
+                    {   ...spec, 
+                        thresh$: epoch.commit 
+                                ? of(epoch.commit.range[0] + epoch.commit.range[1])
+                                : of(prev.thresh)   },
+                    {   ...era,
+                        manifest: epoch.manifest,
+                        blocks  });
             }
             case 'NewManifest': {
                 const manifest = signal[1];
