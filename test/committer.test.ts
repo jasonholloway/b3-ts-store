@@ -128,9 +128,9 @@ describe('committer', () => {
 
         const r = await gather(commit$.pipe(
                                 flatMap(comm =>
-                                    comm.error$.pipe(
+                                    comm.event$.pipe(
                                         toArray(),
-                                        map(errs => ({ ...comm, errors: errs }))))
+                                        map(events => ({ ...comm, events }))))
                                 ));
 
         expect(r).toMatchObject(commits);
@@ -146,8 +146,8 @@ describe('committer', () => {
     function pullAllCommits() : MonoTypeOperatorFunction<Commit> {
         return pipe(
             map(commit => ({ 
-                ...commit ,
-                errors: commit.error$.pipe(pullAll())
+                ...commit,
+                event$: commit.event$.pipe(pullAll())
             })),
             pullAll())
     }

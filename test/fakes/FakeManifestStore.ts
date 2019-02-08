@@ -1,21 +1,24 @@
-import { ManifestStore } from "../../lib/bits";
 import { Manifest } from "../../lib/core/signals";
-import { Observable, empty, of, throwError } from "rxjs";
+import { Observable, empty, of } from "rxjs";
+import { ManifestStore } from "../../lib/core/ManifestStore";
+import { tup, packet } from "../../lib/utils";
 
 class FakeManifestStore implements ManifestStore {
 
     manifest: Manifest = undefined;
 
-    load(): Observable<Manifest> {
-        return this.manifest ? of(this.manifest) : empty();
+    load(): Observable<ManifestStore.LoadEvent> {
+        return this.manifest 
+                ? of(packet('Loaded', this.manifest))
+                : empty();
     }    
     
-    save(newManifest: Manifest): Observable<void> {
+    save(newManifest: Manifest): Observable<ManifestStore.SaveEvent> {
         if(newManifest.version <= ((this.manifest && this.manifest.version) || 0))
-            return throwError('Newer manifest in place!');
+            return of(packet('Gazumped'));
         else {
             this.manifest = newManifest;
-            return empty();
+            return of(packet('Saved'));
         }
     }
 

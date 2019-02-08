@@ -6,7 +6,8 @@ import { EvaluableEra } from "./evaluator";
 import { Era, Slice } from "./eraSlicer";
 import { Manifest } from "./signals";
 import { pusher } from "./pusher";
-import { BlockStore, ManifestStore } from "../bits";
+import { BlockStore } from "../bits";
+import { ManifestStore } from "./ManifestStore";
 
 export interface DoCommit {
     id: string
@@ -25,7 +26,6 @@ export interface Commit {
     era: Era
     data: Dict<any[]>
     range: [number, number],
-    error$: Observable<Error>,
     event$: Observable<CommitEvent>
 }
 
@@ -93,7 +93,6 @@ export const committer =
                             data,
                             range: tup(era.thresh, 1),
                             era,
-                            error$: empty(),
                             event$: empty()
                         })),                        
                         pusher(blockStore, manifestStore))

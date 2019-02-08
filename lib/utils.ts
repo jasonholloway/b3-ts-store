@@ -155,6 +155,11 @@ export type Keyed$<U> = Observable<GroupedObservable<string, U>>
 
 
 
+export function packet<K extends string, V = null>(key: K, v?: V): [K, V] {
+    return tup(key, v);
+};
+
+
 type GetNames<M> = M extends [infer K, any] ? K : never
 type GetValues<M, K> = M extends [K, infer V] ? V : never
 

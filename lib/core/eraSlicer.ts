@@ -1,11 +1,11 @@
 import { Observable, empty, OperatorFunction, pipe, of, MonoTypeOperatorFunction, concat, forkJoin } from "rxjs";
 import { filter, shareReplay, map, concatMap, share, defaultIfEmpty, merge, takeLast, toArray } from "rxjs/operators";
-import { tup, concatScan, logVal } from "../utils";
-import { Manifest, emptyManifest, Signal } from "./signals";
+import { tup, concatScan, logVal, packet } from "../utils";
+import { Manifest, emptyManifest, Signal, NewEpoch } from "./signals";
 import { Evaluable, emptyEvaluable } from "./evaluable";
 import { Windower, createWindower } from "./windower";
-import { newEpoch } from ".";
 import { Commit } from "./committer";
+import { getPackedSettings } from "http2";
 
 
 export interface Tuple2<A, B> extends Array<A | B> {
@@ -62,17 +62,21 @@ export type Epoch = { manifest: Manifest, commit?: Commit }
 //signal$ needs to complete before era$
 //
 
+export const newEpoch = (epoch: Epoch, blocks: Evaluable): NewEpoch => 
+    ['Epoch', tup(epoch, blocks)];
+
 
 export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Ripple>) : OperatorFunction<Epoch & Evaluable, Era> {
     const getWindow = createWindower(ripple$);
     return pipe(
         map(e => newEpoch(e, e)),
         merge(signal$),
+        logVal('signal'),
         concatScan(
             (prev: Era, signal: Signal) =>
                 of(prev).pipe(
                     digestPrevious(),
-                    handle(signal),
+                    handleSignals(signal),
                     setEraId(),
                     sliceRipples(getWindow),
                     shareReplay(1)
@@ -98,7 +102,7 @@ function digestPrevious() : OperatorFunction<Era, [Era, Spec, Era]> {
 }
 
 
-function handle(signal: Signal): MonoTypeOperatorFunction<[Era, Spec, Era]> {
+function handleSignals(signal: Signal): MonoTypeOperatorFunction<[Era, Spec, Era]> {
     return map(([prev, spec, era]) => {
         switch(signal[0]) {
             case 'Start':

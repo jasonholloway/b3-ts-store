@@ -1,5 +1,5 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
-import { Dict, propsToArray, tup, valsToArray as valsToArray } from "../lib/utils";
+import { Dict, propsToArray, tup, valsToArray as valsToArray, extract } from "../lib/utils";
 import { map, concatMap, groupBy, pluck } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
@@ -169,9 +169,12 @@ describe('core', () => {
             expect(await getManifestVersions())
                 .toContain(999));
 
-        it('error emitted into Commit', async () => {
-            const errs = await gather(commit$.pipe(concatMap(c => c.error$)));
-            expect(errs).toMatchObject([ 'Newer manifest in place!' ]);
+        it('gazumped event emitted', async () => {
+            const events = await gather(commit$.pipe(
+                                            concatMap(c => c.event$),
+                                            extract('Gazumped')));
+
+            expect(events).toHaveLength(1);
         })
     })
 
@@ -185,7 +188,7 @@ describe('core', () => {
         return pipe(
             map(commit => ({ 
                 ...commit ,
-                errors: commit.error$.pipe(pullAll())
+                event$: commit.event$.pipe(pullAll())
             })),
             pullAll())
     }

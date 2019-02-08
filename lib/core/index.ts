@@ -1,17 +1,17 @@
 import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
-import { BlockStore, ManifestStore } from "../bits";
+import { BlockStore } from "../bits";
 import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil } from "rxjs/operators";
-import { Signal, Manifest, NewEpoch, doReset } from "./signals";
+import { NewEpoch, doReset } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { committer, DoCommit, Commit, Committed } from "./committer";
-import { Observable, Subject, merge, empty, timer, of, interval } from "rxjs";
+import { Observable, Subject, merge, empty, timer, of } from "rxjs";
 import { pullManifests } from "./pullManifests";
-import { pusher } from "./pusher";
 import { createViewer } from "./viewer";
-import { tup, extract, logComplete, log, logVal } from "../utils";
+import { tup, extract } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
-import { eraSlicer, Ripple, Epoch, pullReplay } from "./eraSlicer";
+import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
+import { ManifestStore } from "./ManifestStore";
 
 
 export interface Core<M extends Model> {
@@ -20,15 +20,6 @@ export interface Core<M extends Model> {
     view<K extends KnownLogs<M>>(ref: K): Observable<KnownAggr<M, K>>,
     close()
 } 
-
-const emptyEvaluable: Evaluable = {
-    logRef$: empty(),
-    evaluate: () => empty()
-}
-
-export const newEpoch = (epoch: Epoch, blocks: Evaluable): NewEpoch => 
-    ['Epoch', tup(epoch, blocks)];
-
 
 export const createCore =
     <M extends Model>

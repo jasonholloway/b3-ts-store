@@ -1,9 +1,14 @@
 import { Observable } from "rxjs";
 import { Manifest } from "./signals";
 
-type Result =  ['Saved', void] | ['Gazumped', void]
+export declare module ManifestStore {
+    export type LoadEvent = ['Loaded', Manifest]
+    export type SaveEvent =  ['Saved', void] | ['Gazumped', void]
+}
+
 
 export interface ManifestStore {
-    load(): Observable<Manifest>;
-    save(manifest: Manifest): Observable<Result>
+    load(): Observable<ManifestStore.LoadEvent>;
+    save(manifest: Manifest): Observable<ManifestStore.SaveEvent>
 }
+
