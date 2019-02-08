@@ -124,10 +124,15 @@ describe('core', () => {
                 expect(thresholds).toEqual([ 0, 1 ]);
             })
 
-            it('has commit info', async () => {
+            xit('has commit info', async () => {
                 throw 1234;
             })
+        })
 
+        describe('on error', () => {
+            xit('new commit allowed', () => {
+                throw 12345;
+            })
         })
 
     })
@@ -161,7 +166,7 @@ describe('core', () => {
             expect(manifestStore.manifest.version).toBe(999));
         
         it('newer manifest percolates into new era', async () =>
-            expect(await getManifestVersions())                
+            expect(await getManifestVersions())
                 .toContain(999));
 
         it('error emitted into Commit', async () => {

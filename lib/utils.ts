@@ -1,4 +1,4 @@
-import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter, concatAll, shareReplay } from 'rxjs/operators';
+import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter, concatAll, shareReplay, mapTo } from 'rxjs/operators';
 import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable, of } from 'rxjs';
 
 
@@ -166,7 +166,28 @@ export const extract =
         map(([, v]) => v as V)
     );
     
+export const extractConcat =
+    <M extends [string, any], K extends GetNames<M> & string, A extends GetValues<M, K>, B>
+    (key: K, project: (a: A) => Observable<B>) : OperatorFunction<M, B> =>
+    pipe(
+        extract(key),
+        concatMap(project)
+    )
 
+
+type Handlers<M extends [string, any]> =
+        { [key in GetNames<M>]: (a: GetValues<M, key>) => Observable<any> }
+
+type HandlerReturnTypes<H extends Handlers<any>> =
+        H[keyof H] extends () => Observable<infer B> ? B : never
+
+export const handle = 
+    <M extends [string, any], H extends Handlers<M>>
+    (handlers: H) : OperatorFunction<M, HandlerReturnTypes<H>> =>
+    concatMap(([k, a]) => {
+        const handler = handlers[k];
+        return (handler && handler(a)) || empty();
+    });
 
 
 

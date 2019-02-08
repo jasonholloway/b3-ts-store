@@ -18,14 +18,14 @@ export type Committed = {
 }
 
 
-export type CommitEvent = ['Error', Error] | ['Committed', Committed]
+export type CommitEvent = ['Error', Error] | ['Committed', Committed] | ['Gazumped', {}]
 
 export interface Commit {
     id: string,
     era: Era
     data: Dict<any[]>
     range: [number, number],
-    error$: Observable<Error>
+    error$: Observable<Error>,
     event$: Observable<CommitEvent>
 }
 

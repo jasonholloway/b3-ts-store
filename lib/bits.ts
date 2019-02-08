@@ -27,10 +27,6 @@ export interface BlockStore {
     save(key: string, block: Block): Promise<void>;
 }
 
-export interface ManifestStore {
-    load(): Observable<Manifest>;
-    save(manifest: Manifest): Observable<void>
-}
 
 
 export type Update<T extends string, V> = [number, T, V]
