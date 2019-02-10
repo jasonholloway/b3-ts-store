@@ -1,5 +1,5 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
-import { Dict, propsToArray, tup, valsToArray as valsToArray, extract } from "../lib/utils";
+import { Dict, propsToArray, tup, valsToArray as valsToArray, extract, demux } from "../lib/utils";
 import { map, concatMap, groupBy, pluck } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";

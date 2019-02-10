@@ -71,7 +71,6 @@ export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Rippl
     return pipe(
         map(e => newEpoch(e, e)),
         merge(signal$),
-        logVal('signal'),
         concatScan(
             (prev: Era, signal: Signal) =>
                 of(prev).pipe(

@@ -1,16 +1,16 @@
-import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
+import { Model, KnownLogs, KnownAggr } from "./evaluable";
 import { BlockStore } from "../bits";
-import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil } from "rxjs/operators";
-import { NewEpoch, doReset } from "./signals";
+import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil, tap } from "rxjs/operators";
+import { doReset } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { committer, DoCommit, Commit, Committed } from "./committer";
-import { Observable, Subject, merge, empty, timer, of } from "rxjs";
+import { Observable, Subject, merge, timer, of } from "rxjs";
 import { pullManifests } from "./pullManifests";
 import { createViewer } from "./viewer";
-import { tup, extract } from "../utils";
+import { demux as demux, skipAll, pipeTo, logVal } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
-import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
+import { eraSlicer, Ripple, Epoch, pullAll } from "./eraSlicer";
 import { ManifestStore } from "./ManifestStore";
 
 
@@ -26,15 +26,19 @@ export const createCore =
     (model: M, blockStore: BlockStore, manifestStore: ManifestStore) =>
     (ripple$: Observable<Ripple<any>>, doReset$: Observable<void>, doCommit$: Observable<DoCommit>) : Core<M> => {
 
-    const committed$ = new Subject<Committed>();
     const close$ = new Subject();
+    const committed$ = new Subject<Committed>();
+    const gazumped$ = new Subject<{}>();
+    const error$ = new Subject<Error>();
 
     doReset$ = completeOnClose(doReset$);
     ripple$ = completeOnClose(ripple$);
     doCommit$ = completeOnClose(doCommit$);
     
+    error$.subscribe(err => console.error(err));
+
     const epoch$ = merge<Epoch>(
-                    timer(0, 10000).pipe(
+                    merge(timer(0, 10000), gazumped$).pipe(                        
                         takeUntil(close$),
                         pullManifests(manifestStore),
                         map(manifest => ({ manifest }))),
@@ -56,14 +60,15 @@ export const createCore =
                     evaluator(model),   //would be nice if this were part of the interior scan(?)
                     shareReplay(1));
 
-    const commit$ = doCommit$.pipe(                    
+    const commit$ = doCommit$.pipe(
                     committer(era$, blockStore, manifestStore),
                     shareReplay(1));
 
     commit$.pipe(
         flatMap(c => c.event$),
-        extract('Committed'))
-        .subscribe(committed$);
+        demux('Committed', pipeTo(committed$)),
+        demux('Gazumped', pipeTo(gazumped$)),
+        demux('Error', pipeTo(error$)));
 
     const viewer = createViewer(era$);
 

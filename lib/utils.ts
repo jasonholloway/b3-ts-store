@@ -1,5 +1,6 @@
-import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter, concatAll, shareReplay, mapTo } from 'rxjs/operators';
-import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable, of } from 'rxjs';
+import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter, concatAll, shareReplay, mapTo, defaultIfEmpty, finalize, partition } from 'rxjs/operators';
+import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable, of, UnaryFunction, merge, iif, Observer } from 'rxjs';
+import { pullAll } from './core/eraSlicer';
 
 
 
@@ -105,8 +106,8 @@ export function bufferAll<V>() : OperatorFunction<V, V[]> {
 
 
 export const skipAll = 
-    (): OperatorFunction<any, null> =>
-        pipe(skipWhile(() => true));
+    (): OperatorFunction<any, never> =>
+    skipWhile(() => true) as OperatorFunction<any, never>;
 
 
 export function capture<A, B>(project: (A) => Observable<B>) : OperatorFunction<A, [A, Observable<B>]> {
@@ -179,20 +180,46 @@ export const extractConcat =
         concatMap(project)
     )
 
+// type Handlers<M extends [string, any]> =
+//     { [key in GetNames<M>]: (a: GetValues<M, key>) => Observable<any> }
 
-type Handlers<M extends [string, any]> =
-        { [key in GetNames<M>]: (a: GetValues<M, key>) => Observable<any> }
+// type HandlerReturnTypes<H extends Handlers<any>> =
+//     H[keyof H] extends () => Observable<infer B> ? B : never
 
-type HandlerReturnTypes<H extends Handlers<any>> =
-        H[keyof H] extends () => Observable<infer B> ? B : never
+// export const handle = 
+//     <M extends [string, any], H extends Handlers<M>>
+//     (handlers: H) : OperatorFunction<M, HandlerReturnTypes<H>> =>
+//     concatMap(([k, a]) => {
+//         const handler = handlers[k];
+//         return (handler && handler(a)) || empty();
+//     });
 
-export const handle = 
-    <M extends [string, any], H extends Handlers<M>>
-    (handlers: H) : OperatorFunction<M, HandlerReturnTypes<H>> =>
-    concatMap(([k, a]) => {
-        const handler = handlers[k];
-        return (handler && handler(a)) || empty();
-    });
+
+type ExcludePacket<M, K extends GetNames<M>> =
+    M extends [string, any] ? Exclude<M, PickPacket<M, K>> : M
+
+type PickPacket<M extends [string, any], K extends GetNames<M>> =
+    M extends [K, infer A] ? [K, A] : never
+
+
+export const demux =
+    <M, K extends GetNames<M> & string, B>
+    (key: K, operator: OperatorFunction<GetValues<M, K>, B> = undefined): OperatorFunction<M, ExcludePacket<M, K> | B> =>
+    m$ => {
+        const [match$, other$] = partition(m => m[0] == key)(m$) as [Observable<[K, GetValues<M, K>]>, Observable<ExcludePacket<M, K>>];
+        return merge(
+                match$.pipe(
+                    map(([, a]) => a),
+                    operator),
+                other$);
+    };
+
+export const pipeTo =
+    <V>(sink: Observer<V>): OperatorFunction<V, never> =>
+    val$ => {
+        val$.subscribe(sink);
+        return val$.pipe(skipAll());
+    };
 
 
 

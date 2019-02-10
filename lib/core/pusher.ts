@@ -1,8 +1,8 @@
 import { BlockStore } from "../bits";
 import { OperatorFunction, pipe, of, concat, from } from "rxjs";
 import { Commit, Committed, CommitEvent } from "./committer";
-import { concatMap, map, groupBy, reduce, flatMap } from "rxjs/operators";
-import { propsToArray, reduceToDict, tup, handle } from "../utils";
+import { concatMap, map, groupBy, reduce, flatMap, mapTo } from "rxjs/operators";
+import { propsToArray, reduceToDict, tup, demux } from "../utils";
 import { Manifest } from "./signals";
 import uuid from 'uuid/v1'
 import { ManifestStore } from "./ManifestStore";
@@ -42,12 +42,9 @@ export const pusher =
                                 })));
                     }),
                     concatMap(manifest =>
-                        manifestStore.save(manifest)
-                            .pipe(
-                                handle({
-                                    Gazumped: () => of(gazumped()),
-                                    Saved: () => of(committed({ manifest, commit })) //plus etag...
-                                }))),
+                        manifestStore.save(manifest).pipe(
+                            demux('Gazumped', mapTo(gazumped())),
+                            demux('Saved', mapTo(committed({ manifest, commit }))))),
                     pullAll())
         })));
 

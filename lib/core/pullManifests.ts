@@ -1,8 +1,8 @@
-import { OperatorFunction, pipe, of } from "rxjs";
+import { OperatorFunction, pipe } from "rxjs";
 import { Manifest } from "./signals";
-import { concatMap, share } from "rxjs/operators";
+import { concatMap, share, map } from "rxjs/operators";
 import { ManifestStore } from "./ManifestStore";
-import { handle } from "../utils";
+import { demux } from "../utils";
 
 export const pullManifests =
     (manifestStore: ManifestStore) : OperatorFunction<any, Manifest> =>
@@ -10,9 +10,7 @@ export const pullManifests =
         concatMap(() => 
             manifestStore.load()
                 .pipe(
-                    handle({
-                        Loaded: manifest => of(manifest)
-                    })
+                    demux('Loaded', map(m => m)) //a nice overload here would be nice
                 )),
         share()
     );
