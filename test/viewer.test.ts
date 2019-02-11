@@ -1,6 +1,6 @@
-import { Subject, from, zip, BehaviorSubject, of, MonoTypeOperatorFunction, pipe } from "rxjs";
-import { Dict, propsToArray, tup, logComplete } from "../lib/utils";
-import { map, concatMap, groupBy, tap, startWith } from "rxjs/operators";
+import { Subject, from, of } from "rxjs";
+import { Dict, propsToArray, tup } from "../lib/utils";
+import { map, concatMap, groupBy, startWith } from "rxjs/operators";
 import { KnownLogs } from "../lib/core/evaluable";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/core/committer";

@@ -1,5 +1,5 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
-import { Dict, propsToArray, tup, valsToArray as valsToArray, extract, demux } from "../lib/utils";
+import { Dict, propsToArray, tup, valsToArray as valsToArray, extract } from "../lib/utils";
 import { map, concatMap, groupBy, pluck } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
@@ -9,7 +9,7 @@ import { pause } from "./utils";
 import { Core, createCore } from "../lib/core";
 import { EvaluableEra } from "../lib/core/evaluator";
 import { gather } from "./helpers";
-import { pullAll, Ripple, pullAllSlices } from "../lib/core/eraSlicer";
+import { pullAll, Ripple } from "../lib/core/eraSlicer";
 
 type TestRipple = Dict<number[]>
 
@@ -31,16 +31,23 @@ describe('core', () => {
 
     let core: Core<TestModel>
 
+    let setupStores: () => void;
+    
+    beforeAll(() => {
+        setupStores = () => {
+            manifestStore.manifest = { version: 10, logBlocks: { myLog2: [ 'block1' ] } };
+            blockStore.blocks = { block1: { myLog2: [ 4, 5, 6 ] } };
+        };
+    })
+
     beforeEach(async () => {
         manifestStore = new FakeManifestStore();
         blockStore = new FakeBlockStore();
+        setupStores();
 
         ripple$ = new Subject<Ripple<number>>();
         doReset$ = new Subject<void>();
         doCommit$ = new Subject<DoCommit>();
-
-        manifestStore.manifest = { version: 10, logBlocks: { myLog2: [ 'block1' ] } };
-        blockStore.blocks = { block1: { myLog2: [ 4, 5, 6 ] } }
 
         core = createCore(model, blockStore, manifestStore)(ripple$, doReset$, doCommit$);
 
@@ -151,10 +158,31 @@ describe('core', () => {
 
 
 
-    describe('when there\'s an existing, newer manifest', () => {
-        beforeEach(async () => {
-            manifestStore.manifest = { version: 999, logBlocks: {} };
+    describe('when no manifest in place', () => {
+        beforeAll(() => {
+            setupStores = () => {
+                manifestStore.manifest = undefined;
+            }
+        })
 
+        it('starts from scratch', async () => {
+            const viewing = gather(core.view('myLog'));
+            emit({ myLog: [ 1, 2, 3 ] });
+            complete();
+
+            expect(await viewing).toEqual([ '', '1,2,3' ]);
+        })
+    })
+
+
+    describe('when there\'s an existing, newer manifest', () => {
+        beforeAll(() => {
+            setupStores = () => {
+                manifestStore.manifest = { version: 999, logBlocks: {} };
+            };
+        })
+
+        beforeEach(async () => {
             emit({ myLog: [ 1, 2, 3 ] });
             doCommit();
     

@@ -1,7 +1,7 @@
 import { pipe, OperatorFunction, empty, of } from "rxjs";
-import { scan, concatMap, map, filter, defaultIfEmpty, startWith, single, distinct, takeLast, withLatestFrom } from "rxjs/operators";
+import { scan, concatMap, map, filter, defaultIfEmpty, startWith, single, distinct, takeLast, withLatestFrom, tap } from "rxjs/operators";
 import { Evaluable, Model, KnownLogs } from "./evaluable";
-import { tup, concatScan } from "../utils";
+import { tup, concatScan, logVal, log } from "../utils";
 import { Era, Ripple, Slice } from "./eraSlicer";
 
 

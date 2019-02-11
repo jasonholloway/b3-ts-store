@@ -1,8 +1,8 @@
-import { Subject, from, Observable, zip, BehaviorSubject, of } from "rxjs";
-import { Dict, tup, propsToArray, log, logComplete } from "../lib/utils";
-import { map, concatMap, groupBy, toArray, tap, startWith } from "rxjs/operators";
+import { Subject, from, Observable, of } from "rxjs";
+import { Dict, tup, propsToArray } from "../lib/utils";
+import { map, concatMap, groupBy, toArray, startWith } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
-import { Manifest, setThreshold, Signal, refreshEra, emptyManifest, DoReset } from "../lib/core/signals";
+import { setThreshold, Signal, emptyManifest } from "../lib/core/signals";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
@@ -48,7 +48,7 @@ describe('evaluator', () => {
 
     describe('logRefs', () => {
         it('advertises known log refs', async () => {
-            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
+            emit({ myLog: [1, 2], myLog2: [ 9 ] });
         
             await expectLogRefs([
                 ['myLog', 'myLog2']
@@ -56,7 +56,7 @@ describe('evaluator', () => {
         })
 
         it('ignores log refs without updates', async () => {
-            ripple({ myLog: [], myLog2: [ 9 ] });
+            emit({ myLog: [], myLog2: [ 9 ] });
         
             await expectLogRefs([
                 ['myLog2']
@@ -64,9 +64,11 @@ describe('evaluator', () => {
         })
 
         it('includes logRefs of eras within threshold', async () => {
-            ripple({ myLog: [1] });
+            emit({ myLog: [1] });
+            await pause();
             epoch$.next({ manifest: emptyManifest });
-            ripple({ myLog2: [1] });
+            await pause();
+            emit({ myLog2: [1] });
 
             await expectLogRefs([
                 ['myLog'],
@@ -75,9 +77,9 @@ describe('evaluator', () => {
         })
 
         it('excludes logRefs of eras before threshold', async () => {
-            ripple({ myLog: [1] });
+            emit({ myLog: [1] });
             signal$.next(setThreshold(1));
-            ripple({ myLog2: [1] });
+            emit({ myLog2: [1] });
 
             await expectLogRefs([
                 ['myLog'],
@@ -86,9 +88,9 @@ describe('evaluator', () => {
         })
 
         it('dedupes logRefs', async () => {
-            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
-            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
-            ripple({ myLog: [1, 2], myLog2: [ 9 ] });
+            emit({ myLog: [1, 2], myLog2: [ 9 ] });
+            emit({ myLog: [1, 2], myLog2: [ 9 ] });
+            emit({ myLog: [1, 2], myLog2: [ 9 ] });
         
             await expectLogRefs([
                 ['myLog', 'myLog2']
@@ -110,7 +112,7 @@ describe('evaluator', () => {
         it('single slice', async () => {
             const viewing = view('myLog');
 
-            ripple({ myLog: [1, 2] });
+            emit({ myLog: [1, 2] });
 
             await pause();
             complete();
@@ -122,8 +124,8 @@ describe('evaluator', () => {
         it('multiple slices', async () => {
             const viewing = view('myLog');
 
-            ripple({ myLog: [1, 2] });
-            ripple({ myLog: [3, 4] });
+            emit({ myLog: [1, 2] });
+            emit({ myLog: [3, 4] });
             complete();
     
             expect(await viewing)
@@ -131,12 +133,12 @@ describe('evaluator', () => {
         })
 
         it('only emits from latest slice on', async () => {
-            ripple({ myLog: [1] });
-            ripple({ myLog: [2] });
+            emit({ myLog: [1] });
+            emit({ myLog: [2] });
 
             const viewing = view('myLog');
 
-            ripple({ myLog: [3] });
+            emit({ myLog: [3] });
             complete();
 
             expect(await viewing)
@@ -148,8 +150,8 @@ describe('evaluator', () => {
         it('ignores before threshold', async () => {
             const viewing = view('myLog');
 
-            ripple({ myLog: [1, 2] });
-            ripple({ myLog: [3, 4] });
+            emit({ myLog: [1, 2] });
+            emit({ myLog: [3, 4] });
             signal$.next(setThreshold(1));
             complete();
 
@@ -165,7 +167,7 @@ describe('evaluator', () => {
         it('loads blocks first, given manifest', async () => {
             const viewing = view('myLog');
 
-            ripple({ myLog: [ 5, 6 ] });
+            emit({ myLog: [ 5, 6 ] });
 
             blockStore.blocks = {
                 block0: { myLog: [ 1, 2 ] },
@@ -197,7 +199,7 @@ describe('evaluator', () => {
     describe('when strange log encountered', () => {
 
         it('not listed in logRefs', async () => {
-            ripple({ flibble: [1] });
+            emit({ flibble: [1] });
 
             await expectLogRefs([
                 []
@@ -215,7 +217,7 @@ describe('evaluator', () => {
     }
 
 
-    function ripple(rip: Dict<number[]>) {
+    function emit(rip: Dict<number[]>) {
         const ripple = from(propsToArray(rip)).pipe(
                             concatMap(([k, r]) => from(r).pipe(
                                                     map(v => tup(k, v)))),

@@ -1,16 +1,16 @@
 import { Model, KnownLogs, KnownAggr } from "./evaluable";
 import { BlockStore } from "../bits";
-import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil, tap } from "rxjs/operators";
-import { doReset } from "./signals";
+import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil, defaultIfEmpty } from "rxjs/operators";
+import { doReset, emptyManifest } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { committer, DoCommit, Commit, Committed } from "./committer";
 import { Observable, Subject, merge, timer, of } from "rxjs";
 import { pullManifests } from "./pullManifests";
 import { createViewer } from "./viewer";
-import { demux as demux, skipAll, pipeTo, logVal } from "../utils";
+import { demux as demux, pipeTo } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
-import { eraSlicer, Ripple, Epoch, pullAll } from "./eraSlicer";
+import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
 import { ManifestStore } from "./ManifestStore";
 
 
@@ -38,13 +38,14 @@ export const createCore =
     error$.subscribe(err => console.error(err));
 
     const epoch$ = merge<Epoch>(
-                    merge(timer(0, 10000), gazumped$).pipe(                        
+                    merge(timer(0, 10000), gazumped$).pipe(
                         takeUntil(close$),
                         pullManifests(manifestStore),
+                        defaultIfEmpty(emptyManifest),
                         map(manifest => ({ manifest }))),
                     committed$.pipe(
                         takeUntil(close$)));
-                            
+
     const evalEpoch$ = epoch$.pipe(
                         concatMap(epoch => 
                             of(epoch.manifest).pipe(
@@ -52,7 +53,7 @@ export const createCore =
                                 evaluateBlocks(model),
                                 map(evaluable => ({ ...epoch, ...evaluable }))
                             )));
-                        
+
     const reset$ = doReset$.pipe(mapTo(doReset()));
 
     const era$ = evalEpoch$.pipe(
@@ -61,7 +62,7 @@ export const createCore =
                     shareReplay(1));
 
     const commit$ = doCommit$.pipe(
-                    committer(era$, blockStore, manifestStore),
+                    committer(era$, blockStore, manifestStore), //REMEMBER!!! gotta put pushing within exhaust TODO
                     shareReplay(1));
 
     commit$.pipe(

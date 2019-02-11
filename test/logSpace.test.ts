@@ -26,28 +26,28 @@ describe('logSpace', () => {
     let error$: Observable<Error>
     let commit$: Observable<Commit>
 
-    beforeEach(() => {
+    beforeEach(async () => {
         blockStore = new FakeBlockStore();
         manifestStore = new FakeManifestStore();
 
         space = createLogSpace(model, manifestStore, blockStore);
         log = getLog();
-
+        
         error$ = space.error$.pipe(pullAll());
         commit$ = space.commit$.pipe(pullAll());
     })
-
+    
     afterEach(complete);
-
+    
     it('logs aggregates staged updates into view', async () => {
         log.stage(addUp('1'));
         log.stage(addUp('2'));
         log.stage(addUp('3'));
-
+        
         expect(await view(log))
             .toBe('1:2:3');
     })
-
+    
     it('using same log key gets same log', async () => {
         const log1 = getLog('hello');
         log1.stage(addUp('123'));

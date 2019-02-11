@@ -8,7 +8,7 @@ export const createViewer =
     (era$: Observable<EvaluableEra<M>>) : Viewer<M> => {
         era$ = era$.pipe(shareReplay(1));
         era$.subscribe();
-
+        
         return (ref: KnownLogs<M>) =>
             era$.pipe(
                 concatMap(({ evaluate }) => evaluate(ref)));
