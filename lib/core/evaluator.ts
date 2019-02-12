@@ -1,7 +1,7 @@
 import { pipe, OperatorFunction, empty, of } from "rxjs";
 import { scan, concatMap, map, filter, defaultIfEmpty, startWith, single, distinct, takeLast, withLatestFrom } from "rxjs/operators";
 import { Evaluable, Model, KnownLogs } from "./evaluable";
-import { tup, concatScan } from "../utils";
+import { tup, concatScan, logVal } from "../utils";
 import { Era, Ripple, Slice, emptyEra } from "./eraSlicer";
 
 
@@ -23,7 +23,7 @@ export const evaluator =
 
                     evaluate(ref) {
                         const m = model.logs[ref];
-                        
+
                         const blockView$ = era.blocks.evaluate(ref)         //if we could look at previous era here, we could check to see if we have to refetch...
                                                 .pipe(single());
 
@@ -46,6 +46,7 @@ export const evaluator =
                                             startWith(era.from - 1));
 
                         return oldView$.pipe(
+                                logVal('oldView'),
                                 concatMap(oldView =>
                                     era.currSlice$.pipe(
                                         startWith(tup(era.from - 1, empty())),

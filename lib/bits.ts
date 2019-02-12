@@ -1,4 +1,3 @@
-import { Manifest } from "./core/signals";
 import { Observable } from "rxjs";
 
 export function declareLogModel<U extends AnyUpdate, D>(m: Model<U, D>): Model<U, D> {
@@ -14,19 +13,13 @@ export type Model<U, D> = {
 export interface Log<U extends AnyUpdate, V> {
     key: string,
     stage(update: U): void;
-    view(): Promise<V>;
+    view(): Observable<V>;
 }
 
 
 export type Block = {
     [keys: string]: any[]
 }
-
-export interface BlockStore {
-    load(key: string): Promise<Block>;
-    save(key: string, block: Block): Promise<void>;
-}
-
 
 
 export type Update<T extends string, V> = [number, T, V]

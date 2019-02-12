@@ -1,6 +1,6 @@
 import { Observable, empty, OperatorFunction, pipe, of, MonoTypeOperatorFunction, concat, forkJoin } from "rxjs";
 import { filter, shareReplay, map, concatMap, share, defaultIfEmpty, merge, takeLast, toArray } from "rxjs/operators";
-import { tup, concatScan } from "../utils";
+import { tup, concatScan, logVal } from "../utils";
 import { Manifest, emptyManifest, Signal, NewEpoch } from "./signals";
 import { Evaluable, emptyEvaluable } from "./evaluable";
 import { Windower, createWindower } from "./windower";
@@ -22,9 +22,14 @@ export interface Slice<V = any> extends Tuple2<SliceId, Ripple<V>> {}
 
 export type Slice$<V> = Observable<Slice<V>>
 
+export type Epoch = { 
+    manifest: Manifest, 
+    commit?: Commit 
+}
+
 export interface Era<V = any> {
     id: number,
-    manifest: Manifest,
+    epoch: Epoch,
     blocks: Evaluable<any>,
     thresh: number
     from: number,
@@ -38,20 +43,22 @@ interface Spec {
     thresh$: Observable<number>
 }
 
+export const emptyEpoch: Epoch = {
+    manifest: emptyManifest
+}
 
 export const emptyEra: Era = {
     id: -1,
+    epoch: emptyEpoch,
     thresh: 0,
     from: 0,
     oldSlice$: empty(),
     currSlice$: empty(),
     slices: empty(),
-    manifest: emptyManifest,
     blocks: emptyEvaluable,
 }
 
 
-export type Epoch = { manifest: Manifest, commit?: Commit }
 
 
 //reset sends a signal into scan
@@ -116,11 +123,9 @@ function handleSignals(signal: Signal): MonoTypeOperatorFunction<[Era, Spec, Era
                     {   ...prev }, 
                     {   ...spec, 
                         thresh$: epoch.commit 
-                                ? of(epoch.commit.range[0] + epoch.commit.range[1])
-                                : of(prev.thresh)   },
-                    {   ...era,
-                        manifest: epoch.manifest,
-                        blocks  });
+                                    ? of(epoch.commit.range[0] + epoch.commit.range[1])
+                                    : of(prev.thresh)   },
+                    {   ...era, epoch, blocks });
             }
             case 'NewManifest': {
                 const manifest = signal[1];

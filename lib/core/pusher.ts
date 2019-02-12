@@ -1,12 +1,12 @@
-import { BlockStore } from "../bits";
 import { OperatorFunction, pipe, of, concat, from } from "rxjs";
 import { Commit, Committed, CommitEvent } from "./committer";
-import { concatMap, map, groupBy, reduce, flatMap, mapTo } from "rxjs/operators";
-import { propsToArray, reduceToDict, tup, demux } from "../utils";
+import { concatMap, map, groupBy, reduce, flatMap, mapTo, catchError, tap } from "rxjs/operators";
+import { propsToArray, reduceToDict, tup, demux, packet } from "../utils";
 import { Manifest } from "./signals";
 import uuid from 'uuid/v1'
 import { ManifestStore } from "./ManifestStore";
 import { pullAll } from "./eraSlicer";
+import { BlockStore } from "./BlockStore";
 
 export const pusher =
     (blockStore: BlockStore, manifestStore: ManifestStore) : OperatorFunction<Commit, Commit> =>
@@ -15,13 +15,13 @@ export const pusher =
             ...commit,
             event$: 
                 of(commit.data).pipe(
-                    concatMap(async data => {
+                    concatMap(data => {
                         const ref = uuid();
-                        await blockStore.save(ref, data);   //but what if blockstore has an event to emit?
-                        return tup(ref, data);
+                        return blockStore.save(ref, data).pipe(         //but what if blockstore has an event to emit?
+                                demux('Saved', mapTo(tup(ref, data))));
                     }),
                     concatMap(([blockRef, blockData]) => {
-                        const oldLogBlock$ = from(propsToArray(commit.era.manifest.logBlocks));
+                        const oldLogBlock$ = from(propsToArray(commit.era.epoch.manifest.logBlocks));
 
                         const newLogBlock$ = from(propsToArray(blockData))
                                                 .pipe(map(([k]) => tup(k, [blockRef])));
@@ -36,8 +36,8 @@ export const pusher =
 
                         return merged$.pipe(
                                 map(logBlocks => ({
-                                    ...commit.era.manifest,
-                                    version: commit.era.manifest.version + 1,
+                                    ...commit.era.epoch.manifest,
+                                    version: commit.era.epoch.manifest.version + 1,
                                     logBlocks: logBlocks
                                 })));
                     }),
@@ -45,6 +45,7 @@ export const pusher =
                         manifestStore.save(manifest).pipe(
                             demux('Gazumped', mapTo(gazumped())),
                             demux('Saved', mapTo(committed({ manifest, commit }))))),
+                    catchError(err => of(packet('Error', err))),
                     pullAll())
         })));
 

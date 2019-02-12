@@ -1,4 +1,7 @@
-import { BlockStore, Block } from "../../lib/bits";
+import { Block } from "../../lib/bits";
+import { Observable, of, throwError, from } from "rxjs";
+import { BlockStore } from "../../lib/core/BlockStore";
+import { packet } from "../../lib/utils";
 
 class FakeBlockStore implements BlockStore {
 
@@ -6,29 +9,34 @@ class FakeBlockStore implements BlockStore {
     errorsOnPersist = false;
     manualResponse = false;
 
-    async load(key: string): Promise<Block> {
-        if(!this.blocks[key]) throw Error('Block not found!');
-        return this.blocks[key];
+    load(key: string): Observable<BlockStore.LoadResponse> {
+        const block = this.blocks[key];
+        return block ? of(packet('Loaded', block)) : throwError('Block not found!');
     }
 
-    async save(key: string, block: Block): Promise<void> {
-        if(this.errorsOnPersist) throw Error('Failed to store block (as planned!)');
+    save(key: string, block: Block): Observable<BlockStore.SaveResponse> {
+        if(this.errorsOnPersist) {
+            return throwError(Error('Failed to store block (as planned!)'));
+        }
 
-        if(this.blocks[key]) throw Error('Blocks are immutable!');
+        if(this.blocks[key]) {
+            return throwError(Error('AlreadyExists'));
+        }
+
         this.blocks[key] = block;
 
         if(this.manualResponse) {
-            return new Promise<void>((resolve, reject) => {
-                this.resolve = resolve;
-            })
+            return from(new Promise<BlockStore.SaveResponse>((resolve) => {
+                this.resolve = (res: BlockStore.SaveResponse) => resolve(res);
+            }))
         }
     }
 
 
-    private resolve = () => {};
+    private resolve: (res: BlockStore.SaveResponse) => void = () => {};
 
-    respond() {
-        this.resolve();
+    respond(response: BlockStore.SaveResponse = ['Saved', {}]) {
+        this.resolve(response);
     }
 }
 

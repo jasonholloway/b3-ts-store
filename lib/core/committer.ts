@@ -1,13 +1,13 @@
 import { Model } from "./evaluable";
 import { Observable, OperatorFunction, concat, empty, pipe, merge } from "rxjs";
-import { share, withLatestFrom, concatMap, map, toArray, groupBy, concatAll, flatMap, filter, exhaustMap, startWith, takeWhile } from "rxjs/operators";
-import { reduceToDict, tup, Dict, propsToArray, scanToArray, skipAll } from "../utils";
+import { share, withLatestFrom, concatMap, map, toArray, groupBy, concatAll, flatMap, filter, exhaustMap, startWith, takeWhile, takeUntil } from "rxjs/operators";
+import { reduceToDict, tup, Dict, propsToArray, scanToArray, skipAll, log, logVal } from "../utils";
 import { EvaluableEra } from "./evaluator";
 import { Era, Slice } from "./eraSlicer";
 import { Manifest } from "./signals";
 import { pusher } from "./pusher";
-import { BlockStore } from "../bits";
 import { ManifestStore } from "./ManifestStore";
+import { BlockStore } from "./BlockStore";
 
 export interface DoCommit {
     id: string
@@ -19,7 +19,7 @@ export type Committed = {
 }
 
 
-export type CommitEvent = ['Error', Error] | ['Committed', Committed] | ['Gazumped', {}]
+export type CommitEvent = ['Error', any] | ['Committed', Committed] | ['Gazumped', {}]
 
 export interface Commit {
     id: string,
@@ -77,7 +77,8 @@ export const committer =
             exhaustMap(([{id}, {era, slice$}]) =>
                 merge(
                     era$.pipe(                                                      //will complete when our commit has made it into era - opening up more commits!
-                        takeWhile(era => era.manifest.version != 9),
+                        map(e => e.epoch.commit),                        
+                        takeWhile(cm => !cm || cm.id !== id),
                         skipAll()),
                     slice$.pipe(
                         concatMap(([, part$]) => part$),

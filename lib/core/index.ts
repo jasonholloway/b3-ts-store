@@ -1,17 +1,17 @@
 import { Model, KnownLogs, KnownAggr } from "./evaluable";
-import { BlockStore } from "../bits";
-import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil, defaultIfEmpty } from "rxjs/operators";
+import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil } from "rxjs/operators";
 import { doReset, emptyManifest } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { committer, DoCommit, Commit, Committed } from "./committer";
-import { Observable, Subject, merge, timer, of, empty } from "rxjs";
+import { Observable, Subject, merge, of } from "rxjs";
 import { pullManifests } from "./pullManifests";
 import { createViewer } from "./viewer";
-import { demux as demux, pipeTo, logVal, log } from "../utils";
+import { demux as demux, pipeTo, logVal } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
 import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
 import { ManifestStore } from "./ManifestStore";
+import { BlockStore } from "./BlockStore";
 
 
 export interface Core<M extends Model> {
@@ -24,26 +24,27 @@ export interface Core<M extends Model> {
 export const createCore =
     <M extends Model>
     (model: M, blockStore: BlockStore, manifestStore: ManifestStore) =>
-    (ripple$: Observable<Ripple<any>>, doReset$: Observable<void>, doCommit$: Observable<DoCommit>) : Core<M> => {
+    (ripple$: Observable<Ripple<any>>, doPull$: Observable<any>, doReset$: Observable<void>, doCommit$: Observable<DoCommit>) : Core<M> => {
 
     const close$ = new Subject();
-    const committed$ = new Subject<Committed>();
+    const pushed$ = new Subject<Committed>();
     const gazumped$ = new Subject<{}>();
     const error$ = new Subject<Error>();
 
-    doReset$ = completeOnClose(doReset$);
     ripple$ = completeOnClose(ripple$);
+    doPull$ = completeOnClose(doPull$);
+    doReset$ = completeOnClose(doReset$);
     doCommit$ = completeOnClose(doCommit$);
     
-    error$.subscribe(err => console.error(err));
+//    error$.subscribe(err => console.error(err));
 
     const epoch$ = merge<Epoch>(
                     of({ manifest: emptyManifest }),
-                    merge(timer(0, 10000), gazumped$).pipe(
+                    merge(doPull$, gazumped$).pipe(
                         takeUntil(close$),
                         pullManifests(manifestStore),
                         map(manifest => ({ manifest }))),
-                    committed$.pipe(
+                    pushed$.pipe(
                         takeUntil(close$)));
 
     const evalEpoch$ = epoch$.pipe(
@@ -67,7 +68,7 @@ export const createCore =
 
     commit$.pipe(
         flatMap(c => c.event$),
-        demux('Committed', pipeTo(committed$)),
+        demux('Committed', pipeTo(pushed$)),
         demux('Gazumped', pipeTo(gazumped$)),
         demux('Error', pipeTo(error$)));
 

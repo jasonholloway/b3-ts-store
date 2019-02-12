@@ -10,6 +10,7 @@ import { Commit } from "../lib/core/committer";
 import { pullAll } from "../lib/core/eraSlicer";
 import { first, timeout } from "rxjs/operators";
 import { gather } from "./helpers";
+import { inspect } from "util";
 
 jest.setTimeout(400);
 
@@ -79,16 +80,20 @@ describe('logSpace', () => {
             })
 
             it('aggregated data stays same', async () => {
-                log.stage(addUp('5'));
-                log.stage(addUp('5'));
-                expect(await view(log)).toBe('5:5');
+                log.stage(addUp('1'));
+                log.stage(addUp('2'));
+                expect(await view(log)).toBe('1:2');
 
                 const committing = space.commit();
-                expect(await view(log)).toBe('5:5');
+                expect(await view(log)).toBe('1:2');
 
                 blockStore.respond();
-                await committing;
-                expect(await view(log)).toBe('5:5');
+                await committing.toPromise();
+
+                console.log(inspect(blockStore.blocks, true, 5));
+                console.log(manifestStore.manifest.logBlocks);
+
+                expect(await view(log)).toBe('1:2');
             })
         })
 
@@ -152,11 +157,14 @@ describe('logSpace', () => {
 
                 log.stage(addUp('2'));
                 space.commit();
+                await pause();
             })
 
             it('full view summoned', async () => {
                 const space2 = createLogSpace(model, manifestStore, blockStore);
                 const log2 = space2.getLog(log.ref);
+
+                console.log(blockStore.blocks);
 
                 console.log(manifestStore.manifest)
                 

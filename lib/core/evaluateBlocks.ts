@@ -1,7 +1,8 @@
 import { Model, Evaluable, KnownLogs, KnownAggr } from "./evaluable";
 import { OperatorFunction, pipe, empty, from, Observable } from "rxjs";
 import { BlockFrame } from "./pullBlocks";
-import { map, concatMap, scan, takeLast, startWith } from "rxjs/operators";
+import { map, concatMap, scan, takeLast, startWith, tap } from "rxjs/operators";
+import { logVal, log } from "../utils";
 
 export const evaluateBlocks = 
     <M extends Model>(model: M) : OperatorFunction<BlockFrame, Evaluable<M>> =>

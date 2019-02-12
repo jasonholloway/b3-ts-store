@@ -23,6 +23,7 @@ describe('core', () => {
     let blockStore: FakeBlockStore
 
     let ripple$: Subject<Ripple<number>>
+    let doPull$: Subject<void>
     let doReset$: Subject<void>
     let doCommit$: Subject<DoCommit>
 
@@ -46,10 +47,11 @@ describe('core', () => {
         setupStores();
 
         ripple$ = new Subject<Ripple<number>>();
+        doPull$ = new Subject<void>();
         doReset$ = new Subject<void>();
         doCommit$ = new Subject<DoCommit>();
 
-        core = createCore(model, blockStore, manifestStore)(ripple$, doReset$, doCommit$);
+        core = createCore(model, blockStore, manifestStore)(ripple$, doPull$, doReset$, doCommit$);
 
         era$ = core.era$.pipe(pullAll());
         commit$ = core.commit$.pipe(pullAllCommits());
@@ -68,6 +70,7 @@ describe('core', () => {
         })
 
         it('serves views of existing blocks', async () => {
+            doPull();
             complete();
             const r = await gather(core.view('myLog2'));
             expect(r).toEqual([ '4,5,6' ]);
@@ -87,6 +90,7 @@ describe('core', () => {
         })
 
         it('reemits base view', async () => {
+            doPull();
             emit({ myLog2: [ 7, 8, 9 ] });
             doReset();
             complete();
@@ -100,6 +104,7 @@ describe('core', () => {
 
     describe('on commit', () => {
         beforeEach(async () => {
+            doPull();
             emit({ myLog: [ 1, 2, 3 ] });
             doCommit();
 
@@ -123,12 +128,12 @@ describe('core', () => {
 
             it('triggered', async () => {
                 const eraIds = await gather(era$.pipe(pluck('id')));
-                expect(eraIds).toEqual([ 0, 1 ]);
+                expect(eraIds).toEqual([ 0, 1, 2 ]);
             })
 
             it('has shifted thresh', async () => {
                 const thresholds = await gather(era$.pipe(pluck('thresh')));
-                expect(thresholds).toEqual([ 0, 1 ]);
+                expect(thresholds).toEqual([ 0, 0, 1 ]);
             })
 
             xit('has commit info', async () => {
@@ -150,9 +155,9 @@ describe('core', () => {
             complete();
         })
 
-        it('pulls in latest manifest from store', async () => {
+        it('starts with default empty manifest', async () => {
             expect(await getManifestVersions())
-                .toEqual([ 10 ]);
+                .toEqual([ 0 ]);
         })
     })
 
@@ -209,7 +214,7 @@ describe('core', () => {
 
     function getManifestVersions() {
         return gather(era$.pipe(
-                map(({ manifest: { version }}) => version)));
+                map(({ epoch: { manifest: { version }}}) => version)));
     }
 
     function pullAllCommits() : MonoTypeOperatorFunction<Commit> {
@@ -233,6 +238,10 @@ describe('core', () => {
                         map(g => tup(g.key, g)));
 
         ripple$.next(ripple);
+    }
+
+    function doPull() {
+        doPull$.next();
     }
 
     function doCommit() {

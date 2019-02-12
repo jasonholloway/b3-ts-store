@@ -1,6 +1,5 @@
-import { BlockStore } from "./bits";
-import { Subject, Observable, empty, of } from "rxjs";
-import { tup, demux, extract, log, logVal } from "./utils";
+import { Subject, Observable, empty, of, interval, concat } from "rxjs";
+import { tup, extract } from "./utils";
 import { Model, KnownLogs, KnownAggr } from "./core/evaluable";
 import { createCore } from "./core";
 import { DoCommit, Commit } from "./core/committer";
@@ -8,6 +7,7 @@ import { Ripple, pullAll } from "./core/eraSlicer";
 import uuid from 'uuid';
 import { concatMap, timeout, first } from "rxjs/operators";
 import { ManifestStore } from "./core/ManifestStore";
+import { BlockStore } from "./core/BlockStore";
 
 export interface LogSpace<M extends Model> {
     getLog<K extends KnownLogs<M>, V extends KnownAggr<M, K>>(key: K): Log<M, K, V>,
@@ -34,7 +34,9 @@ export function createLogSpace<M extends Model>(model: M, manifests: ManifestSto
     const doReset$ = new Subject<void>();
     const doCommit$ = new Subject<DoCommit>();
 
-    const core = createCore(model, blocks, manifests)(ripple$, doReset$, doCommit$);
+    const doPull$ = concat(of(0), interval(10000));
+
+    const core = createCore(model, blocks, manifests)(ripple$, doPull$, doReset$, doCommit$);
 
     return {
         getLog<K extends KnownLogs<M>, V extends KnownAggr<M, K>>(ref: K): Log<M, K, V> {
