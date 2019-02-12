@@ -1,4 +1,4 @@
-import { Subject, from, pipe, Observable, MonoTypeOperatorFunction } from "rxjs";
+import { Subject, from, pipe, Observable, MonoTypeOperatorFunction, empty } from "rxjs";
 import { Dict, propsToArray, tup, valsToArray as valsToArray, extract } from "../lib/utils";
 import { map, concatMap, groupBy, pluck } from "rxjs/operators";
 import { TestModel } from "./fakes/testModel";
@@ -83,7 +83,7 @@ describe('core', () => {
             complete();
 
             const eras = await gather(era$);
-            expect(eras).toMatchObject([ { id: 0 }, { id: 1 } ]);
+            expect(eras.map(e => e.id)).toEqual([ 0, 1 ]);
         })
 
         it('reemits base view', async () => {

@@ -1,8 +1,8 @@
 import { pipe, OperatorFunction, empty, of } from "rxjs";
-import { scan, concatMap, map, filter, defaultIfEmpty, startWith, single, distinct, takeLast, withLatestFrom, tap } from "rxjs/operators";
+import { scan, concatMap, map, filter, defaultIfEmpty, startWith, single, distinct, takeLast, withLatestFrom } from "rxjs/operators";
 import { Evaluable, Model, KnownLogs } from "./evaluable";
-import { tup, concatScan, logVal, log } from "../utils";
-import { Era, Ripple, Slice } from "./eraSlicer";
+import { tup, concatScan } from "../utils";
+import { Era, Ripple, Slice, emptyEra } from "./eraSlicer";
 
 
 export interface EvaluableEra<M extends Model> 
@@ -42,7 +42,7 @@ export const evaluator =
                                                     takeLast(1))));
                         
                         const sliceId$ = era.currSlice$.pipe(
-                                            map(([sliceId]) => sliceId),
+                                            map(([sliceId]) => sliceId),                                            
                                             startWith(era.from - 1));
 
                         return oldView$.pipe(

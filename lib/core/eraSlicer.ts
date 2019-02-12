@@ -1,6 +1,6 @@
 import { Observable, empty, OperatorFunction, pipe, of, MonoTypeOperatorFunction, concat, forkJoin } from "rxjs";
-import { filter, shareReplay, map, concatMap, share, defaultIfEmpty, merge, takeLast, toArray, tap } from "rxjs/operators";
-import { tup, concatScan, logVal, log } from "../utils";
+import { filter, shareReplay, map, concatMap, share, defaultIfEmpty, merge, takeLast, toArray } from "rxjs/operators";
+import { tup, concatScan } from "../utils";
 import { Manifest, emptyManifest, Signal, NewEpoch } from "./signals";
 import { Evaluable, emptyEvaluable } from "./evaluable";
 import { Windower, createWindower } from "./windower";
@@ -39,7 +39,7 @@ interface Spec {
 }
 
 
-const emptyEra: Era = {
+export const emptyEra: Era = {
     id: -1,
     thresh: 0,
     from: 0,

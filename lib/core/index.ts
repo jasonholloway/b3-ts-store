@@ -4,10 +4,10 @@ import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil, defaultIfEmpty 
 import { doReset, emptyManifest } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
 import { committer, DoCommit, Commit, Committed } from "./committer";
-import { Observable, Subject, merge, timer, of } from "rxjs";
+import { Observable, Subject, merge, timer, of, empty } from "rxjs";
 import { pullManifests } from "./pullManifests";
 import { createViewer } from "./viewer";
-import { demux as demux, pipeTo } from "../utils";
+import { demux as demux, pipeTo, logVal, log } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
 import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
@@ -38,10 +38,10 @@ export const createCore =
     error$.subscribe(err => console.error(err));
 
     const epoch$ = merge<Epoch>(
+                    of({ manifest: emptyManifest }),
                     merge(timer(0, 10000), gazumped$).pipe(
                         takeUntil(close$),
                         pullManifests(manifestStore),
-                        defaultIfEmpty(emptyManifest),
                         map(manifest => ({ manifest }))),
                     committed$.pipe(
                         takeUntil(close$)));

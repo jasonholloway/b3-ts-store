@@ -202,9 +202,14 @@ type PickPacket<M extends [string, any], K extends GetNames<M>> =
     M extends [K, infer A] ? [K, A] : never
 
 
+export const mux =
+    <K extends string, V>
+    (key: K): OperatorFunction<V, [K, V]> =>
+    map(v => tup(key, v));
+
 export const demux =
     <M, K extends GetNames<M> & string, B>
-    (key: K, operator: OperatorFunction<GetValues<M, K>, B> = undefined): OperatorFunction<M, ExcludePacket<M, K> | B> =>
+    (key: K, operator: OperatorFunction<GetValues<M, K>, B>): OperatorFunction<M, ExcludePacket<M, K> | B> =>
     m$ => {
         const [match$, other$] = partition(m => m[0] == key)(m$) as [Observable<[K, GetValues<M, K>]>, Observable<ExcludePacket<M, K>>];
         return merge(

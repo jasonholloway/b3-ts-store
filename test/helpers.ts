@@ -1,10 +1,10 @@
-import { toArray, last, timeout, defaultIfEmpty } from "rxjs/operators";
+import { toArray, last, timeout } from "rxjs/operators";
 import { Observable } from "rxjs";
 
 export function gather<V>(v$: Observable<V>) {
-    return v$.pipe(        
+    return v$.pipe(
         toArray(),
-        timeout(500)
+        timeout(500),
     ).toPromise();
 }
 

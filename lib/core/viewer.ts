@@ -1,13 +1,13 @@
 import { Model, KnownLogs, KnownAggr } from "./evaluable";
 import { Observable } from "rxjs";
-import { shareReplay, concatMap } from "rxjs/operators";
+import { concatMap } from "rxjs/operators";
 import { EvaluableEra } from "./evaluator";
+import { pullReplay } from "./eraSlicer";
 
 export const createViewer =
     <M extends Model>
     (era$: Observable<EvaluableEra<M>>) : Viewer<M> => {
-        era$ = era$.pipe(shareReplay(1));
-        era$.subscribe();
+        era$ = era$.pipe(pullReplay(1));
         
         return (ref: KnownLogs<M>) =>
             era$.pipe(
