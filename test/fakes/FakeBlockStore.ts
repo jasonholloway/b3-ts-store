@@ -11,7 +11,7 @@ class FakeBlockStore implements BlockStore {
 
     load(key: string): Observable<BlockStore.LoadResponse> {
         const block = this.blocks[key];
-        return block ? of(packet('Loaded', block)) : throwError('Block not found!');
+        return block ? of(packet('Loaded', block)) : throwError(Error('Block not found!'));
     }
 
     save(key: string, block: Block): Observable<BlockStore.SaveResponse> {
@@ -30,6 +30,8 @@ class FakeBlockStore implements BlockStore {
                 this.resolve = (res: BlockStore.SaveResponse) => resolve(res);
             }))
         }
+
+        return of(packet('Saved', {}));
     }
 
 

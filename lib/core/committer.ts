@@ -1,6 +1,6 @@
 import { Model } from "./evaluable";
 import { Observable, OperatorFunction, concat, empty, pipe, merge } from "rxjs";
-import { share, withLatestFrom, concatMap, map, toArray, groupBy, concatAll, flatMap, filter, exhaustMap, startWith, takeWhile, takeUntil } from "rxjs/operators";
+import { share, withLatestFrom, concatMap, map, toArray, groupBy, concatAll, flatMap, filter, exhaustMap, startWith, takeWhile, takeUntil, zip, count } from "rxjs/operators";
 import { reduceToDict, tup, Dict, propsToArray, scanToArray, skipAll, log, logVal } from "../utils";
 import { EvaluableEra } from "./evaluator";
 import { Era, Slice } from "./eraSlicer";
@@ -89,10 +89,12 @@ export const committer =
                                         map(r => tup(g$.key, r)))),
                         reduceToDict(),
                         filter(data => propsToArray(data).length > 0),      //if the slices are empty, then this will get trapped!!!
-                        map(data => ({                                      //will end up waiting for confirmation that never comes,
+                        
+                        zip(slice$.pipe(count())),                        
+                        map(([data, sliceCount]) => ({                                      //will end up waiting for confirmation that never comes,
                             id,                                             //as commit nevermade (rightfully)
                             data,
-                            range: tup(era.thresh, 1),
+                            range: tup(era.thresh, sliceCount),
                             era,
                             event$: empty()
                         })),                        

@@ -1,0 +1,52 @@
+
+to not restate views on era changes,
+the viewer would have to itself debounce
+as each era serves itself in full - how can an era know it doesn't have to emit anything new in the context of consumption?
+it's not party to that
+
+so...
+the viewer will be able to debounce, but only if it somehow knows the version of the view:
+if the version is the same as last time, then emit the view...
+
+the version of a view is the version of the underlying data
+the viewer itself only receives the version from the data it tracks, or rather - from the evaluator it interacts with
+
+the underlying data is arranged in slices, and, upstream of this, in blocks
+
+what this leads tois the idea of committing log heads to the manifest along with blocks
+
+as new blocks are added to the manifest's logBlocks, the logHead is also incremented, to equal in the first place the number of updates going into the log (though it could be any incrementing number if all it does is invalidate caches)
+
+logVersions, basically
+
+each commit must update logVersions in the uploaded manifest
+
+these logVersions will then be communicated through to evaluators,
+and then on to views
+
+views will come with [logVersion, sliceVersion]
+these will be simply compared by the viewer
+
+------------------------------------------------
+
+the evaluator will piece together these bits of info
+
+currently each era is evaluated, which allows per-log stuff to be fetched per-era, which allows savings
+
+but a large part of what makes up a log is its per-epoch data
+
+it's like the evaluator should track a stream of epochs, with a stream of eras within it
+more data would be made more available, in its natural structure
+
+-----------------------------------------------
+
+
+
+
+
+
+
+
+
+
+

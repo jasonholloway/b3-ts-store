@@ -10,8 +10,8 @@ import { pullBlocks } from "../lib/core/pullBlocks";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator } from "../lib/core/evaluator";
 import { gather } from "./helpers";
-import { Manifest, Signal, emptyManifest, newManifest, refreshEra } from "../lib/core/signals";
-import { Ripple, pullAll, eraSlicer } from "../lib/core/eraSlicer";
+import { Manifest, Signal, emptyManifest, refreshEra } from "../lib/core/signals";
+import { Ripple, pullAll, eraSlicer, newEpoch } from "../lib/core/eraSlicer";
 
 type TestRipple = Dict<number[]>
 
@@ -71,7 +71,7 @@ describe('viewer', () => {
             await expectViews('myLog', [ '1,2' ]);
         })
     })
-
+    
     describe('across eras', () => {
 
         xit('doesn\'t reemit if nothing changed', async () => {
@@ -83,7 +83,6 @@ describe('viewer', () => {
 
             emit({ myLog: [ 13 ] });
             signal$.next(refreshEra());
-            signal$.next(newManifest(emptyManifest));
 
             complete();
 

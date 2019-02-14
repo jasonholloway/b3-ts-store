@@ -46,7 +46,6 @@ export const evaluator =
                                             startWith(era.from - 1));
 
                         return oldView$.pipe(
-                                logVal('oldView'),
                                 concatMap(oldView =>
                                     era.currSlice$.pipe(
                                         startWith(tup(era.from - 1, empty())),

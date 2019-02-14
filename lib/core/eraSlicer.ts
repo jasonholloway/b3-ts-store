@@ -68,8 +68,8 @@ export const emptyEra: Era = {
 //signal$ needs to complete before era$
 //
 
-export const newEpoch = (epoch: Epoch, blocks: Evaluable): NewEpoch => 
-    ['Epoch', tup(epoch, blocks)];
+export const newEpoch = (epoch: Epoch, blocks?: Evaluable): NewEpoch => 
+    ['Epoch', tup(epoch, blocks || emptyEvaluable)];
 
 
 export function eraSlicer(signal$: Observable<Signal>, ripple$: Observable<Ripple>) : OperatorFunction<Epoch & Evaluable, Era> {
@@ -124,12 +124,9 @@ function handleSignals(signal: Signal): MonoTypeOperatorFunction<[Era, Spec, Era
                     {   ...spec, 
                         thresh$: epoch.commit 
                                     ? of(epoch.commit.range[0] + epoch.commit.range[1])
-                                    : of(prev.thresh)   },
+                                    : of(prev.thresh)   
+                    },
                     {   ...era, epoch, blocks });
-            }
-            case 'NewManifest': {
-                const manifest = signal[1];
-                return tup(prev, spec, { ...era, manifest });
             }
             case 'SetThreshold': {
                 const thresh = signal[1];

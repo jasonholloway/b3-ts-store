@@ -90,9 +90,6 @@ describe('logSpace', () => {
                 blockStore.respond();
                 await committing.toPromise();
 
-                console.log(inspect(blockStore.blocks, true, 5));
-                console.log(manifestStore.manifest.logBlocks);
-
                 expect(await view(log)).toBe('1:2');
             })
         })
@@ -163,10 +160,6 @@ describe('logSpace', () => {
             it('full view summoned', async () => {
                 const space2 = createLogSpace(model, manifestStore, blockStore);
                 const log2 = space2.getLog(log.ref);
-
-                console.log(blockStore.blocks);
-
-                console.log(manifestStore.manifest)
                 
                 expect(await view(log2))
                     .toEqual('1:2');

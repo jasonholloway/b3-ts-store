@@ -24,9 +24,6 @@ export type Manifest = {
 export const refreshEra = 
     () => ['RefreshEra'] as RefreshEra;
 
-export const newManifest = 
-    (manifest: Manifest) => tup('NewManifest', manifest) as NewManifest;
-
 export const setThreshold =
     (thresh: number) => tup('SetThreshold', thresh) as SetThreshold;
 

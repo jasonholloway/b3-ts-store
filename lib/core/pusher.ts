@@ -1,6 +1,6 @@
 import { OperatorFunction, pipe, of, concat, from } from "rxjs";
 import { Commit, Committed, CommitEvent } from "./committer";
-import { concatMap, map, groupBy, reduce, flatMap, mapTo, catchError, tap } from "rxjs/operators";
+import { concatMap, map, groupBy, reduce, flatMap, mapTo, catchError } from "rxjs/operators";
 import { propsToArray, reduceToDict, tup, demux, packet } from "../utils";
 import { Manifest } from "./signals";
 import uuid from 'uuid/v1'
@@ -17,7 +17,7 @@ export const pusher =
                 of(commit.data).pipe(
                     concatMap(data => {
                         const ref = uuid();
-                        return blockStore.save(ref, data).pipe(         //but what if blockstore has an event to emit?
+                        return blockStore.save(ref, data).pipe(
                                 demux('Saved', mapTo(tup(ref, data))));
                     }),
                     concatMap(([blockRef, blockData]) => {
