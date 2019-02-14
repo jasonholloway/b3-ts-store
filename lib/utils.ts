@@ -1,4 +1,4 @@
-import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter, concatAll, shareReplay, mapTo, defaultIfEmpty, finalize, partition } from 'rxjs/operators';
+import { publish as publishOperator, map, publishReplay, concatMap, tap, reduce, scan, startWith, switchMap, groupBy, buffer, skipWhile, filter, concatAll, shareReplay, mapTo, defaultIfEmpty, finalize, partition, share } from 'rxjs/operators';
 import { Observable, ConnectableObservable, pipe, ObservableInput, from, OperatorFunction, empty, Subject, Subscription, MonoTypeOperatorFunction, GroupedObservable, of, UnaryFunction, merge, iif, Observer } from 'rxjs';
 import { pullAll } from './core/eraSlicer';
 
@@ -210,14 +210,17 @@ export const mux =
 export const demux =
     <M, K extends GetNames<M> & string, B>
     (key: K, operator: OperatorFunction<GetValues<M, K>, B>): OperatorFunction<M, ExcludePacket<M, K> | B> =>
-    m$ => {
-        const [match$, other$] = partition(m => m[0] == key)(m$) as [Observable<[K, GetValues<M, K>]>, Observable<ExcludePacket<M, K>>];
-        return merge(
-                match$.pipe(
-                    map(([, a]) => a),
-                    operator),
-                other$);
-    };
+    pipe(
+        share(),
+        m$ => {
+            const [match$, other$] = partition(m => m[0] == key)(m$) as [Observable<[K, GetValues<M, K>]>, Observable<ExcludePacket<M, K>>];
+            return merge(
+                    match$.pipe(
+                        map(([, a]) => a),
+                        operator),
+                    other$);
+        });
+
 
 export const pipeTo =
     <V>(sink: Observer<V>): OperatorFunction<V, never> =>

@@ -1,6 +1,6 @@
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import FakeManifestStore from "./fakes/FakeManifestStore";
-import { propsToArray } from "../lib/utils";
+import { propsToArray, logComplete } from "../lib/utils";
 import { addUp, TestModel } from "./fakes/testModel";
 import { LogSpace, createLogSpace, Log } from "../lib/LogSpace";
 import { KnownLogs } from "../lib/core/evaluable";
@@ -8,7 +8,7 @@ import { pause } from "./utils";
 import { Observable } from "rxjs";
 import { Commit } from "../lib/core/committer";
 import { pullAll } from "../lib/core/eraSlicer";
-import { first, timeout } from "rxjs/operators";
+import { first, timeout, take } from "rxjs/operators";
 import { gather } from "./helpers";
 import { inspect } from "util";
 
@@ -32,7 +32,7 @@ describe('logSpace', () => {
         manifestStore = new FakeManifestStore();
 
         space = createLogSpace(model, manifestStore, blockStore);
-        log = getLog();
+        log = space.getLog('test');
         
         error$ = space.error$.pipe(pullAll());
         commit$ = space.commit$.pipe(pullAll());
@@ -106,6 +106,63 @@ describe('logSpace', () => {
                 expect(await view(log)).toBe('1:2');
             })
 
+            describe('many competing commits', () => {
+
+                let view$: Observable<string>
+
+                beforeEach(async () => {
+                    view$ = log.view$.pipe(pullAll());
+
+                    log.stage(addUp('1'));
+                    space.commit();
+
+                    log.stage(addUp('2'));
+                    space.commit();
+                    space.commit();
+
+                    await pause();
+                    complete();
+                    await pause();
+                })
+
+                it('local view uses all ripples', async () => 
+                    expect(await gather(view$))
+                        .toEqual(['' , '1', '1:2', '1:2']));
+
+                it('only first commit goes through', () =>
+                    expect(manifestStore.manifest.logBlocks[log.ref].length).toBe(1));
+            })
+
+
+            describe('many competing commits with slow push', () => {
+
+                let view$: Observable<string>
+
+                beforeEach(async () => {
+                    view$ = log.view$.pipe(pullAll());
+
+                    manifestStore.delay = 50;
+
+                    log.stage(addUp('1'));
+                    space.commit();
+
+                    log.stage(addUp('2'));
+                    space.commit();
+                    space.commit();
+
+                    await pause(50);
+                    complete();
+                })
+
+                it('local view uses all ripples', async () => 
+                    expect(await gather(view$))
+                        .toEqual(['' , '1', '1:2', '1:2']));
+
+                it('only first commit goes through', () =>
+                    expect(manifestStore.manifest.logBlocks[log.ref].length).toBe(1));
+            })
+
+
         })
 
 
@@ -124,7 +181,7 @@ describe('logSpace', () => {
                 expect(block[log.ref]).toEqual([ 
                     ['ADD', '4'], 
                     ['ADD', '5'] 
-                ]);           //currently only storing first slice!
+                ]);
             })
 
             it('stores manifest, referring to stored block', () => {
@@ -236,7 +293,7 @@ describe('logSpace', () => {
     function latest<V>(o$: Observable<V>): Promise<V> {
         return o$.pipe(
                 first(), 
-                timeout(100)
+                timeout(100),
             ).toPromise();
     }
 

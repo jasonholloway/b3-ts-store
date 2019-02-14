@@ -5,7 +5,7 @@ import { createCore } from "./core";
 import { DoCommit, Commit } from "./core/committer";
 import { Ripple, pullAll } from "./core/eraSlicer";
 import uuid from 'uuid';
-import { concatMap, timeout, first } from "rxjs/operators";
+import { concatMap, timeout, first, filter, take } from "rxjs/operators";
 import { ManifestStore } from "./core/ManifestStore";
 import { BlockStore } from "./core/BlockStore";
 
@@ -54,7 +54,8 @@ export function createLogSpace<M extends Model>(model: M, manifests: ManifestSto
             const id = uuid();
 
             const commit$ = core.commit$.pipe(
-                                first(c => c.id == id),
+                                filter(c => c.id == id),
+                                take(1),
                                 timeout(200),
                                 concatMap(c => c.event$.pipe(extract('Error'))),
                                 pullAll())

@@ -1,7 +1,7 @@
 import { Model } from "./evaluable";
 import { Observable, OperatorFunction, concat, empty, pipe, merge } from "rxjs";
-import { share, withLatestFrom, concatMap, map, toArray, groupBy, concatAll, flatMap, filter, exhaustMap, startWith, takeWhile, takeUntil, zip, count } from "rxjs/operators";
-import { reduceToDict, tup, Dict, propsToArray, scanToArray, skipAll, log, logVal } from "../utils";
+import { share, withLatestFrom, concatMap, map, toArray, groupBy, concatAll, flatMap, filter, exhaustMap, startWith, takeWhile, zip, count } from "rxjs/operators";
+import { reduceToDict, tup, Dict, propsToArray, scanToArray, skipAll } from "../utils";
 import { EvaluableEra } from "./evaluator";
 import { Era, Slice } from "./eraSlicer";
 import { Manifest } from "./signals";
@@ -61,10 +61,8 @@ const trackSlices =
             era.currSlice$.pipe(
                 scanToArray(),
                 startWith([] as Slice[]),
-                map(currSlices => ({
-                    era,
-                    slice$: concat(era.oldSlice$, currSlices)
-                })
+                map(currSlices => 
+                    ({ era, slice$: concat(era.oldSlice$, currSlices) })
             )))
     );
 
@@ -89,7 +87,7 @@ export const committer =
                                         map(r => tup(g$.key, r)))),
                         reduceToDict(),
                         filter(data => propsToArray(data).length > 0),      //if the slices are empty, then this will get trapped!!!
-                        
+
                         zip(slice$.pipe(count())),                        
                         map(([data, sliceCount]) => ({                                      //will end up waiting for confirmation that never comes,
                             id,                                             //as commit nevermade (rightfully)
@@ -98,6 +96,7 @@ export const committer =
                             era,
                             event$: empty()
                         })),                        
+
                         pusher(blockStore, manifestStore))
                 )),
             share()

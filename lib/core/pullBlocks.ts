@@ -1,11 +1,10 @@
 import { Observable, OperatorFunction, pipe, from, empty } from "rxjs";
 import { LogRef } from "./evaluable";
 import { Block } from "../bits";
-import { map, concatMap, scan, concatAll, defaultIfEmpty, tap } from "rxjs/operators";
+import { map, concatMap, scan, concatAll, defaultIfEmpty } from "rxjs/operators";
 import { Manifest, emptyManifest } from "./signals";
-import { Dict, logVal, demux } from "../utils";
+import { Dict, demux } from "../utils";
 import { BlockStore } from "./BlockStore";
-import { inspect } from "util";
 
 export type BlockRef = string
 
@@ -32,7 +31,7 @@ export const pullBlocks =
                 (prev$, manifest) => 
                     prev$.pipe(
                         defaultIfEmpty({}),
-                        map(prev => ({
+                        map(() => ({
                             data: {},
                             manifest, 
                             load: (blockRef: BlockRef) => (logRef: LogRef) => {

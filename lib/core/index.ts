@@ -6,7 +6,7 @@ import { committer, DoCommit, Commit, Committed } from "./committer";
 import { Observable, Subject, merge, of } from "rxjs";
 import { pullManifests } from "./pullManifests";
 import { createViewer } from "./viewer";
-import { demux as demux, pipeTo, logVal } from "../utils";
+import { demux as demux, pipeTo } from "../utils";
 import { evaluateBlocks } from "./evaluateBlocks";
 import { evaluator, EvaluableEra } from "./evaluator";
 import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
@@ -36,7 +36,7 @@ export const createCore =
     doReset$ = completeOnClose(doReset$);
     doCommit$ = completeOnClose(doCommit$);
     
-//    error$.subscribe(err => console.error(err));
+    // error$.subscribe(err => console.error(err));
 
     const epoch$ = merge<Epoch>(
                     of({ manifest: emptyManifest }),
@@ -58,7 +58,7 @@ export const createCore =
     const reset$ = doReset$.pipe(mapTo(doReset()));
 
     const era$ = evalEpoch$.pipe(
-                    eraSlicer(reset$, ripple$),
+                    eraSlicer(reset$, ripple$),                    
                     evaluator(model),   //would be nice if this were part of the interior scan(?)
                     shareReplay(1));
 
