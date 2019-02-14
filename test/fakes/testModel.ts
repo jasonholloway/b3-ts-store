@@ -1,4 +1,6 @@
 import { declareUpdate } from "../../lib/utils";
+import { Model } from "../../lib/core/evaluable";
+import { Log } from "../../lib/LogSpace";
 
 
 const logModel = {
@@ -26,6 +28,18 @@ export class TestModel {
 
         test: logModel2,
         hello: logModel2
+    }
+
+    //a derivation will select by type
+    //we want typed logs, instead of singular ones
+    //before we can specify derivations
+
+    //so the derivation will occur on staging from a well-known, exposed log
+    //
+    //
+    
+    derivations = {
+
     }
 }
 

@@ -40,9 +40,15 @@ more data would be made more available, in its natural structure
 
 -----------------------------------------------
 
+*LogSpaces*
 
+should have constructors for log proxies, which will wire up followers properly
 
+hmm, followers should specify what they follow: it isn't up to the followed to do so
 
+this means that each individual Log should be wired up appropriately on summoning
+
+the LogSpace must do this - the underlying storage doesn't give two hoots about it, like
 
 
 

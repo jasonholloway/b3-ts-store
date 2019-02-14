@@ -1,16 +1,14 @@
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import FakeManifestStore from "./fakes/FakeManifestStore";
-import { propsToArray, logComplete } from "../lib/utils";
+import { propsToArray } from "../lib/utils";
 import { addUp, TestModel } from "./fakes/testModel";
 import { LogSpace, createLogSpace, Log } from "../lib/LogSpace";
 import { KnownLogs } from "../lib/core/evaluable";
 import { pause } from "./utils";
 import { Observable } from "rxjs";
-import { Commit } from "../lib/core/committer";
 import { pullAll } from "../lib/core/eraSlicer";
-import { first, timeout, take } from "rxjs/operators";
+import { first, timeout } from "rxjs/operators";
 import { gather } from "./helpers";
-import { inspect } from "util";
 
 jest.setTimeout(400);
 
@@ -24,18 +22,12 @@ describe('logSpace', () => {
     let blockStore: FakeBlockStore;
     let manifestStore: FakeManifestStore;
     
-    let error$: Observable<Error>
-    let commit$: Observable<Commit>
-
     beforeEach(async () => {
         blockStore = new FakeBlockStore();
         manifestStore = new FakeManifestStore();
 
         space = createLogSpace(model, manifestStore, blockStore);
         log = space.getLog('test');
-        
-        error$ = space.error$.pipe(pullAll());
-        commit$ = space.commit$.pipe(pullAll());
     })
     
     afterEach(complete);
@@ -176,7 +168,7 @@ describe('logSpace', () => {
             })
 
             it('stores block', async () => {
-                const [[_, block]] = propsToArray(blockStore.blocks);
+                const [[, block]] = propsToArray(blockStore.blocks);
                 
                 expect(block[log.ref]).toEqual([ 
                     ['ADD', '4'], 
