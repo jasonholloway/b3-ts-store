@@ -1,4 +1,3 @@
-import { Model, KnownLogs, KnownAggr } from "./evaluable";
 import { shareReplay, mapTo, concatMap, map, flatMap, takeUntil } from "rxjs/operators";
 import { doReset, emptyManifest } from "./signals";
 import { pullBlocks as pullBlocks } from "./pullBlocks";
@@ -12,6 +11,7 @@ import { evaluator, EvaluableEra } from "./evaluator";
 import { eraSlicer, Ripple, Epoch } from "./eraSlicer";
 import { ManifestStore } from "./ManifestStore";
 import { BlockStore } from "./BlockStore";
+import { Model, KnownLogs, KnownAggr } from "../model";
 
 
 export interface Core<M extends Model> {

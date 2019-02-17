@@ -1,6 +1,5 @@
 import { Subject, Observable, empty, of, interval, concat } from "rxjs";
 import { tup, extract } from "./utils";
-import { Model, KnownLogs, KnownAggr } from "./core/evaluable";
 import { createCore } from "./core";
 import { DoCommit, Commit } from "./core/committer";
 import { Ripple, pullAll } from "./core/eraSlicer";
@@ -8,6 +7,7 @@ import uuid from 'uuid';
 import { concatMap, timeout, first, filter, take } from "rxjs/operators";
 import { ManifestStore } from "./core/ManifestStore";
 import { BlockStore } from "./core/BlockStore";
+import { Model, KnownLogs, KnownAggr } from "./model";
 
 export interface LogSpace<M extends Model> {
     getLog<K extends KnownLogs<M>, V extends KnownAggr<M, K>>(key: K): Log<M, K, V>,

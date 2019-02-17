@@ -1,8 +1,6 @@
 import { Subject, from, of } from "rxjs";
 import { Dict, propsToArray, tup } from "../lib/utils";
 import { map, concatMap, groupBy, startWith } from "rxjs/operators";
-import { KnownLogs } from "../lib/core/evaluable";
-import { TestModel } from "./fakes/testModel";
 import { DoCommit } from "../lib/core/committer";
 import { Viewer, createViewer } from "../lib/core/viewer";
 import FakeBlockStore from "./fakes/FakeBlockStore";
@@ -11,15 +9,15 @@ import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator } from "../lib/core/evaluator";
 import { gather } from "./helpers";
 import { Manifest, Signal, emptyManifest, refreshEra } from "../lib/core/signals";
-import { Ripple, pullAll, eraSlicer, newEpoch } from "../lib/core/eraSlicer";
+import { Ripple, pullAll, eraSlicer } from "../lib/core/eraSlicer";
+import { testModel as model } from "./fakes/testModel";
+import { KnownLogs } from "../lib/model";
 
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
 
 describe('viewer', () => {
-
-    const model = new TestModel();
 
     let blockStore: FakeBlockStore
 
@@ -28,7 +26,7 @@ describe('viewer', () => {
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
-    let view: Viewer<TestModel>
+    let view: Viewer<typeof model>
     
     beforeEach(() => {
         blockStore = new FakeBlockStore();
@@ -113,12 +111,12 @@ describe('viewer', () => {
     })
 
 
-    function getView(ref: KnownLogs<TestModel>) {
+    function getView(ref: KnownLogs<typeof model>) {
         return gather(view(ref));
     }
 
 
-    async function expectViews(ref: KnownLogs<TestModel>, expected: any[]) {        
+    async function expectViews(ref: KnownLogs<typeof model>, expected: any[]) {        
         complete();
         expect(await getView(ref)).toEqual(expected);
     }

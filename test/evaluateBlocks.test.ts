@@ -1,6 +1,5 @@
 import { Subject, Observable } from "rxjs";
 import { startWith } from "rxjs/operators";
-import { TestModel } from "./fakes/testModel";
 import { Manifest } from "../lib/core/signals";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
@@ -8,15 +7,14 @@ import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { Evaluable } from "../lib/core/evaluable";
 import { final, gather } from "./helpers";
 import { pullAll } from "../lib/core/eraSlicer";
+import { testModel } from "./fakes/testModel";
 
 
 describe('evaluateBlocks', () => {
 
-    const model = new TestModel();
-
     let blockStore: FakeBlockStore
     let manifest$: Subject<Manifest>
-    let frame$: Observable<Evaluable<TestModel>>
+    let frame$: Observable<Evaluable<typeof testModel>>
     let manifest: Manifest;
 
     beforeEach(() => {
@@ -49,7 +47,7 @@ describe('evaluateBlocks', () => {
         frame$ = manifest$.pipe(
                     startWith(manifest),
                     pullBlocks(blockStore),
-                    evaluateBlocks(model),
+                    evaluateBlocks(testModel),
                     pullAll());
     })
 

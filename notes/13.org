@@ -50,9 +50,77 @@ this means that each individual Log should be wired up appropriately on summonin
 
 the LogSpace must do this - the underlying storage doesn't give two hoots about it, like
 
+---------------------------------------
 
+so the question is then, on staging an update, do we need to know the current aggregated state?
 
+i'd say, actually, no - we might just be enqueuing little self-consistent atoms that don't invalidate each other
 
+in which case, there can be no requirement for pre-loading, as everything is always committable
+similarly, when building indices and projections, we shouldn't always require the previous projection to be in place (ie thru expensive loading)
+
+if there are previous updates to blot out, then this should be done at the compaction phase
+
+---------------------------------------
+
+so ripples should be projected straight off, without loading of prior aggregations:
+if a product has been put, it has been put...
+
+but then the onus is on the front-end to ensure the user has staged new updates based upon the latest version of the past
+and if the underlying ground can move and rebase put updates, then i can't see how we can enforce this
+
+whether to load previous aggregations is a question for the particular LogModel
+
+as an update is placed, then it seems there should be some check of consistency...
+and any such check of consistency can onlybe against the aggregated state of the log (actually, it can be against the state of /any/ log, as all is in series)
+
+in checking whether a commit is ok, or rather, if staging is ok, or anything really...
+then each logModel is to have an opportunity to check itself, by asynchronously loading the present state of anything it likes
+and so, cross-log constraints will be possible: eg can't delete category if products are in it
+
+---------------------------------------
+
+how about - a reference to another log must exist for it to be committed
+(but all references exist, whether they've been updated or not)
+
+or, a product must have a category
+this should only be enforced though over the updates we are currently staging
+if the product doesn't have a category and was committed previously,
+then a simple update to correct its name shouldn't be rejected
+
+so there'd be an AddCategory update - but how could we stop products /not having/ a category
+
+easily: by loading the aggregation up front (if we wanted to)
+
+----------------------------------------
+
+this flexibility would be nice: then derivations could opt out of expensive consistency checking, while domain data could be checked as we wished
+
+so a LogModel would have a property that streamed back errors based on its latest state
+and - it could potentially access other logs too
+
+-------------------
+
+staged updates could show errors then, as they sit there
+
+-----------------------------
+
+but, not only do we want errors arising from staging to emerge, but we want the initial impule to be rejected if necessary
+i can imagine a kind of secondary interface, a /tryStage/ method that would return false if errors arose...
+
+but really, for such imperative actions, such clickings on a button, we want the update to be immediately published and endorsed, not just /staged/ but /committed/
+
+really these kind of updates are badly suited to this log scheme
+though with some retrying and auto-rebasing it could still work under contention without too much thrashing
+(logs would be better split up however)
+
+------------------------------
+
+*PLAN FOR TODAY*
+
+test for projection
+- need source logModel
+- and target logModel
 
 
 

@@ -1,7 +1,6 @@
 import { declareUpdate } from "../../lib/utils";
-import { Model } from "../../lib/core/evaluable";
-import { Log } from "../../lib/LogSpace";
-
+import { empty, of } from "rxjs";
+import { ModelBuilder } from '../../lib/model'
 
 const logModel = {
     zero: '',
@@ -9,40 +8,29 @@ const logModel = {
         ac == '' ? v.toString() : (ac + ',' + v)
 };
 
+
+
+export const addUp = declareUpdate('ADD').withData<string>();
+export type AddUp = ReturnType<typeof addUp>
+
 const logModel2 = {
     zero: '',
     add: (ac: string, [_, body]: AddUp) =>
         ac == '' ? body : (ac + ':' + body)
 }
 
-
-export class TestModel {
-    logs = {
-        a: logModel,
-        b: logModel,
-
-        myLog: logModel,
-        myLog2: logModel,
-        myLog3: logModel,
-        myLog4: logModel,
-
-        test: logModel2,
-        hello: logModel2
-    }
-
-    //a derivation will select by type
-    //we want typed logs, instead of singular ones
-    //before we can specify derivations
-
-    //so the derivation will occur on staging from a well-known, exposed log
-    //
-    //
-    
-    derivations = {
-
-    }
-}
-
-
-export const addUp = declareUpdate('ADD').withData<string>();
-export type AddUp = ReturnType<typeof addUp>
+export const testModel = 
+    ModelBuilder.default
+        .log('a', logModel)
+        .log('b', logModel)
+        .log('myLog', logModel)
+        .log('myLog2', logModel)
+        .log('myLog3', logModel)
+        .log('myLog4', logModel)
+        .log('test', logModel2)
+        .log('hello', logModel2)
+        .log('derivable', logModel)
+        .log('derived', logModel)
+        .derive('a', n => empty())
+        .derive('b', u => of('poo'))
+        .done();

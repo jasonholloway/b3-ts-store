@@ -1,7 +1,6 @@
 import { Subject, from, pipe, Observable, MonoTypeOperatorFunction, empty } from "rxjs";
 import { Dict, propsToArray, tup, valsToArray as valsToArray, extract } from "../lib/utils";
 import { map, concatMap, groupBy, pluck } from "rxjs/operators";
-import { TestModel } from "./fakes/testModel";
 import { DoCommit, Commit } from "../lib/core/committer";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import FakeBlockStore from "./fakes/FakeBlockStore";
@@ -10,14 +9,13 @@ import { Core, createCore } from "../lib/core";
 import { EvaluableEra } from "../lib/core/evaluator";
 import { gather } from "./helpers";
 import { pullAll, Ripple } from "../lib/core/eraSlicer";
+import { testModel } from "./fakes/testModel";
 
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
 
 describe('core', () => {
-
-    const model = new TestModel();
 
     let manifestStore: FakeManifestStore
     let blockStore: FakeBlockStore
@@ -27,10 +25,10 @@ describe('core', () => {
     let doReset$: Subject<void>
     let doCommit$: Subject<DoCommit>
 
-    let era$: Observable<EvaluableEra<TestModel>>
+    let era$: Observable<EvaluableEra<typeof testModel>>
     let commit$: Observable<Commit>
 
-    let core: Core<TestModel>
+    let core: Core<typeof testModel>
 
     let setupStores: () => void;
     
@@ -51,7 +49,7 @@ describe('core', () => {
         doReset$ = new Subject<void>();
         doCommit$ = new Subject<DoCommit>();
 
-        core = createCore(model, blockStore, manifestStore)(ripple$, doPull$, doReset$, doCommit$);
+        core = createCore(testModel, blockStore, manifestStore)(ripple$, doPull$, doReset$, doCommit$);
 
         era$ = core.era$.pipe(pullAll());
         commit$ = core.commit$.pipe(pullAllCommits());

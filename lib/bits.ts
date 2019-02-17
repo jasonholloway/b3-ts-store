@@ -1,15 +1,5 @@
 import { Observable } from "rxjs";
 
-export function declareLogModel<U extends AnyUpdate, D>(m: Model<U, D>): Model<U, D> {
-    return m;
-}
-
-export type Model<U, D> = {
-    zero: D,
-    add(data: D, update: U): D
-}
-
-
 export interface Log<U extends AnyUpdate, V> {
     key: string,
     stage(update: U): void;

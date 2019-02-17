@@ -1,27 +1,25 @@
 import { Subject, from, Observable, of } from "rxjs";
 import { Dict, tup, propsToArray } from "../lib/utils";
 import { map, concatMap, groupBy, toArray, startWith } from "rxjs/operators";
-import { TestModel } from "./fakes/testModel";
 import { setThreshold, Signal, emptyManifest } from "../lib/core/signals";
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { evaluator, EvaluableEra } from "../lib/core/evaluator";
-import { KnownLogs } from "../lib/core/evaluable";
 import { eraSlicer, Ripple, pullAllSlices, Epoch } from "../lib/core/eraSlicer";
 import { pause } from "./utils";
+import { testModel as model } from "./fakes/testModel";
+import { KnownLogs } from "../lib/model";
 
 
 describe('evaluator', () => {
-
-    const model = new TestModel();
 
     let epoch$: Subject<Epoch>
     let signal$: Subject<Signal>
     let ripple$: Subject<Ripple<number>>
     let blockStore: FakeBlockStore
 
-    let era$: Observable<EvaluableEra<TestModel>>
+    let era$: Observable<EvaluableEra<typeof model>>
 
     beforeEach(() => {
         blockStore = new FakeBlockStore();
@@ -209,7 +207,7 @@ describe('evaluator', () => {
     })
 
 
-    function view(ref: KnownLogs<TestModel>): Promise<any[]> {
+    function view(ref: KnownLogs<typeof model>): Promise<any[]> {
         return era$.pipe(
                 concatMap(era => era.evaluate(ref)),
                 toArray())

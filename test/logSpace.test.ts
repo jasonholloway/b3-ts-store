@@ -1,24 +1,22 @@
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import FakeManifestStore from "./fakes/FakeManifestStore";
 import { propsToArray } from "../lib/utils";
-import { addUp, TestModel } from "./fakes/testModel";
+import { addUp, testModel } from "./fakes/testModel";
 import { LogSpace, createLogSpace, Log } from "../lib/LogSpace";
-import { KnownLogs } from "../lib/core/evaluable";
 import { pause } from "./utils";
 import { Observable } from "rxjs";
 import { pullAll } from "../lib/core/eraSlicer";
 import { first, timeout } from "rxjs/operators";
 import { gather } from "./helpers";
+import { KnownLogs } from "../lib/model";
 
 jest.setTimeout(400);
 
 describe('logSpace', () => {
 
-    const model = new TestModel();
+    let space: LogSpace<typeof testModel>;
 
-    let space: LogSpace<TestModel>;
-
-    let log: Log<TestModel, any, string>;
+    let log: Log<typeof testModel, any, string>;
     let blockStore: FakeBlockStore;
     let manifestStore: FakeManifestStore;
     
@@ -26,7 +24,7 @@ describe('logSpace', () => {
         blockStore = new FakeBlockStore();
         manifestStore = new FakeManifestStore();
 
-        space = createLogSpace(model, manifestStore, blockStore);
+        space = createLogSpace(testModel, manifestStore, blockStore);
         log = space.getLog('test');
     })
     
@@ -52,6 +50,17 @@ describe('logSpace', () => {
             .toBe('123:456');
     })
 
+    it('derivations updated', async () => {
+        const derivable = getLog('derivable');
+        const derived = getLog('derived');
+
+        derivable.stage('wibble');
+        derivable.stage('parp');
+        derivable.stage('wooo!');
+
+        const derivedView = await latest(derived.view$);
+        expect(derivedView).toEqual('wpw');
+    })
 
     describe('logSpace commits and resets', () => {
 
@@ -207,7 +216,7 @@ describe('logSpace', () => {
             })
 
             it('full view summoned', async () => {
-                const space2 = createLogSpace(model, manifestStore, blockStore);
+                const space2 = createLogSpace(testModel, manifestStore, blockStore);
                 const log2 = space2.getLog(log.ref);
                 
                 expect(await view(log2))
@@ -270,7 +279,7 @@ describe('logSpace', () => {
 
 
 
-    function getLog<K extends KnownLogs<TestModel>>(logRef?: K) {
+    function getLog<K extends KnownLogs<typeof testModel>>(logRef?: K) {
         return space.getLog(logRef || 'test');
     }
 
@@ -278,7 +287,7 @@ describe('logSpace', () => {
         space.complete();
     }
 
-    function view<V>(log: Log<TestModel, any, V>) {
+    function view<V>(log: Log<typeof testModel, any, V>) {
         return latest(log.view$);
     }
 

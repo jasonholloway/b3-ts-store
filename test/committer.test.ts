@@ -1,7 +1,6 @@
 import { Subject, from, pipe, Observable, GroupedObservable, MonoTypeOperatorFunction, BehaviorSubject, empty, of } from "rxjs";
 import { Dict, propsToArray, tup } from "../lib/utils";
 import { map, concatMap, groupBy, toArray, flatMap } from "rxjs/operators";
-import { TestModel } from "./fakes/testModel";
 import { DoCommit, committer, Commit } from "../lib/core/committer";
 import { emptyManifest, Manifest } from "../lib/core/signals";
 import { pause } from "./utils";
@@ -12,14 +11,13 @@ import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
 import { gather } from "./helpers";
 import FakeManifestStore from "./fakes/FakeManifestStore";
+import { testModel } from "./fakes/testModel";
 
 type TestRipple = Dict<number[]>
 
 jest.setTimeout(400);
 
 describe('committer', () => {
-
-    const model = new TestModel();
 
     let blockStore: FakeBlockStore;
     let manifestStore: FakeManifestStore;
@@ -28,7 +26,7 @@ describe('committer', () => {
     let ripple$: Subject<Ripple<number>>
     let doCommit$: Subject<DoCommit>
 
-    let era$: Observable<EvaluableEra<TestModel>>
+    let era$: Observable<EvaluableEra<typeof testModel>>
     let commit$: Observable<Commit>
     
     beforeEach(() => {
@@ -43,13 +41,13 @@ describe('committer', () => {
                         concatMap(manifest => 
                             of(manifest).pipe(
                                 pullBlocks(new FakeBlockStore()),
-                                evaluateBlocks(model),
+                                evaluateBlocks(testModel),
                                 map(evaluable => ({ manifest, ...evaluable }))
                             )));
 
         era$ = epoch$.pipe(
                 eraSlicer(empty(), ripple$),
-                evaluator(model),
+                evaluator(testModel),
                 pullAll());
 
         commit$ = doCommit$.pipe(

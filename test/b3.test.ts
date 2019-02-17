@@ -1,5 +1,4 @@
 import { declareUpdate } from '../lib/utils';
-import { declareLogModel } from '../lib/bits';
 
 
 describe('b3 model', () => {

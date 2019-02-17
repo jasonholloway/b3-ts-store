@@ -1,8 +1,9 @@
 import { pipe, OperatorFunction, empty, of } from "rxjs";
 import { scan, concatMap, map, filter, defaultIfEmpty, startWith, single, distinct, takeLast, withLatestFrom } from "rxjs/operators";
-import { Evaluable, Model, KnownLogs } from "./evaluable";
+import { Evaluable } from "./evaluable";
 import { tup, concatScan } from "../utils";
 import { Era, Ripple, Slice } from "./eraSlicer";
+import { Model, KnownLogs } from "../model";
 
 
 export interface EvaluableEra<M extends Model> 

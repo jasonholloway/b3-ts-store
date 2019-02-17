@@ -6,15 +6,13 @@ import { emptyManifest, Signal, Manifest, setThreshold, refreshEra, doReset } fr
 import { pullBlocks } from "../lib/core/pullBlocks";
 import FakeBlockStore from "./fakes/FakeBlockStore";
 import { evaluateBlocks } from "../lib/core/evaluateBlocks";
-import { TestModel } from "./fakes/testModel";
 import { pause } from "./utils";
 import { emptyEvaluable } from "../lib/core/evaluable";
+import { testModel } from "./fakes/testModel";
 
 jest.setTimeout(500);
 
 describe('eraSlicer', () => {
-
-    let model = new TestModel();
 
     let blockStore: FakeBlockStore;
 
@@ -35,7 +33,7 @@ describe('eraSlicer', () => {
                         concatMap(manifest => 
                             of(manifest).pipe(
                                 pullBlocks(blockStore),
-                                evaluateBlocks(model),
+                                evaluateBlocks(testModel),
                                 map(evaluable => ({ manifest, ...evaluable }))
                             )));
 
@@ -231,7 +229,7 @@ describe('eraSlicer as specifier', () => {
                         concatMap(manifest => 
                             of(manifest).pipe(
                                 pullBlocks(new FakeBlockStore()),
-                                evaluateBlocks(new TestModel()),
+                                evaluateBlocks(testModel),
                                 map(evaluable => ({ manifest, ...evaluable }))
                             )));
                             

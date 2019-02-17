@@ -1,8 +1,8 @@
-import { Model, KnownLogs, KnownAggr } from "./evaluable";
 import { Observable } from "rxjs";
 import { concatMap } from "rxjs/operators";
 import { EvaluableEra } from "./evaluator";
 import { pullReplay } from "./eraSlicer";
+import { Model, KnownLogs, KnownAggr } from "../model";
 
 export const createViewer =
     <M extends Model>
